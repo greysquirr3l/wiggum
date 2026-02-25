@@ -1,0 +1,57 @@
+[project]
+name = "example-project"
+description = "An example project to test wiggum scaffold generation"
+language = "rust"
+path = "/tmp/example-project"
+architecture = "hexagonal"
+
+[orchestrator]
+persona = "You are a senior Rust software engineer"
+rules = [
+    "Keep domain crate free of I/O dependencies",
+    "Rust edition 2024, stable toolchain",
+]
+
+[[phases]]
+name = "Workspace Scaffold"
+order = 1
+
+[[phases.tasks]]
+slug = "workspace-scaffold"
+title = "Cargo workspace + crates + CI pipeline"
+goal = "Set up the project structure with stub modules and CI"
+depends_on = []
+hints = ["Create a 3-crate workspace: domain, infra, tui"]
+test_hints = ["Verify cargo build --workspace succeeds"]
+
+[[phases]]
+name = "Domain Model"
+order = 2
+
+[[phases.tasks]]
+slug = "domain-model"
+title = "Entities, value objects, port traits, error types"
+goal = "Define the pure domain layer with no I/O dependencies"
+depends_on = ["workspace-scaffold"]
+
+[[phases.tasks]]
+slug = "domain-services"
+title = "Domain service traits and implementations"
+goal = "Implement core business logic services"
+depends_on = ["domain-model"]
+
+[[phases]]
+name = "Infrastructure"
+order = 3
+
+[[phases.tasks]]
+slug = "http-client"
+title = "HTTP client adapter"
+goal = "Implement the HTTP client adapter for API communication"
+depends_on = ["domain-model"]
+
+[[phases.tasks]]
+slug = "persistence"
+title = "Persistence adapter"
+goal = "Implement the persistence adapter for data storage"
+depends_on = ["domain-model"]

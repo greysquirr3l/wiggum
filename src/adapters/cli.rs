@@ -1,0 +1,110 @@
+use std::path::PathBuf;
+
+use clap::{Parser, Subcommand};
+
+#[derive(Debug, Parser)]
+#[command(
+    name = "wiggum",
+    about = "AI orchestration scaffold generator for the Ralph Wiggum loop",
+    version
+)]
+pub struct Cli {
+    #[command(subcommand)]
+    pub command: Command,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum Command {
+    /// Generate all artifacts from a plan file
+    Generate {
+        /// Path to the plan TOML file
+        plan: PathBuf,
+
+        /// Override the output directory (defaults to project.path from the plan)
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+
+        /// Overwrite existing files without prompting
+        #[arg(long)]
+        force: bool,
+
+        /// Preview what would be generated without writing files
+        #[arg(long)]
+        dry_run: bool,
+
+        /// Show estimated token counts for generated artifacts
+        #[arg(long)]
+        estimate_tokens: bool,
+
+        /// Skip AGENTS.md generation
+        #[arg(long)]
+        skip_agents_md: bool,
+    },
+
+    /// Validate a plan file without generating artifacts
+    Validate {
+        /// Path to the plan TOML file
+        plan: PathBuf,
+
+        /// Run lint rules to check plan quality
+        #[arg(long)]
+        lint: bool,
+    },
+
+    /// Interactively create a new plan file
+    Init {
+        /// Path to write the generated plan TOML
+        #[arg(short, long)]
+        plan: Option<PathBuf>,
+    },
+
+    /// Add a task to an existing plan file
+    AddTask {
+        /// Path to the plan TOML file
+        plan: PathBuf,
+    },
+
+    /// Start the MCP server (stdio transport)
+    Serve {
+        /// Start in MCP mode
+        #[arg(long)]
+        mcp: bool,
+    },
+
+    /// Generate a post-execution report from PROGRESS.md
+    Report {
+        /// Path to PROGRESS.md (default: ./PROGRESS.md)
+        #[arg(long, default_value = "PROGRESS.md")]
+        progress: PathBuf,
+
+        /// Project directory for git timeline (optional)
+        #[arg(long)]
+        project_dir: Option<PathBuf>,
+    },
+
+    /// Watch PROGRESS.md for live progress updates
+    Watch {
+        /// Path to PROGRESS.md (default: ./PROGRESS.md)
+        #[arg(long, default_value = "PROGRESS.md")]
+        progress: PathBuf,
+
+        /// Poll interval in milliseconds
+        #[arg(long, default_value = "1000")]
+        poll_ms: u64,
+    },
+
+    /// Bootstrap a plan from an existing project directory
+    Bootstrap {
+        /// Path to the project directory (defaults to current directory)
+        #[arg(default_value = ".")]
+        path: PathBuf,
+
+        /// Path to write the generated plan TOML (defaults to <path>/plan.toml)
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+
+        /// Overwrite existing plan file without prompting
+        #[arg(long)]
+        force: bool,
+    },
+}

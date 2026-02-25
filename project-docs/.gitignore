@@ -1,0 +1,8 @@
+# Ignore everything in project-docs (dev/reference material)
+*
+
+# But track mdbook source and config
+!.gitignore
+!book.toml
+!docs_source/
+!docs_source/**

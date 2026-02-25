@@ -1,0 +1,13 @@
+[book]
+title = "Wiggum Documentation"
+description = "AI orchestration scaffold generator for the Ralph Wiggum loop"
+authors = ["greysquirr3l"]
+language = "en"
+src = "docs_source"
+
+[build]
+build-dir = "../docs"
+
+[output.html]
+git-repository-url = "https://github.com/greysquirr3l/wiggum"
+edit-url-template = "https://github.com/greysquirr3l/wiggum/edit/main/project-docs/docs_source/{path}"

@@ -1,0 +1,53 @@
+# Rust
+/target/
+**/*.rs.bk
+
+# Cargo
+Cargo.lock
+!Cargo.lock
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# IDEs and editors
+.vscode/*.log
+*.swp
+*.swo
+*~
+.idea/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# mdBook build output
+/docs/
+
+# AI / code-graph tools
+.coraline/
+.codegraph/
+.serena/
+
+# MCP config (machine-local paths)
+.mcp.json
+.vscode/mcp.json
+
+# VS Code settings (machine-specific)
+.vscode/settings.json
+
+# Wiggum generated output (from `wiggum generate`)
+# Un-ignore these if you want to track scaffolded artifacts
+PROGRESS.md
+IMPLEMENTATION_PLAN.md
+tasks/
+
+# Development reference docs (not shipped)
+docs/dev/
+reference/
+
