@@ -1,4 +1,5 @@
 pub mod agents_md;
+pub mod clean;
 pub mod orchestrator;
 pub mod plan_doc;
 pub mod progress;

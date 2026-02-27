@@ -62,6 +62,11 @@ fn main() {
             output,
             force,
         } => cmd_bootstrap(&path, output.as_deref(), force),
+        Command::Clean {
+            plan,
+            output,
+            dry_run,
+        } => cmd_clean(&plan, output.as_deref(), dry_run),
     };
 
     if let Err(e) = result {
@@ -262,5 +267,60 @@ fn cmd_bootstrap(
     force: bool,
 ) -> wiggum::error::Result<()> {
     bootstrap::run_bootstrap(project_path, output, force)?;
+    Ok(())
+}
+
+fn cmd_clean(
+    plan_path: &Path,
+    output_override: Option<&Path>,
+    dry_run: bool,
+) -> wiggum::error::Result<()> {
+    let fs = FsAdapter;
+    let toml_content = fs.read_plan(plan_path)?;
+    let plan = Plan::from_toml(&toml_content)?;
+
+    let project_path =
+        output_override.map_or_else(|| PathBuf::from(&plan.project.path), Path::to_path_buf);
+
+    if dry_run {
+        let targets = generation::clean::collect_targets(&plan, &project_path)?;
+        let existing: Vec<_> = targets.iter().filter(|p| p.exists()).collect();
+        if existing.is_empty() {
+            println!("Nothing to clean in {}", project_path.display());
+        } else {
+            println!("Dry run — would remove:\n");
+            for path in &existing {
+                let relative = path.strip_prefix(&project_path).unwrap_or(path);
+                if path.is_dir() {
+                    println!("  📁 {}/", relative.display());
+                } else {
+                    println!("  🗑  {}", relative.display());
+                }
+            }
+            println!(
+                "\n  Total: {} item(s) in {}",
+                existing.len(),
+                project_path.display()
+            );
+        }
+        return Ok(());
+    }
+
+    let removed = generation::clean::remove_artifacts(&plan, &project_path)?;
+
+    if removed.is_empty() {
+        println!("Nothing to clean in {}", project_path.display());
+    } else {
+        println!(
+            "🧹 Cleaned {} item(s) from {}",
+            removed.len(),
+            project_path.display()
+        );
+        for path in &removed {
+            let relative = path.strip_prefix(&project_path).unwrap_or(path);
+            println!("   ✕ {}", relative.display());
+        }
+    }
+
     Ok(())
 }

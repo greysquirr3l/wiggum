@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-02-26
+
+### Added
+
+- `wiggum clean` command to remove generated artifacts (`--dry-run` supported)
+
+## [0.1.0] - 2026-02-24
+
 ### Added
 
 - Interactive plan creation (`wiggum init`)
@@ -25,4 +33,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - VCS-aware reporting with git timeline
 - mdBook documentation site
 
-[Unreleased]: https://github.com/greysquirr3l/wiggum/compare/main...HEAD
+[Unreleased]: https://github.com/greysquirr3l/wiggum/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/greysquirr3l/wiggum/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/greysquirr3l/wiggum/releases/tag/v0.1.0

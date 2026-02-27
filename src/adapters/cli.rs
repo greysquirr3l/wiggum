@@ -107,4 +107,18 @@ pub enum Command {
         #[arg(long)]
         force: bool,
     },
+
+    /// Remove all wiggum-generated artifacts from a project
+    Clean {
+        /// Path to the plan TOML file
+        plan: PathBuf,
+
+        /// Override the target directory (defaults to project.path from the plan)
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+
+        /// Preview what would be removed without deleting anything
+        #[arg(long)]
+        dry_run: bool,
+    },
 }
