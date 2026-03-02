@@ -99,7 +99,7 @@ pub enum Command {
         #[arg(default_value = ".")]
         path: PathBuf,
 
-        /// Path to write the generated plan TOML (defaults to <path>/plan.toml)
+        /// Path to write the generated plan TOML (defaults to `<path>/plan.toml`)
         #[arg(short, long)]
         output: Option<PathBuf>,
 
