@@ -1,0 +1,250 @@
+# example-plan.toml — Kestrel: a lightweight webhook relay service
+#
+# This file is a reference example showing every supported field.
+# Start here, trim what you don't need, and fill in your own project details.
+#
+# Run:
+#   wiggum validate example-plan.toml
+#   wiggum generate example-plan.toml --dry-run
+#   wiggum generate example-plan.toml
+
+# ─── Project ──────────────────────────────────────────────────────────────────
+
+[project]
+name        = "kestrel"
+description = """
+Kestrel is a lightweight HTTP webhook relay service written in Rust.
+It receives inbound webhooks, validates HMAC-SHA256 signatures, persists
+events to a SQLite queue, and fans them out to one or more configurable
+downstream targets with automatic exponential-backoff retry on failure.
+"""
+language     = "rust"
+path         = "/path/to/kestrel"   # absolute path to the target project root
+architecture = "hexagonal"          # hexagonal | layered | modular | flat
+
+# ─── Preflight ────────────────────────────────────────────────────────────────
+# Commands run by every subagent before marking a task complete.
+# Language defaults are applied automatically; override them here if needed.
+
+[preflight]
+build = "cargo build --workspace"
+test  = "cargo test --workspace"
+lint  = "cargo clippy --workspace -- -D warnings"
+
+# ─── Orchestrator ─────────────────────────────────────────────────────────────
+# Controls the persona and rules baked into every generated subagent prompt.
+
+[orchestrator]
+persona  = "You are a senior Rust engineer specialising in async HTTP services and hexagonal architecture."
+strategy = "standard"   # standard | tdd | gsd
+rules = [
+    "Rust edition 2024, stable toolchain only — no nightly features.",
+    "Keep the domain module free of I/O dependencies (no tokio, no reqwest, no sqlx).",
+    "All error types use thiserror; no .unwrap() outside of tests.",
+    "HMAC secrets must never appear in log output at any log level.",
+    "Use sqlx with compile-time query macros; migrations live in migrations/.",
+    "Every public function must have at least one unit or integration test.",
+    "Use Coraline (coraline_* MCP tools) for code navigation when exploring the codebase.",
+]
+
+# ─── Phase 1: Workspace Scaffold ──────────────────────────────────────────────
+
+[[phases]]
+name  = "Workspace Scaffold"
+order = 1
+
+[[phases.tasks]]
+slug      = "workspace-scaffold"
+title     = "Cargo workspace, CI pipeline, and repo hygiene"
+goal      = "Bootstrap the project with a compilable stub workspace, GitHub Actions CI, and linting config."
+depends_on = []
+hints = [
+    "Single crate for now (src/lib.rs + src/main.rs); extract sub-crates only if clearly needed later.",
+    "Add deny.toml (cargo-deny) for supply-chain checks.",
+    "GitHub Actions: build + clippy + test on ubuntu-latest and macos-latest.",
+    "Use Rust edition 2024 in Cargo.toml.",
+]
+test_hints = [
+    "CI must pass: green build + clippy with -D warnings + cargo test.",
+]
+must_haves = [
+    "Cargo.toml with edition = \"2024\"",
+    ".github/workflows/ci.yml runs cargo build, clippy, and test",
+    "deny.toml present",
+]
+
+# ─── Phase 2: Domain Model ────────────────────────────────────────────────────
+
+[[phases]]
+name  = "Domain Model"
+order = 2
+
+[[phases.tasks]]
+slug      = "domain-types"
+title     = "Core entities, value objects, and port traits"
+goal      = "Define the pure domain layer: WebhookEvent, DeliveryTarget, RetryPolicy, and the port traits with no I/O dependencies."
+depends_on = ["workspace-scaffold"]
+hints = [
+    "WebhookEvent: id (Uuid), source (String), payload (Bytes), received_at (DateTime<Utc>), signature (Option<String>).",
+    "DeliveryTarget: id (Uuid), url (String), secret (Option<String>), retry_policy (RetryPolicy).",
+    "RetryPolicy: max_attempts (u8), backoff_base_ms (u64) — exponential jitter.",
+    "Port traits: EventStore (save/load), TargetStore (list), Dispatcher (dispatch).",
+    "No tokio, no reqwest, no sqlx in the domain module.",
+]
+test_hints = [
+    "Unit-test RetryPolicy::next_delay(attempt) for exponential backoff correctness.",
+    "Test that WebhookEvent rejects an empty source string.",
+]
+must_haves = [
+    "All domain types derive Serialize/Deserialize",
+    "Port traits are object-safe",
+    "Zero I/O dependencies in the domain module (enforced by a #![forbid(unsafe_code)] stub)",
+]
+
+[[phases.tasks]]
+slug      = "signature-validation"
+title     = "HMAC-SHA256 webhook signature validator"
+goal      = "Implement constant-time HMAC-SHA256 signature validation for incoming webhook payloads."
+depends_on = ["domain-types"]
+hints = [
+    "Use the hmac + sha2 crates; match GitHub-style X-Hub-Signature-256 header format (sha256=<hex>).",
+    "Use subtle::ConstantTimeEq for the comparison — never a plain == on secret material.",
+    "Expose as a pure function: validate_signature(secret: &[u8], payload: &[u8], header: &str) -> bool.",
+]
+test_hints = [
+    "Test: valid signature passes.",
+    "Test: tampered payload fails.",
+    "Test: wrong secret fails.",
+    "Test: missing header (empty string) returns false when a secret is configured.",
+]
+must_haves = [
+    "Constant-time comparison — no timing side-channel",
+    "Function is pure (no I/O, no side effects)",
+]
+
+# ─── Phase 3: HTTP Inbound Layer ──────────────────────────────────────────────
+
+[[phases]]
+name  = "HTTP Inbound Layer"
+order = 3
+
+[[phases.tasks]]
+slug      = "inbound-router"
+title     = "Axum router — POST /webhook and GET /healthz"
+goal      = "Stand up an Axum HTTP server that receives webhook POSTs, validates signatures, and hands events to the domain for persistence."
+depends_on = ["signature-validation"]
+hints = [
+    "Use axum 0.8.x with the tokio runtime.",
+    "POST /webhook — extract the raw body before any JSON parsing so the HMAC covers the exact bytes received; call validate_signature; persist via EventStore port.",
+    "GET /healthz — return 200 OK with {\"status\":\"ok\"} for load-balancer probes.",
+    "Return 400 for invalid signature, 500 for store errors (structured JSON error body in both cases).",
+    "App state holds Arc<dyn EventStore + Send + Sync> and the server config.",
+]
+test_hints = [
+    "Integration test: POST with a valid signature → 202 Accepted.",
+    "Integration test: POST with an invalid signature → 400 Bad Request.",
+    "Integration test: GET /healthz → 200 OK.",
+]
+must_haves = [
+    "Raw body read before JSON deserialization",
+    "Secrets never logged",
+    "Structured JSON error responses (not plain text)",
+]
+
+# ─── Phase 4: Outbound Dispatch ───────────────────────────────────────────────
+
+[[phases]]
+name  = "Outbound Dispatch"
+order = 4
+
+[[phases.tasks]]
+slug      = "http-dispatcher"
+title     = "reqwest-based outbound dispatcher with retry"
+goal      = "Implement the Dispatcher port using reqwest: POST events to downstream targets with exponential-backoff retry and delivery logging."
+depends_on = ["inbound-router"]
+hints = [
+    "Use reqwest with rustls-tls (no native-tls).",
+    "Respect RetryPolicy from the target config; log attempt number and final outcome at debug level.",
+    "On exhausted retries mark the delivery as failed in DeliveryLog.",
+    "Sign outbound requests with the target's secret (same HMAC-SHA256 scheme) so downstream can verify.",
+]
+test_hints = [
+    "Use wiremock to simulate a failing downstream — assert retry count matches the target's RetryPolicy.",
+    "Assert sign-then-verify round-trip: sign outbound payload, validate with the same secret.",
+]
+must_haves = [
+    "TLS via rustls, not native-tls",
+    "Retry count and final outcome persisted to DeliveryLog",
+    "Outbound requests signed with target secret",
+]
+
+[[phases.tasks]]
+slug      = "sqlite-adapter"
+title     = "SQLite EventStore and DeliveryLog adapter (sqlx)"
+goal      = "Implement the EventStore port and a DeliveryLog adapter backed by SQLite using sqlx with compile-time checked queries."
+depends_on = ["http-dispatcher"]
+hints = [
+    "Migrations in migrations/ using sqlx-cli format; run automatically on startup.",
+    "Tables: events (id, source, payload, received_at), deliveries (id, event_id, target_id, attempt, status, dispatched_at).",
+    "Use sqlx::query_as! macros for compile-time checking. DATABASE_URL must be set (use .env for dev).",
+    "Accept Arc<SqlitePool> through app state; expose via the EventStore trait impl.",
+]
+test_hints = [
+    "Use an in-memory SQLite DB (sqlite::memory:) in tests to avoid filesystem side-effects.",
+    "Test save-then-load round-trip for WebhookEvent.",
+    "Test that failed delivery status is recorded correctly.",
+]
+must_haves = [
+    "All SQL uses compile-time checked query macros",
+    "Migrations applied automatically at startup",
+    "In-memory test DB used in all adapter tests",
+]
+
+# ─── Phase 5: Config and CLI ──────────────────────────────────────────────────
+
+[[phases]]
+name  = "Config and CLI"
+order = 5
+
+[[phases.tasks]]
+slug      = "config-parsing"
+title     = "TOML config with environment-variable overrides"
+goal      = "Define and parse the application configuration from kestrel.toml with KESTREL_-prefixed environment variable overrides."
+depends_on = ["workspace-scaffold"]
+hints = [
+    "Config sections: [server] (host, port), [database] (url), [[targets]] (array of DeliveryTarget configs).",
+    "Use the figment crate for layered config (TOML file → env vars).",
+    "Env var prefix: KESTREL_ (e.g. KESTREL_SERVER_PORT=8080 overrides server.port).",
+    "Validate at load time: all target URLs must be https:// outside of dev/test mode.",
+]
+test_hints = [
+    "Test that KESTREL_SERVER_PORT env var overrides the file value.",
+    "Test that a non-HTTPS target URL fails validation outside dev mode.",
+    "Test that missing required fields produce clear error messages.",
+]
+must_haves = [
+    "Config validated at startup — process exits with a clear error message if invalid",
+    "No secrets in the committed default config file",
+]
+
+[[phases.tasks]]
+slug      = "cli-entrypoint"
+title     = "clap CLI — serve, validate-config, version"
+goal      = "Wire the application entry point with clap: subcommands for serve, validate-config, and version output."
+depends_on = ["config-parsing", "inbound-router", "sqlite-adapter"]
+hints = [
+    "Use the clap derive API.",
+    "serve: load config, run migrations, bind the Axum server.",
+    "validate-config [--config <path>]: parse and validate config then exit 0 or 1 with a clear error.",
+    "version: print semver + git commit SHA (embed with env!(\"CARGO_PKG_VERSION\") and a build.rs SHA).",
+    "Structured JSON logging via tracing + tracing-subscriber; default level INFO, override with RUST_LOG.",
+]
+test_hints = [
+    "CLI integration test: kestrel validate-config --config tests/fixtures/valid.toml → exit 0.",
+    "CLI integration test: kestrel validate-config --config tests/fixtures/invalid.toml → exit 1 with message.",
+]
+must_haves = [
+    "All three subcommands present and functional",
+    "Startup log line includes version and bound address",
+    "RUST_LOG respected",
+]

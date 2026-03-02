@@ -50,4 +50,5 @@ tasks/
 # Development reference docs (not shipped)
 docs/dev/
 reference/
+!reference/example-plan.toml
 
