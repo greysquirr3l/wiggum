@@ -83,6 +83,10 @@ Monitor progress in a separate terminal with:
 wiggum watch
 ```
 
+## Example plan
+
+See [`reference/example-plan.toml`](reference/example-plan.toml) for a fully annotated plan covering all supported fields — project metadata, preflight commands, orchestrator persona and rules, multiple phases with dependency wiring, and per-task hints, test hints, and must-haves.
+
 ## Language support
 
 Rust, Go, TypeScript, Python, Java, C#, Kotlin, Swift, Ruby, Elixir — each with idiomatic defaults for build, test, and lint commands.
