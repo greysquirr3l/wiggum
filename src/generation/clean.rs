@@ -104,13 +104,15 @@ mod tests {
     use tempfile::TempDir;
 
     fn sample_plan(path: &str) -> Plan {
+        // Replace backslashes with forward slashes for cross-platform TOML compatibility
+        let normalized_path = path.replace('\\', "/");
         let toml = format!(
             r#"
 [project]
 name = "test-project"
 description = "test"
 language = "rust"
-path = "{path}"
+path = "{normalized_path}"
 
 [[phases]]
 name = "Phase 1"
