@@ -4,9 +4,18 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to release (e.g. v0.3.0)"
+        required: true
+        type: string
 
 env:
   CARGO_TERM_COLOR: always
+  # Resolve tag ref for both push-tag and workflow_dispatch triggers
+  RELEASE_TAG: ${{ github.event.inputs.tag || github.ref }}
+  RELEASE_VERSION: ${{ github.event.inputs.tag && github.event.inputs.tag || github.ref_name }}
 
 # Top-level permissions - individual jobs may override
 permissions:
@@ -39,7 +48,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.ref }}
+          ref: ${{ env.RELEASE_TAG }}
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -102,7 +111,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.ref }}
+          ref: ${{ env.RELEASE_TAG }}
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -121,7 +130,7 @@ jobs:
       - name: Verify version matches tag
         run: |
           CARGO_VERSION=$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "wiggum") | .version')
-          TAG_VERSION="${GITHUB_REF#refs/tags/v}"
+          TAG_VERSION="${RELEASE_VERSION#v}"
           if [ "$CARGO_VERSION" != "$TAG_VERSION" ]; then
             echo "Version mismatch: Cargo.toml has $CARGO_VERSION, tag is $TAG_VERSION"
             exit 1
@@ -147,7 +156,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.ref }}
+          ref: ${{ env.RELEASE_TAG }}
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -157,7 +166,7 @@ jobs:
       - name: Extract changelog for this version
         id: changelog
         run: |
-          VERSION="${GITHUB_REF#refs/tags/v}"
+          VERSION="${RELEASE_VERSION#v}"
           if [ -f CHANGELOG.md ]; then
             NOTES=$(awk "/^## \[?$VERSION\]?/{flag=1; next} /^## /{flag=0} flag" CHANGELOG.md)
           else
@@ -173,4 +182,5 @@ jobs:
           body: ${{ steps.changelog.outputs.notes }}
           files: artifacts/**/*
           draft: false
-          prerelease: ${{ contains(github.ref, '-alpha') || contains(github.ref, '-beta') || contains(github.ref, '-rc') }}
+          tag_name: ${{ env.RELEASE_VERSION }}
+          prerelease: ${{ contains(env.RELEASE_VERSION, '-alpha') || contains(env.RELEASE_VERSION, '-beta') || contains(env.RELEASE_VERSION, '-rc') }}
