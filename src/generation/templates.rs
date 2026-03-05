@@ -368,6 +368,17 @@ const TASK_TEMPLATE: &str = r#"# T{{ number_padded }} — {{ title }}
 {% endif %}
 {% endif %}
 
+## Housekeeping: TODO / FIXME Sweep
+
+Before running preflight, scan all files you created or modified in this task for
+`TODO`, `FIXME`, `HACK`, `XXX`, and similar markers.
+
+- **Resolve** any that fall within the scope of this task's goal.
+- **Leave in place** any that reference work belonging to a later task or phase — but ensure they include a task reference (e.g. `// TODO(T07): wire up auth adapter`).
+- **Remove** any placeholder markers that are no longer relevant after your implementation.
+
+If none are found, move on.
+
 ## Preflight
 
 ```bash
@@ -380,6 +391,7 @@ const TASK_TEMPLATE: &str = r#"# T{{ number_padded }} — {{ title }}
 - [ ] All tests pass
 - [ ] Linter passes with no warnings
 - [ ] Implementation matches the goal described above
+- [ ] No unresolved TODO/FIXME/HACK markers that belong to this task's scope
 
 ## After Completion
 
