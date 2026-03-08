@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-03-07
+
+### Changed
+
+- Updated to Rust 1.94.0; enhanced Cargo.toml formatting with TOML 1.1 multi-line inline tables
+- Set MSRV to 1.94.0 to leverage stable TOML 1.1 support
+
+### Removed
+
+- Removed `.coraline/` from `.gitignore` (Coraline is a separate project)
+
 ## [0.3.0] - 2026-03-05
 
 ### Added
@@ -40,7 +51,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - VCS-aware reporting with git timeline
 - mdBook documentation site
 
-[Unreleased]: https://github.com/greysquirr3l/wiggum/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/greysquirr3l/wiggum/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/greysquirr3l/wiggum/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/greysquirr3l/wiggum/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/greysquirr3l/wiggum/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/greysquirr3l/wiggum/releases/tag/v0.1.0
