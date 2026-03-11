@@ -139,13 +139,15 @@ Repeat until all tasks (T01–T{{ task_count_padded }}) in PROGRESS.md are `[x]`
 
 1. Read PROGRESS.md.
 2. Find the next task that is `[ ]` and whose dependencies are all `[x]`.
-3. Mark it `[~]` in PROGRESS.md.
-4. **Read the Accumulated Learnings section** — apply any relevant insights.
-5. Start a subagent with the SUBAGENT_PROMPT below.
-6. Wait for the subagent to complete.
-7. Read PROGRESS.md again.
-8. Verify the task is now `[x]`. If it is not, mark it `[!]` and output a warning, then continue to the next available task.
-9. Repeat.
+3. **Check for a gate** — if the task file begins with a `⛔ GATE` banner, emit it verbatim
+   and **stop**. The human must confirm (e.g. by restarting the orchestrator) before you proceed.
+4. Mark it `[~]` in PROGRESS.md.
+5. **Read the Accumulated Learnings section** — apply any relevant insights.
+6. Start a subagent with the SUBAGENT_PROMPT below.
+7. Wait for the subagent to complete.
+8. Read PROGRESS.md again.
+9. Verify the task is now `[x]`. If it is not, mark it `[!]` and output a warning, then continue to the next available task.
+10. Repeat.
 
 When all tasks are `[x]`, output:
 
@@ -271,7 +273,10 @@ Focus on must-haves. No gold-plating.
 "#;
 
 const TASK_TEMPLATE: &str = r#"# T{{ number_padded }} — {{ title }}
-
+{% if gate %}
+> ⛔ **GATE — Human confirmation required before starting this task.**
+> {{ gate }}
+{% endif %}
 > **Depends on**: {{ depends_on_desc }}.
 
 ## Goal

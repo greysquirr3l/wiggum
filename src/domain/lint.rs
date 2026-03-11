@@ -396,6 +396,7 @@ mod tests {
                 hints: t.hints,
                 test_hints: t.test_hints,
                 must_haves: t.must_haves,
+                gate: t.gate,
                 phase_name: "Phase 1".to_string(),
                 phase_order: 1,
             })
@@ -412,6 +413,7 @@ mod tests {
             hints: Vec::new(),
             test_hints: Vec::new(),
             must_haves: Vec::new(),
+            gate: None,
         }
     }
 
@@ -456,6 +458,7 @@ mod tests {
                     hints: vec!["hint".to_string()],
                     test_hints: vec!["test".to_string()],
                     must_haves: Vec::new(),
+                    gate: None,
                 }
             })
             .collect();
@@ -475,6 +478,7 @@ mod tests {
                 hints: vec!["use cargo init".to_string()],
                 test_hints: vec!["verify compiles".to_string()],
                 must_haves: Vec::new(),
+                gate: None,
             },
             TaskDef {
                 slug: "domain".to_string(),
@@ -484,6 +488,7 @@ mod tests {
                 hints: vec!["use serde".to_string()],
                 test_hints: vec!["unit test parsing".to_string()],
                 must_haves: Vec::new(),
+                gate: None,
             },
         ];
         let (plan, resolved) = make_plan(tasks, Some("hexagonal".to_string()));

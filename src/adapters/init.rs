@@ -230,6 +230,7 @@ fn prompt_tasks_for_phase(phase_name: &str, existing_phases: &[Phase]) -> Result
             hints: Vec::new(),
             test_hints: Vec::new(),
             must_haves: Vec::new(),
+            gate: None,
         });
 
         task_num += 1;

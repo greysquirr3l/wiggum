@@ -81,6 +81,10 @@ pub struct TaskDef {
     /// Must-have deliverables — used by the GSD strategy.
     #[serde(default)]
     pub must_haves: Vec<String>,
+    /// Human-in-the-loop gate: when set, the orchestrator must emit this
+    /// message and pause for human confirmation before starting this task.
+    #[serde(default)]
+    pub gate: Option<String>,
 }
 
 /// A resolved task with its assigned number (T01, T02, ...).
@@ -94,6 +98,8 @@ pub struct ResolvedTask {
     pub hints: Vec<String>,
     pub test_hints: Vec<String>,
     pub must_haves: Vec<String>,
+    /// Human-in-the-loop gate message, if any.
+    pub gate: Option<String>,
     pub phase_name: String,
     pub phase_order: u32,
 }
@@ -238,6 +244,7 @@ impl Plan {
                     hints: task.hints.clone(),
                     test_hints: task.test_hints.clone(),
                     must_haves: task.must_haves.clone(),
+                    gate: task.gate.clone(),
                     phase_name: phase.name.clone(),
                     phase_order: phase.order,
                 });

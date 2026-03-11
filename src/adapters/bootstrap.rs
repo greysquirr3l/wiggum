@@ -143,6 +143,7 @@ pub fn build_plan_from_scan(scan: &ScanResult, project_path: &Path) -> Plan {
                 hints: vec![],
                 test_hints: vec![],
                 must_haves: vec![],
+                gate: None,
             }],
         }],
     };

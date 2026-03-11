@@ -34,6 +34,7 @@ pub fn render_with(tera: &Tera, plan: &Plan, task: &ResolvedTask) -> Result<Stri
     ctx.insert("hints", &task.hints);
     ctx.insert("test_hints", &task.test_hints);
     ctx.insert("must_haves", &task.must_haves);
+    ctx.insert("gate", &task.gate);
     ctx.insert("strategy", &plan.orchestrator.strategy.to_string());
 
     // Language profile data

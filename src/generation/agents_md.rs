@@ -76,6 +76,7 @@ mod tests {
                     hints: vec![],
                     test_hints: vec![],
                     must_haves: vec![],
+                    gate: None,
                 }],
             }],
         }

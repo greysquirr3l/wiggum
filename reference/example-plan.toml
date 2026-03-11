@@ -232,6 +232,7 @@ slug      = "cli-entrypoint"
 title     = "clap CLI — serve, validate-config, version"
 goal      = "Wire the application entry point with clap: subcommands for serve, validate-config, and version output."
 depends_on = ["config-parsing", "inbound-router", "sqlite-adapter"]
+gate      = "Run `cargo test --workspace` locally and confirm all phase 1–4 tests pass before the orchestrator starts this task."
 hints = [
     "Use the clap derive API.",
     "serve: load config, run migrations, bind the Axum server.",

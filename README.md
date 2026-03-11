@@ -85,7 +85,20 @@ wiggum watch
 
 ## Example plan
 
-See [`reference/example-plan.toml`](reference/example-plan.toml) for a fully annotated plan covering all supported fields — project metadata, preflight commands, orchestrator persona and rules, multiple phases with dependency wiring, and per-task hints, test hints, and must-haves.
+See [`reference/example-plan.toml`](reference/example-plan.toml) for a fully annotated plan covering all supported fields — project metadata, preflight commands, orchestrator persona and rules, multiple phases with dependency wiring, and per-task hints, test hints, must-haves, and gates.
+
+### Gates (human-in-the-loop stops)
+
+Add a `gate` to any task to require human confirmation before the orchestrator proceeds:
+
+```toml
+[[phases.tasks]]
+slug  = "deploy"
+gate  = "Confirm staging tests passed before the orchestrator runs this task."
+# ... rest of task
+```
+
+The generated task file opens with a `⛔ GATE` banner, and the orchestrator prompt instructs the loop to stop and wait for confirmation before marking the task in-progress.
 
 ## Language support
 
