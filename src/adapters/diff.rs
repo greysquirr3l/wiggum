@@ -166,7 +166,12 @@ pub fn format_diff(changes: &[Change]) -> String {
     // Phases section
     let phase_changes: Vec<_> = changes
         .iter()
-        .filter(|c| matches!(c, Change::PhaseAdded(_) | Change::PhaseRemoved(_) | Change::PhaseOrderChanged { .. }))
+        .filter(|c| {
+            matches!(
+                c,
+                Change::PhaseAdded(_) | Change::PhaseRemoved(_) | Change::PhaseOrderChanged { .. }
+            )
+        })
         .collect();
 
     if !phase_changes.is_empty() {
@@ -187,7 +192,12 @@ pub fn format_diff(changes: &[Change]) -> String {
     // Tasks section
     let task_changes: Vec<_> = changes
         .iter()
-        .filter(|c| matches!(c, Change::TaskAdded { .. } | Change::TaskRemoved { .. } | Change::TaskModified(_)))
+        .filter(|c| {
+            matches!(
+                c,
+                Change::TaskAdded { .. } | Change::TaskRemoved { .. } | Change::TaskModified(_)
+            )
+        })
         .collect();
 
     if !task_changes.is_empty() {

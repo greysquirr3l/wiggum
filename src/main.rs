@@ -414,7 +414,10 @@ fn cmd_split(plan_path: &Path, task_slug: &str, into: Option<u32>) -> wiggum::er
             println!("Cancelled.");
         } else {
             split::apply_split(plan_path, &split_plan)?;
-            println!("✅ plan.toml updated. Run `wiggum validate {}` to verify.", plan_path.display());
+            println!(
+                "✅ plan.toml updated. Run `wiggum validate {}` to verify.",
+                plan_path.display()
+            );
         }
     }
 
@@ -445,7 +448,10 @@ fn cmd_prices(update: bool) -> wiggum::error::Result<()> {
 
     if update {
         println!("⚠️  Online price updates not yet implemented.");
-        println!("Using bundled prices (last updated: {}).", data.last_updated);
+        println!(
+            "Using bundled prices (last updated: {}).",
+            data.last_updated
+        );
         println!();
     }
 

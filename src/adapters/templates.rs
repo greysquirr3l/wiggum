@@ -139,7 +139,11 @@ pub fn load_template(name: &str) -> Result<TaskTemplate> {
 /// # Errors
 ///
 /// Returns an error if the task cannot be found or the template cannot be written.
-pub fn save_template(plan_path: &Path, task_slug: &str, template_name: Option<&str>) -> Result<PathBuf> {
+pub fn save_template(
+    plan_path: &Path,
+    task_slug: &str,
+    template_name: Option<&str>,
+) -> Result<PathBuf> {
     let fs = FsAdapter;
     let toml_content = fs.read_plan(plan_path)?;
     let plan = Plan::from_toml(&toml_content)?;
@@ -183,7 +187,10 @@ pub fn format_template_list(templates: &[TemplateInfo]) -> String {
     }
 
     lines.push(String::new());
-    lines.push(format!("Templates directory: {}", templates_dir().display()));
+    lines.push(format!(
+        "Templates directory: {}",
+        templates_dir().display()
+    ));
     lines.push("Use `wiggum templates show <name>` for details.".to_string());
 
     lines.join("\n")

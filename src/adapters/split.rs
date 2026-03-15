@@ -84,7 +84,10 @@ pub struct SplitPart {
 pub fn run_interactive_split(plan_path: &Path, task_slug: &str) -> Result<SplitPlan> {
     let analysis = analyze_task(plan_path, task_slug)?;
 
-    println!("Task: {} (~{} tokens)", analysis.title, analysis.estimated_tokens);
+    println!(
+        "Task: {} (~{} tokens)",
+        analysis.title, analysis.estimated_tokens
+    );
     if analysis.is_oversized {
         println!("⚠️  Task exceeds recommended size (~{OVERSIZED_THRESHOLD} tokens)");
     }
@@ -207,7 +210,11 @@ pub fn apply_split(plan_path: &Path, split: &SplitPlan) -> Result<String> {
                 part.goal.clone()
             },
             depends_on,
-            hints: if i == 0 { original.hints.clone() } else { vec![] },
+            hints: if i == 0 {
+                original.hints.clone()
+            } else {
+                vec![]
+            },
             test_hints: if i == split.parts.len() - 1 {
                 original.test_hints.clone()
             } else {
@@ -236,7 +243,11 @@ pub fn apply_split(plan_path: &Path, split: &SplitPlan) -> Result<String> {
         let final_slug = split.parts.last().map_or(&split.original_slug, |p| &p.slug);
         for phase in &mut plan.phases {
             for task in &mut phase.tasks {
-                if let Some(pos) = task.depends_on.iter().position(|d| d == &split.original_slug) {
+                if let Some(pos) = task
+                    .depends_on
+                    .iter()
+                    .position(|d| d == &split.original_slug)
+                {
                     final_slug.clone_into(&mut task.depends_on[pos]);
                 }
             }

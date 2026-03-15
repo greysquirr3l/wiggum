@@ -13,6 +13,7 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  RUST_VERSION: "1.94.0"
   # Resolve tag ref for both push-tag and workflow_dispatch triggers
   RELEASE_TAG: ${{ github.event.inputs.tag || github.ref }}
   RELEASE_VERSION: ${{ github.event.inputs.tag && github.event.inputs.tag || github.ref_name }}
@@ -51,8 +52,9 @@ jobs:
           ref: ${{ env.RELEASE_TAG }}
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@master
         with:
+          toolchain: ${{ env.RUST_VERSION }}
           targets: ${{ matrix.target }}
 
       - name: Install cross-compilation tool
@@ -114,7 +116,9 @@ jobs:
           ref: ${{ env.RELEASE_TAG }}
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
 
       - name: Cache cargo registry
         uses: actions/cache@v5
