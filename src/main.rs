@@ -4,14 +4,15 @@ use std::process;
 use clap::Parser;
 use tracing::{error, info};
 
-use wiggum::adapters::cli::{Cli, Command};
+use wiggum::adapters::cli::{Cli, Command, TemplatesCmd};
 use wiggum::adapters::fs::FsAdapter;
 use wiggum::adapters::mcp;
 use wiggum::adapters::vcs;
-use wiggum::adapters::{bootstrap, init};
+use wiggum::adapters::{bootstrap, diff, init, resume, retro, split, templates};
 use wiggum::domain::dag::{parallel_groups, validate_dag};
 use wiggum::domain::lint;
 use wiggum::domain::plan::Plan;
+use wiggum::domain::pricing::PricingData;
 use wiggum::generation;
 use wiggum::ports::PlanReader;
 
@@ -67,6 +68,21 @@ fn main() {
             output,
             dry_run,
         } => cmd_clean(&plan, output.as_deref(), dry_run),
+        Command::Resume {
+            progress,
+            plan,
+            task,
+            dry_run,
+        } => cmd_resume(&progress, &plan, task.as_deref(), dry_run),
+        Command::Diff { old, new } => cmd_diff(&old, &new),
+        Command::Retro {
+            progress,
+            apply,
+            plan,
+        } => cmd_retro(&progress, apply, &plan),
+        Command::Split { plan, task, into } => cmd_split(&plan, &task, into),
+        Command::Templates(sub) => cmd_templates(sub),
+        Command::Prices { update } => cmd_prices(update),
     };
 
     if let Err(e) = result {
@@ -321,6 +337,128 @@ fn cmd_clean(
             println!("   ✕ {}", relative.display());
         }
     }
+
+    Ok(())
+}
+
+fn cmd_resume(
+    progress_path: &Path,
+    plan_path: &Path,
+    task_override: Option<&str>,
+    dry_run: bool,
+) -> wiggum::error::Result<()> {
+    let ctx = resume::find_resume_task(progress_path, plan_path, task_override)?;
+
+    println!("{}", resume::format_resume_info(&ctx, dry_run));
+
+    if !dry_run {
+        println!();
+        println!("{}", "─".repeat(60));
+        println!("{}", ctx.prompt);
+    }
+
+    Ok(())
+}
+
+fn cmd_diff(old_path: &Path, new_path: &Path) -> wiggum::error::Result<()> {
+    let changes = diff::diff_plans(old_path, new_path)?;
+    println!("{}", diff::format_diff(&changes));
+    Ok(())
+}
+
+fn cmd_retro(progress_path: &Path, _apply: bool, _plan_path: &Path) -> wiggum::error::Result<()> {
+    let summary = retro::analyze_progress(progress_path)?;
+    println!("{}", retro::format_retro(&summary));
+
+    // TODO: Implement --apply flag to patch plan.toml
+    // if apply && !summary.suggestions.is_empty() {
+    //     println!("\nSave suggestions to plan-retro.toml? [Y/n]:");
+    // }
+
+    Ok(())
+}
+
+fn cmd_split(plan_path: &Path, task_slug: &str, into: Option<u32>) -> wiggum::error::Result<()> {
+    let analysis = split::analyze_task(plan_path, task_slug)?;
+
+    if let Some(n) = into {
+        // Non-interactive mode
+        println!("{}", split::format_split_preview(&analysis));
+        if n < 2 {
+            println!("\n⚠️  Cannot split into fewer than 2 tasks");
+            return Ok(());
+        }
+        println!("\nNon-interactive split into {n} tasks not yet implemented.");
+        println!("Use interactive mode: `wiggum split --task {task_slug}`");
+    } else {
+        // Interactive mode
+        let split_plan = split::run_interactive_split(plan_path, task_slug)?;
+
+        println!("\nPreview changes? [Y/n]: ");
+        let mut input = String::new();
+        std::io::stdin().read_line(&mut input)?;
+        if !input.trim().to_lowercase().starts_with('n') {
+            println!("\nWould create:");
+            for (i, part) in split_plan.parts.iter().enumerate() {
+                println!("  {}. {} — {}", i + 1, part.slug, part.goal);
+            }
+            if split_plan.rewire_dependents {
+                println!("  (Would rewire dependents to last task)");
+            }
+        }
+
+        println!("\nApply? [Y/n]: ");
+        input.clear();
+        std::io::stdin().read_line(&mut input)?;
+        if input.trim().to_lowercase().starts_with('n') {
+            println!("Cancelled.");
+        } else {
+            split::apply_split(plan_path, &split_plan)?;
+            println!("✅ plan.toml updated. Run `wiggum validate {}` to verify.", plan_path.display());
+        }
+    }
+
+    Ok(())
+}
+
+fn cmd_templates(cmd: TemplatesCmd) -> wiggum::error::Result<()> {
+    match cmd {
+        TemplatesCmd::List => {
+            let list = templates::list_templates()?;
+            println!("{}", templates::format_template_list(&list));
+        }
+        TemplatesCmd::Show { name } => {
+            let tmpl = templates::load_template(&name)?;
+            println!("{}", templates::format_template_show(&tmpl));
+        }
+        TemplatesCmd::Save { plan, task, name } => {
+            let path = templates::save_template(&plan, &task, name.as_deref())?;
+            println!("✅ Template saved to {}", path.display());
+        }
+    }
+    Ok(())
+}
+
+#[allow(clippy::unnecessary_wraps)] // May add error cases in the future
+fn cmd_prices(update: bool) -> wiggum::error::Result<()> {
+    let data = PricingData::bundled();
+
+    if update {
+        println!("⚠️  Online price updates not yet implemented.");
+        println!("Using bundled prices (last updated: {}).", data.last_updated);
+        println!();
+    }
+
+    println!("Model pricing (per 1M tokens):\n");
+    println!("  {:<24} {:>10} {:>10}", "Model", "Input", "Output");
+    println!("  {}", "─".repeat(46));
+    for model in &data.models {
+        println!(
+            "  {:<24} {:>9.2}$ {:>9.2}$",
+            model.name, model.input_per_m, model.output_per_m
+        );
+    }
+    println!("\n  Last updated: {}", data.last_updated);
 
     Ok(())
 }

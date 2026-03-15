@@ -6,6 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-03-15
+
+### Added
+
+- `wiggum resume` command to recover interrupted orchestrator loops — auto-detects the last in-progress or next task, generates resume prompt with context
+- `wiggum diff <old.toml> <new.toml>` command to compare two plan files — shows phase changes, task additions/removals, and dependency modifications
+- `wiggum retro` command to generate improvement suggestions from PROGRESS.md learnings — analyzes retry patterns, blocking gates, and complexity issues
+- `wiggum split --task <slug>` command to interactively split oversized tasks into smaller units — includes dependency rewiring
+- `wiggum templates` subcommand with `list`, `show`, and `save` operations — enables reusable task snippets stored in `~/.wiggum/templates/`
+- `wiggum prices` command to display model pricing data — shows bundled rates for cost estimation
+- Per-task cost estimation in `--dry-run --estimate-tokens` output — shows estimated costs for Claude, GPT-4, and Gemini models
+- `domain::pricing` module with bundled model pricing data
+
+### Dependencies
+
+- Added `dirs` crate for cross-platform home directory detection (used by templates)
+
 ## [0.3.2] - 2026-03-11
 
 ### Added
@@ -57,7 +74,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - VCS-aware reporting with git timeline
 - mdBook documentation site
 
-[Unreleased]: https://github.com/greysquirr3l/wiggum/compare/v0.3.2...HEAD
+[Unreleased]: https://github.com/greysquirr3l/wiggum/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/greysquirr3l/wiggum/compare/v0.3.2...v0.4.0
 [0.3.2]: https://github.com/greysquirr3l/wiggum/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/greysquirr3l/wiggum/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/greysquirr3l/wiggum/compare/v0.2.0...v0.3.0

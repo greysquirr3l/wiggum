@@ -121,4 +121,99 @@ pub enum Command {
         #[arg(long)]
         dry_run: bool,
     },
+
+    /// Resume an interrupted orchestrator loop from the last in-progress task
+    Resume {
+        /// Path to PROGRESS.md (default: ./PROGRESS.md)
+        #[arg(long, default_value = "PROGRESS.md")]
+        progress: PathBuf,
+
+        /// Path to the plan TOML file (default: ./plan.toml)
+        #[arg(long, default_value = "plan.toml")]
+        plan: PathBuf,
+
+        /// Resume from a specific task instead of auto-detecting
+        #[arg(long)]
+        task: Option<String>,
+
+        /// Show what would be resumed without emitting prompt
+        #[arg(long)]
+        dry_run: bool,
+    },
+
+    /// Compare two plan.toml files and show what changed
+    Diff {
+        /// Path to the original plan TOML file
+        old: PathBuf,
+
+        /// Path to the new plan TOML file
+        new: PathBuf,
+    },
+
+    /// Generate retrospective suggestions from learnings in PROGRESS.md
+    Retro {
+        /// Path to PROGRESS.md (default: ./PROGRESS.md)
+        #[arg(long, default_value = "PROGRESS.md")]
+        progress: PathBuf,
+
+        /// Auto-apply non-destructive suggestions to plan.toml
+        #[arg(long)]
+        apply: bool,
+
+        /// Path to the plan TOML file (for --apply)
+        #[arg(long, default_value = "plan.toml")]
+        plan: PathBuf,
+    },
+
+    /// Split an oversized task into multiple smaller tasks
+    Split {
+        /// Path to the plan TOML file
+        plan: PathBuf,
+
+        /// Slug of the task to split
+        #[arg(long)]
+        task: String,
+
+        /// Non-interactive mode: split into N tasks
+        #[arg(long)]
+        into: Option<u32>,
+    },
+
+    /// Manage reusable task templates
+    #[command(subcommand)]
+    Templates(TemplatesCmd),
+
+    /// Update model pricing data
+    Prices {
+        /// Update prices from the latest source
+        #[arg(long)]
+        update: bool,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+pub enum TemplatesCmd {
+    /// List available templates
+    List,
+
+    /// Show details of a specific template
+    Show {
+        /// Template name
+        name: String,
+    },
+
+    /// Save a task from the current plan as a template
+    Save {
+        /// Path to the plan TOML file
+        #[arg(long)]
+        plan: PathBuf,
+
+        /// Slug of the task to save
+        #[arg(long)]
+        task: String,
+
+        /// Template name (defaults to task slug)
+        #[arg(long)]
+        name: Option<String>,
+    },
 }

@@ -42,48 +42,37 @@ pub fn estimate_all(artifacts: &super::GeneratedArtifacts) -> Vec<TokenEstimate>
     estimates
 }
 
-/// Format token estimates as a human-readable report string.
+/// Format token estimates as a human-readable report string with cost estimates.
 #[must_use]
 pub fn format_report(artifacts: &super::GeneratedArtifacts) -> String {
+    use crate::domain::pricing::PricingData;
+
     let estimates = estimate_all(artifacts);
     let mut lines = vec!["Token estimates (approx, chars/4):\n".to_string()];
 
-    // Shared artifacts
-    for est in estimates.iter().take(3) {
+    // Per-task token counts
+    for est in estimates.iter().skip(3) {
         lines.push(format!("  {:<30} ~{} tokens", est.name, est.tokens));
     }
 
-    // Base overhead = progress + plan_doc + orchestrator
-    let base_overhead: usize = estimates.iter().take(3).map(|e| e.tokens).sum();
+    // Total tokens
+    let total_tokens: usize = estimates.iter().map(|e| e.tokens).sum();
+    lines.push(String::new());
+    lines.push(format!("  Total: ~{total_tokens} tokens"));
 
-    // Per-task context
-    if estimates.len() > 3 {
-        lines.push(String::new());
-        lines.push("  Per-task context (plan + progress + task file):".to_string());
+    // Cost estimates
+    let pricing = PricingData::bundled();
+    let costs = pricing.estimate_cost(total_tokens);
 
-        let mut largest: usize = 0;
-        for est in estimates.iter().skip(3) {
-            let task_context = base_overhead + est.tokens;
-            if task_context > largest {
-                largest = task_context;
-            }
-            let flag = if task_context > 4000 {
-                "  ⚠️"
-            } else {
-                "  ✅"
-            };
-            lines.push(format!(
-                "    {:<28} ~{} tokens{flag}",
-                est.name, task_context
-            ));
-        }
-
-        lines.push(String::new());
-        lines.push(format!(
-            "  Base overhead per iteration: ~{base_overhead} tokens"
-        ));
-        lines.push(format!("  Largest single task context: ~{largest} tokens"));
+    lines.push(String::new());
+    lines.push("Estimated cost (prompt + completion, rough):".to_string());
+    for cost in &costs {
+        lines.push(format!("  {:<24} ~${:.2}", cost.model, cost.cost_usd));
     }
+
+    lines.push(String::new());
+    lines.push("  Prices are estimates. Actual cost depends on completion length.".to_string());
+    lines.push(format!("  Last updated: {}. Run `wiggum prices` to see rates.", pricing.last_updated));
 
     lines.join("\n")
 }
@@ -137,8 +126,9 @@ mod tests {
         };
         let report = format_report(&artifacts);
         assert!(report.contains("Token estimates"));
-        assert!(report.contains("PROGRESS.md"));
-        assert!(report.contains("Base overhead"));
         assert!(report.contains("T01-foo.md"));
+        assert!(report.contains("Total:"));
+        assert!(report.contains("Estimated cost"));
+        assert!(report.contains("claude-sonnet-4"));
     }
 }

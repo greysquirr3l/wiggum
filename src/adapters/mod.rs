@@ -1,8 +1,13 @@
 pub mod add_task;
 pub mod bootstrap;
 pub mod cli;
+pub mod diff;
 pub mod fs;
 pub mod init;
 pub mod mcp;
+pub mod resume;
+pub mod retro;
+pub mod split;
+pub mod templates;
 pub mod vcs;
 pub mod watch;
