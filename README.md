@@ -38,6 +38,11 @@ wiggum generate plan.toml
 | `validate` | Validate plan structure and dependency graph |
 | `add-task` | Add a task to an existing plan |
 | `bootstrap` | Generate a plan from an existing project |
+| `diff` | Compare two plan files |
+| `resume` | Recover an interrupted orchestrator loop |
+| `retro` | Generate improvement suggestions from PROGRESS.md |
+| `split` | Split an oversized task into smaller units |
+| `templates` | Manage reusable task templates |
 | `serve --mcp` | Start the MCP server |
 | `report` | Generate a post-execution report |
 | `watch` | Live progress monitoring |
@@ -49,11 +54,14 @@ project/
 ├── IMPLEMENTATION_PLAN.md
 ├── PROGRESS.md
 ├── AGENTS.md
-├── orchestrator.prompt.md
+├── features.json
 └── tasks/
     ├── T01-{slug}.md
     ├── T02-{slug}.md
     └── ...
+.vscode/
+├── orchestrator.prompt.md
+└── evaluator.prompt.md   # only when [evaluator] is configured
 ```
 
 ## Running the loop
@@ -64,8 +72,11 @@ After generating artifacts, open your AI coding tool in agent mode and load the 
 2. Open the corresponding `tasks/T{NN}-{slug}.md` file
 3. Spawn a subagent to implement the task
 4. Run preflight checks (build, test, lint) to verify the work
-5. Mark the task complete in `PROGRESS.md` and record learnings
-6. Repeat until all tasks are done
+5. Independently verify — re-runs preflight before trusting the subagent's completion mark
+6. Updates `features.json` with per-criterion pass/fail results
+7. If an `[evaluator]` agent is configured, spawns it to score the task independently
+8. Mark the task complete in `PROGRESS.md` and record learnings
+9. Repeat until all tasks are done
 
 In VS Code with Copilot, copy `orchestrator.prompt.md` into your project as a prompt file:
 

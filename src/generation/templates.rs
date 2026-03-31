@@ -16,6 +16,7 @@ static TEMPLATES: LazyLock<Tera> = LazyLock::new(|| {
         ("task.md", TASK_TEMPLATE),
         ("plan_doc.md", PLAN_DOC_TEMPLATE),
         ("agents.md", AGENTS_MD_TEMPLATE),
+        ("evaluator.md", EVALUATOR_TEMPLATE),
     ];
 
     for (name, content) in templates {
@@ -51,6 +52,7 @@ pub fn get_tera_with_overrides(project_path: &Path) -> Result<Tera> {
         "task.md",
         "plan_doc.md",
         "agents.md",
+        "evaluator.md",
     ];
     for name in template_names {
         let user_file = override_dir.join(name);
@@ -109,6 +111,14 @@ const PROGRESS_TEMPLATE: &str = r"# {{ project_name }} — Implementation Progre
 > to avoid repeating past mistakes.
 
 _No learnings yet._
+
+## Codebase State
+
+> Subagents update this section after completing each task.
+> Describe what now exists, what is wired up, and what key decisions were made.
+> A fresh agent should be able to orient from this section alone.
+
+_No state summary yet._
 ";
 
 const ORCHESTRATOR_TEMPLATE: &str = r#"---
@@ -122,11 +132,16 @@ description: Orchestrator for the Ralph Wiggum loop — drives subagents to impl
 
 <PROGRESS>{{ project_path }}/PROGRESS.md</PROGRESS>
 
+<FEATURES>{{ project_path }}/features.json</FEATURES>
+
 <ORCHESTRATOR_INSTRUCTIONS>
 
 You are an orchestration agent. Your sole job is to drive subagents to implement the {{ project_name }} project until all tasks in PROGRESS.md are marked `[x]`.
 
 **You do NOT implement code yourself. You only spawn subagents and verify their output.**
+
+> ⚠️ **Do NOT declare the project complete until ALL tasks T01–T{{ task_count_padded }} show `[x]` in PROGRESS.md.**
+> Seeing progress is not enough. Every task must individually reach `[x]` before you output the completion message.
 
 ## Setup
 
@@ -142,14 +157,23 @@ Repeat until all tasks (T01–T{{ task_count_padded }}) in PROGRESS.md are `[x]`
 3. **Check for a gate** — if the task file begins with a `⛔ GATE` banner, emit it verbatim
    and **stop**. The human must confirm (e.g. by restarting the orchestrator) before you proceed.
 4. Mark it `[~]` in PROGRESS.md.
-5. **Read the Accumulated Learnings section** — apply any relevant insights.
+5. **Read the Accumulated Learnings and Codebase State sections** — apply any relevant insights.
 6. Start a subagent with the SUBAGENT_PROMPT below.
 7. Wait for the subagent to complete.
-8. Read PROGRESS.md again.
-9. Verify the task is now `[x]`. If it is not, mark it `[!]` and output a warning, then continue to the next available task.
-10. Repeat.
+8. **Independently verify** — run the preflight yourself before trusting the subagent's `[x]`:
+   ```bash
+   {{ preflight_build }} && {{ preflight_test }} && {{ preflight_lint }}
+   ```
+   Do not accept a task as done if preflight fails, regardless of what the subagent reports.{% if has_evaluator %}
+9. **Spawn the evaluator** — start the evaluator agent (`.vscode/evaluator.prompt.md`) with
+   the task context. Wait for it to return a PASS verdict before proceeding.
+   If the evaluator returns FAIL, mark the task `[!]` and capture the evaluator's findings
+   in PROGRESS.md for the next subagent iteration.{% endif %}
+10. Read PROGRESS.md again.
+11. Verify the task is now `[x]`. If it is not, mark it `[!]` and output a warning, then continue to the next available task.
+12. Repeat.
 
-When all tasks are `[x]`, output:
+When **all** tasks T01–T{{ task_count_padded }} show `[x]` in PROGRESS.md, output:
 
 ```
 ✅ All {{ project_name }} implementation tasks complete.
@@ -174,41 +198,48 @@ If this tool is not available, fail immediately with:
 - Project plan: read `{{ project_path }}/IMPLEMENTATION_PLAN.md`
 - Progress tracker: `{{ project_path }}/PROGRESS.md`
 - Task files: `{{ project_path }}/tasks/`
+- Features registry: `{{ project_path }}/features.json`
 {% if strategy == "tdd" %}
 ## Strategy: Test-Driven Development (TDD)
 
 Follow the Red-Green-Refactor cycle strictly:
 
 1. Read PROGRESS.md.
-2. **Read the Accumulated Learnings section** — apply relevant insights from prior tasks.
+2. **Read the Accumulated Learnings and Codebase State sections** — apply relevant insights from prior tasks.
 3. Find the highest-priority task that is `[ ]` and whose dependencies are all `[x]`.
 4. Mark it `[~]` in PROGRESS.md immediately.
 5. Read the corresponding task file in `tasks/`.
-6. **RED** — Write failing tests first based on the test hints. Run them to confirm they fail.
-7. **GREEN** — Write the minimum code to make all tests pass. Do not add extra functionality.
-8. **REFACTOR** — Clean up the code while keeping all tests green. Remove duplication, improve naming.
-9. Run the preflight check from the task file:
-   ```bash
-   {{ preflight_build }} && {{ preflight_test }} && {{ preflight_lint }}
-   ```
-   Fix all errors and warnings until preflight passes.
-10. Verify all exit criteria from the task file are met.
-11. Update PROGRESS.md: change `[~]` to `[x]` for this task.
-12. **Append any learnings** to the Accumulated Learnings section in PROGRESS.md.
+6. **Sprint contract** — Before writing any code, state explicitly:
+   - What you will build (files, functions, types)
+   - How you will verify each exit criterion in the task file
+7. **RED** — Write failing tests first based on the test hints. Run them to confirm they fail.
+8. **GREEN** — Write the minimum code to make all tests pass. Do not add extra functionality.
+9. **REFACTOR** — Clean up the code while keeping all tests green. Remove duplication, improve naming.
+10. Run the preflight check from the task file:
+    ```bash
+    {{ preflight_build }} && {{ preflight_test }} && {{ preflight_lint }}
+    ```
+    Fix all errors and warnings until preflight passes.
+11. Verify every exit criterion from the task file is met.
+12. Update PROGRESS.md: change `[~]` to `[x]` for this task.
+13. **Update Codebase State** in PROGRESS.md — briefly describe what now exists after this task.
+14. **Append any learnings** to the Accumulated Learnings section in PROGRESS.md.
     Format: `- T{NN}: {what you learned}`
-13. Commit with a conventional commit message focused on user impact (not file counts or line numbers).
-14. Stop.
+15. Commit with a conventional commit message focused on user impact (not file counts or line numbers).
+16. Stop.
 {% elif strategy == "gsd" %}
 ## Strategy: Get Stuff Done (GSD)
 
 Focus on must-haves. No gold-plating.
 
 1. Read PROGRESS.md.
-2. **Read the Accumulated Learnings section** — apply relevant insights from prior tasks.
+2. **Read the Accumulated Learnings and Codebase State sections** — apply relevant insights from prior tasks.
 3. Find the highest-priority task that is `[ ]` and whose dependencies are all `[x]`.
 4. Mark it `[~]` in PROGRESS.md immediately.
 5. Read the corresponding task file in `tasks/`.
-6. **Identify must-haves** — list the concrete deliverables from the goal and must_haves.
+6. **Sprint contract** — Before writing any code, state explicitly:
+   - Which must-haves you will implement
+   - How you will verify each one is present and working
 7. **Implement each must-have** — work through them one by one. No extras.
 8. **Verify all must-haves** — confirm every deliverable is present and working.
 9. Run the preflight check from the task file:
@@ -216,32 +247,37 @@ Focus on must-haves. No gold-plating.
    {{ preflight_build }} && {{ preflight_test }} && {{ preflight_lint }}
    ```
    Fix all errors and warnings until preflight passes.
-10. Verify all exit criteria from the task file are met.
+10. Verify every exit criterion from the task file is met.
 11. Update PROGRESS.md: change `[~]` to `[x]` for this task.
-12. **Append any learnings** to the Accumulated Learnings section in PROGRESS.md.
+12. **Update Codebase State** in PROGRESS.md — briefly describe what now exists after this task.
+13. **Append any learnings** to the Accumulated Learnings section in PROGRESS.md.
     Format: `- T{NN}: {what you learned}`
-13. Commit with a conventional commit message focused on user impact (not file counts or line numbers).
-14. Stop.
+14. Commit with a conventional commit message focused on user impact (not file counts or line numbers).
+15. Stop.
 {% else %}
 ## Your job
 
 1. Read PROGRESS.md.
-2. **Read the Accumulated Learnings section** — apply relevant insights from prior tasks.
+2. **Read the Accumulated Learnings and Codebase State sections** — apply relevant insights from prior tasks.
 3. Find the highest-priority task that is `[ ]` and whose dependencies are all `[x]`.
 4. Mark it `[~]` in PROGRESS.md immediately.
-4. Read the corresponding task file in `tasks/`.
-5. Implement the task completely — create all files, write all code, add all tests specified.
-6. Run the preflight check from the task file:
+5. Read the corresponding task file in `tasks/`.
+6. **Sprint contract** — Before writing any code, state explicitly:
+   - What you will build (files, functions, types)
+   - How you will verify each exit criterion listed in the task file
+7. Implement the task completely — create all files, write all code, add all tests specified.
+8. Run the preflight check from the task file:
    ```bash
    {{ preflight_build }} && {{ preflight_test }} && {{ preflight_lint }}
    ```
    Fix all errors and warnings until preflight passes.
-7. Verify all exit criteria from the task file are met.
-8. Update PROGRESS.md: change `[~]` to `[x]` for this task.
-9. **Append any learnings** to the Accumulated Learnings section in PROGRESS.md.
-   Format: `- T{NN}: {what you learned}`
-10. Commit with a conventional commit message focused on user impact (not file counts or line numbers).
-11. Stop.
+9. Verify every exit criterion from the task file is met.
+10. Update PROGRESS.md: change `[~]` to `[x]` for this task.
+11. **Update Codebase State** in PROGRESS.md — briefly describe what now exists after this task.
+12. **Append any learnings** to the Accumulated Learnings section in PROGRESS.md.
+    Format: `- T{NN}: {what you learned}`
+13. Commit with a conventional commit message focused on user impact (not file counts or line numbers).
+14. Stop.
 {% endif %}
 
 ## Rules
@@ -397,6 +433,9 @@ If none are found, move on.
 - [ ] Linter passes with no warnings
 - [ ] Implementation matches the goal described above
 - [ ] No unresolved TODO/FIXME/HACK markers that belong to this task's scope
+{% if evaluation_criteria %}
+{% for criterion in evaluation_criteria %}- [ ] {{ criterion }}
+{% endfor %}{% endif %}
 
 ## After Completion
 
@@ -502,6 +541,102 @@ const AGENTS_MD_TEMPLATE: &str = r#"# AGENTS.md
 - Focus commit messages on user impact, not file counts or line numbers
 
 ---
+
+_Generated by [wiggum](https://github.com/greysquirr3l/wiggum)._
+"#;
+
+const EVALUATOR_TEMPLATE: &str = r#"---
+agent: agent
+description: QA Evaluator — independently verifies task completion for {{ project_name }}
+---
+
+{{ evaluator_persona }}
+
+> **Your role is independent verification, not rubber-stamping.**
+> Do not accept a subagent's claim that a task is done. Re-run everything yourself.
+
+## Project context
+
+- Project: `{{ project_name }}`
+- Tasks: `{{ project_path }}/tasks/`
+- Progress: `{{ project_path }}/PROGRESS.md`
+- Features registry: `{{ project_path }}/features.json`
+
+## When the orchestrator spawns you
+
+The orchestrator will tell you which task (e.g. T01) to evaluate.
+
+1. Read the task file: `{{ project_path }}/tasks/T{NN}-{slug}.md`
+2. Run each preflight command independently and record the full output:
+
+   **Build:**
+   ```bash
+   {{ preflight_build }}
+   ```
+
+   **Tests:**
+   ```bash
+   {{ test_tool }}
+   ```
+
+   **Lint:**
+   ```bash
+   {{ preflight_lint }}
+   ```
+
+3. Read the implementation — verify it actually satisfies the task goal, not just that it compiles.
+4. Check all "Exit Criteria" in the task file. If "Evaluation Criteria" are present, check each one.
+5. Look up the task entry in `features.json` and verify against its `criteria` list.
+
+## Scoring
+
+After checking all criteria:
+
+1. Count passing criteria vs. total criteria.
+2. Assign a score **0–10** (0 = nothing works, 10 = all pass).
+3. Score ≥ {{ pass_threshold }}: **PASS**
+4. Score < {{ pass_threshold }}: **FAIL**
+{% if hard_fail %}
+> ⚠️ **Hard-fail mode is ON.** Any single criterion failure = FAIL, regardless of score.
+{% endif %}
+
+## Output format
+
+```
+## Evaluation: T{NN} — {title}
+
+### Results
+
+| Criterion | Result | Evidence |
+|---|---|---|
+| Build succeeds | PASS/FAIL | <output or error> |
+| All tests pass | PASS/FAIL | <test count or failure> |
+| Linter clean | PASS/FAIL | <warnings/errors or "clean"> |
+| Implementation matches goal | PASS/FAIL | <brief justification> |
+| <task-specific criterion> | PASS/FAIL | <evidence> |
+
+### Score: N/10
+
+### Verdict: PASS / FAIL
+
+### Required fixes (if FAIL)
+- <specific fix needed>
+```
+
+## After evaluation
+
+**If PASS:**
+- Update `features.json`: set `"passes": true` for the task and each passing criterion.
+- Report PASS to the orchestrator.
+
+**If FAIL:**
+- Do NOT mark the task `[x]` in PROGRESS.md. Leave it as `[~]`.
+- Report FAIL to the orchestrator with your findings.
+- The orchestrator will capture your findings in PROGRESS.md for the next iteration.
+
+---
+
+**Pass threshold for this project: {{ pass_threshold }}/10**
 
 _Generated by [wiggum](https://github.com/greysquirr3l/wiggum)._
 "#;

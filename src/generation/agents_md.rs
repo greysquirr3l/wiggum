@@ -65,6 +65,7 @@ mod tests {
                     "All public functions need # Errors docs".to_string(),
                 ],
             },
+            evaluator: None,
             phases: vec![Phase {
                 name: "Foundation".to_string(),
                 order: 1,
@@ -77,6 +78,7 @@ mod tests {
                     test_hints: vec![],
                     must_haves: vec![],
                     gate: None,
+                    evaluation_criteria: vec![],
                 }],
             }],
         }

@@ -25,15 +25,47 @@ A markdown table tracking all phases and tasks with status columns:
 | `[x]` | Complete |
 | `[!]` | Blocked |
 
+Includes a **Codebase State** section where subagents record which files were created or modified. This gives each subsequent subagent accurate context about what the previous one actually changed.
+
 Includes a learnings column where the orchestrator records insights from each completed task.
 
 ## Implementation plan — `IMPLEMENTATION_PLAN.md`
 
 A high-level architecture document derived from your plan's project description and phase structure. Subagents reference this for context about how their task fits into the overall project.
 
-## Orchestrator prompt — `orchestrator.prompt.md`
+## Orchestrator prompt — `.vscode/orchestrator.prompt.md`
 
-The agent-mode prompt that drives the Ralph Wiggum loop. It tells the orchestrator how to read progress, spawn subagents, verify their output, and update the tracker.
+The agent-mode prompt that drives the Ralph Wiggum loop. It tells the orchestrator how to read progress, spawn subagents, verify their output independently, and update the tracker. Includes a sprint contract step, a codebase state handoff step, and a guard against premature completion.
+
+## Feature registry — `features.json`
+
+A structured JSON file listing every task with its pass/fail state and per-criterion results. Both the orchestrator and evaluator reference this as the source of truth for what is actually complete.
+
+```json
+{
+  "project": "my-app",
+  "tasks": [
+    {
+      "id": "T01",
+      "slug": "project-setup",
+      "title": "Initialize project structure",
+      "passes": false,
+      "criteria": [
+        { "label": "build succeeds", "passes": false },
+        { "label": "all tests pass", "passes": false },
+        { "label": "linter clean", "passes": false },
+        { "label": "implementation matches goal", "passes": false }
+      ]
+    }
+  ]
+}
+```
+
+Custom criteria can be added per-task via the `evaluation_criteria` field in your plan TOML.
+
+## Evaluator prompt — `.vscode/evaluator.prompt.md`
+
+Only generated when `[evaluator]` is configured in the plan. Defines a skeptical QA agent that re-runs preflight independently, scores each exit criterion, and updates `features.json` with verified results. Prevents false completions caused by the orchestrator trusting the subagent's self-report.
 
 ## Agents manifest — `AGENTS.md`
 

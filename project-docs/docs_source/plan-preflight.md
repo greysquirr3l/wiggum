@@ -33,3 +33,24 @@ rules = [
 |-------|----------|-------------|
 | `persona` | No | The subagent persona baked into every task prompt |
 | `rules` | No | Project-specific rules included in each subagent prompt |
+
+## Evaluator configuration
+
+The optional `[evaluator]` section enables an independent QA agent that scores each task after the subagent marks it complete. When present, `.vscode/evaluator.prompt.md` is generated alongside the orchestrator prompt.
+
+```toml
+[evaluator]
+persona = "You are a skeptical QA engineer"
+pass_threshold = 7
+hard_fail = true
+test_tool = "cargo test --workspace"
+```
+
+### Fields
+
+| Field | Required | Default | Description |
+|-------|----------|---------|-------------|
+| `persona` | No | `"You are a rigorous QA evaluator"` | Evaluator agent persona |
+| `pass_threshold` | No | `7` | Minimum score (0–10) for a criterion to pass |
+| `hard_fail` | No | `false` | If `true`, abort the loop on any failed criterion |
+| `test_tool` | No | Inherits `preflight.test` | Command the evaluator uses to run the test suite |

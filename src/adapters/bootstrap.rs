@@ -132,6 +132,7 @@ pub fn build_plan_from_scan(scan: &ScanResult, project_path: &Path) -> Plan {
             strategy: Strategy::default(),
             rules: scan.rules.clone(),
         },
+        evaluator: None,
         phases: vec![Phase {
             name: "TODO — rename this phase".to_string(),
             order: 1,
@@ -144,6 +145,7 @@ pub fn build_plan_from_scan(scan: &ScanResult, project_path: &Path) -> Plan {
                 test_hints: vec![],
                 must_haves: vec![],
                 gate: None,
+                evaluation_criteria: vec![],
             }],
         }],
     };

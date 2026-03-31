@@ -38,6 +38,7 @@ pub fn run_init(output_plan: Option<&Path>) -> Result<(Plan, PathBuf)> {
             strategy,
             rules,
         },
+        evaluator: None,
         phases,
     };
     plan.preflight = plan.preflight.with_defaults(language);
@@ -231,6 +232,7 @@ fn prompt_tasks_for_phase(phase_name: &str, existing_phases: &[Phase]) -> Result
             test_hints: Vec::new(),
             must_haves: Vec::new(),
             gate: None,
+            evaluation_criteria: Vec::new(),
         });
 
         task_num += 1;

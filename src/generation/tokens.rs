@@ -108,6 +108,8 @@ mod tests {
                 ("T02-bar.md".to_string(), "b".repeat(2000)),
             ],
             agents_md: None,
+            features_json: String::new(),
+            evaluator_prompt: None,
         };
         let estimates = estimate_all(&artifacts);
         assert_eq!(estimates.len(), 5);
@@ -126,6 +128,8 @@ mod tests {
             plan_doc: "z".repeat(200),
             tasks: vec![("T01-foo.md".to_string(), "a".repeat(1200))],
             agents_md: None,
+            features_json: String::new(),
+            evaluator_prompt: None,
         };
         let report = format_report(&artifacts);
         assert!(report.contains("Token estimates"));

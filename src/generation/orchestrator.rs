@@ -31,6 +31,7 @@ pub fn render_with(tera: &Tera, plan: &Plan, tasks: &[ResolvedTask]) -> Result<S
     ctx.insert("rules", &plan.orchestrator.rules);
     ctx.insert("architecture", &plan.project.architecture);
     ctx.insert("strategy", &plan.orchestrator.strategy.to_string());
+    ctx.insert("has_evaluator", &plan.evaluator.is_some());
 
     tera.render("orchestrator.md", &ctx)
         .map_err(|e| WiggumError::Template(e.to_string()))

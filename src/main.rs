@@ -146,55 +146,7 @@ fn cmd_generate(
     }
 
     if dry_run {
-        println!("Dry run — would generate:\n");
-        #[allow(clippy::cast_precision_loss)]
-        {
-            println!(
-                "  PROGRESS.md             ({:.1} KB)",
-                artifacts.progress.len() as f64 / 1024.0
-            );
-            println!(
-                "  IMPLEMENTATION_PLAN.md  ({:.1} KB)",
-                artifacts.plan_doc.len() as f64 / 1024.0
-            );
-            println!(
-                "  .vscode/orchestrator.prompt.md  ({:.1} KB)",
-                artifacts.orchestrator.len() as f64 / 1024.0
-            );
-            println!("  tasks/");
-            for (filename, content) in &artifacts.tasks {
-                println!("    {filename}  ({:.1} KB)", content.len() as f64 / 1024.0);
-            }
-            if let Some(agents) = &artifacts.agents_md {
-                println!(
-                    "  AGENTS.md               ({:.1} KB)",
-                    agents.len() as f64 / 1024.0
-                );
-            }
-            let total_size = artifacts.progress.len()
-                + artifacts.plan_doc.len()
-                + artifacts.orchestrator.len()
-                + artifacts.tasks.iter().map(|(_, c)| c.len()).sum::<usize>()
-                + artifacts.agents_md.as_ref().map_or(0, String::len);
-            let total_files =
-                3 + artifacts.tasks.len() + usize::from(artifacts.agents_md.is_some());
-            println!(
-                "\n  Total: {} files, {:.1} KB",
-                total_files,
-                total_size as f64 / 1024.0
-            );
-        }
-        println!("  Target: {}", project_path.display());
-        println!("  DAG: valid (no cycles)");
-        let groups = parallel_groups(&resolved)?;
-        println!("  Parallelizable groups: {}", groups.len());
-        for (i, group) in groups.iter().enumerate() {
-            println!("    Group {}: {}", i + 1, group.join(", "));
-        }
-        if estimate_tokens {
-            println!();
-            println!("{}", generation::tokens::format_report(&artifacts));
-        }
+        print_dry_run(&artifacts, &project_path, &resolved, estimate_tokens)?;
         return Ok(());
     }
 
@@ -214,6 +166,10 @@ fn cmd_generate(
     if artifacts.agents_md.is_some() {
         println!("   📝 AGENTS.md");
     }
+    println!("   📊 features.json");
+    if artifacts.evaluator_prompt.is_some() {
+        println!("   🔎 .vscode/evaluator.prompt.md");
+    }
     println!();
     println!("Next steps:");
     println!("  1. Review and enrich the task files in tasks/");
@@ -222,6 +178,76 @@ fn cmd_generate(
     println!("  2. Open the project in VS Code with Copilot Agent mode");
     println!("  3. Run the orchestrator prompt to start the loop");
 
+    Ok(())
+}
+
+#[allow(clippy::cast_precision_loss)]
+fn print_dry_run(
+    artifacts: &generation::GeneratedArtifacts,
+    project_path: &Path,
+    resolved: &[wiggum::domain::plan::ResolvedTask],
+    estimate_tokens: bool,
+) -> wiggum::error::Result<()> {
+    println!("Dry run — would generate:\n");
+    println!(
+        "  PROGRESS.md             ({:.1} KB)",
+        artifacts.progress.len() as f64 / 1024.0
+    );
+    println!(
+        "  IMPLEMENTATION_PLAN.md  ({:.1} KB)",
+        artifacts.plan_doc.len() as f64 / 1024.0
+    );
+    println!(
+        "  .vscode/orchestrator.prompt.md  ({:.1} KB)",
+        artifacts.orchestrator.len() as f64 / 1024.0
+    );
+    println!("  tasks/");
+    for (filename, content) in &artifacts.tasks {
+        println!("    {filename}  ({:.1} KB)", content.len() as f64 / 1024.0);
+    }
+    if let Some(agents) = &artifacts.agents_md {
+        println!(
+            "  AGENTS.md               ({:.1} KB)",
+            agents.len() as f64 / 1024.0
+        );
+    }
+    println!(
+        "  features.json           ({:.1} KB)",
+        artifacts.features_json.len() as f64 / 1024.0
+    );
+    if let Some(eval) = &artifacts.evaluator_prompt {
+        println!(
+            "  .vscode/evaluator.prompt.md  ({:.1} KB)",
+            eval.len() as f64 / 1024.0
+        );
+    }
+    let total_size = artifacts.progress.len()
+        + artifacts.plan_doc.len()
+        + artifacts.orchestrator.len()
+        + artifacts.tasks.iter().map(|(_, c)| c.len()).sum::<usize>()
+        + artifacts.agents_md.as_ref().map_or(0, String::len)
+        + artifacts.features_json.len()
+        + artifacts.evaluator_prompt.as_ref().map_or(0, String::len);
+    let total_files = 4
+        + artifacts.tasks.len()
+        + usize::from(artifacts.agents_md.is_some())
+        + usize::from(artifacts.evaluator_prompt.is_some());
+    println!(
+        "\n  Total: {} files, {:.1} KB",
+        total_files,
+        total_size as f64 / 1024.0
+    );
+    println!("  Target: {}", project_path.display());
+    println!("  DAG: valid (no cycles)");
+    let groups = parallel_groups(resolved)?;
+    println!("  Parallelizable groups: {}", groups.len());
+    for (i, group) in groups.iter().enumerate() {
+        println!("    Group {}: {}", i + 1, group.join(", "));
+    }
+    if estimate_tokens {
+        println!();
+        println!("{}", generation::tokens::format_report(artifacts));
+    }
     Ok(())
 }
 

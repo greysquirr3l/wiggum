@@ -36,6 +36,7 @@ pub fn render_with(tera: &Tera, plan: &Plan, task: &ResolvedTask) -> Result<Stri
     ctx.insert("must_haves", &task.must_haves);
     ctx.insert("gate", &task.gate);
     ctx.insert("strategy", &plan.orchestrator.strategy.to_string());
+    ctx.insert("evaluation_criteria", &task.evaluation_criteria);
 
     // Language profile data
     let profile = plan.project.language.profile();

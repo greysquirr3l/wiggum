@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-03-31
+
+### Added
+
+- `[evaluator]` section in plan TOML — opt-in QA evaluator agent that independently re-runs preflight, scores every exit criterion, and updates `features.json` with verified pass/fail state
+- `features.json` generated artifact — structured JSON registry of all tasks with per-criterion pass/fail tracking; referenced by both the orchestrator and evaluator agent
+- `evaluation_criteria` field on tasks — per-task list of verifiable exit criteria embedded in task files and `features.json`
+- `.vscode/evaluator.prompt.md` generated artifact — evaluator agent prompt, only emitted when `[evaluator]` is configured
+- Codebase State section in `PROGRESS.md` — subagents record file-level changes after each task, giving the next subagent accurate handoff context
+- Sprint contract step in all orchestrator strategy variants — orchestrator agrees on scope with the subagent before handoff
+- Independent verification step in orchestrator loop — orchestrator re-runs preflight itself before trusting a subagent's `[x]` checkbox
+- Premature victory guard in orchestrator prompt — warns the orchestrator not to declare completion until all tasks show `[x]`
+
 ## [0.4.0] - 2026-03-15
 
 ### Added
@@ -74,7 +87,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - VCS-aware reporting with git timeline
 - mdBook documentation site
 
-[Unreleased]: https://github.com/greysquirr3l/wiggum/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/greysquirr3l/wiggum/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/greysquirr3l/wiggum/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/greysquirr3l/wiggum/compare/v0.3.2...v0.4.0
 [0.3.2]: https://github.com/greysquirr3l/wiggum/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/greysquirr3l/wiggum/compare/v0.3.0...v0.3.1

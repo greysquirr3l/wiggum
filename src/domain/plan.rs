@@ -12,6 +12,8 @@ pub struct Plan {
     pub preflight: Preflight,
     #[serde(default)]
     pub orchestrator: Orchestrator,
+    #[serde(default)]
+    pub evaluator: Option<EvaluatorConfig>,
     pub phases: Vec<Phase>,
 }
 
@@ -32,6 +34,47 @@ pub struct Preflight {
     pub build: String,
     pub test: String,
     pub lint: String,
+}
+
+/// Configuration for the evaluator/QA agent generated alongside the subagent.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EvaluatorConfig {
+    /// Persona injected into the evaluator system prompt.
+    #[serde(default = "default_evaluator_persona")]
+    pub persona: String,
+    /// Minimum score (0–10) the evaluator must assign before a task passes.
+    #[serde(default = "default_pass_threshold")]
+    pub pass_threshold: u8,
+    /// When true, any single failing criterion immediately fails the task,
+    /// regardless of the overall score.
+    #[serde(default)]
+    pub hard_fail: bool,
+    /// Shell command the evaluator runs to verify the implementation
+    /// (e.g. `"cargo test --workspace"`). Falls back to preflight.test when absent.
+    #[serde(default)]
+    pub test_tool: Option<String>,
+}
+
+fn default_evaluator_persona() -> String {
+    "You are a skeptical senior engineer acting as a QA evaluator. \
+     Your job is to verify that the implementation actually meets the stated criteria — \
+     not just that it compiles or that the author says it's done."
+        .to_string()
+}
+
+const fn default_pass_threshold() -> u8 {
+    7
+}
+
+impl Default for EvaluatorConfig {
+    fn default() -> Self {
+        Self {
+            persona: default_evaluator_persona(),
+            pass_threshold: default_pass_threshold(),
+            hard_fail: false,
+            test_tool: None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -85,6 +128,10 @@ pub struct TaskDef {
     /// message and pause for human confirmation before starting this task.
     #[serde(default)]
     pub gate: Option<String>,
+    /// Evaluator exit criteria — each item is a verifiable condition that
+    /// must pass before the task can be marked complete.
+    #[serde(default)]
+    pub evaluation_criteria: Vec<String>,
 }
 
 /// A resolved task with its assigned number (T01, T02, ...).
@@ -100,6 +147,8 @@ pub struct ResolvedTask {
     pub must_haves: Vec<String>,
     /// Human-in-the-loop gate message, if any.
     pub gate: Option<String>,
+    /// Evaluator exit criteria carried over from `TaskDef`.
+    pub evaluation_criteria: Vec<String>,
     pub phase_name: String,
     pub phase_order: u32,
 }
@@ -245,6 +294,7 @@ impl Plan {
                     test_hints: task.test_hints.clone(),
                     must_haves: task.must_haves.clone(),
                     gate: task.gate.clone(),
+                    evaluation_criteria: task.evaluation_criteria.clone(),
                     phase_name: phase.name.clone(),
                     phase_order: phase.order,
                 });

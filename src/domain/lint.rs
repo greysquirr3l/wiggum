@@ -378,6 +378,7 @@ mod tests {
                 strategy: Strategy::default(),
                 rules: Vec::new(),
             },
+            evaluator: None,
             phases: vec![Phase {
                 name: "Phase 1".to_string(),
                 order: 1,
@@ -397,6 +398,7 @@ mod tests {
                 test_hints: t.test_hints,
                 must_haves: t.must_haves,
                 gate: t.gate,
+                evaluation_criteria: t.evaluation_criteria,
                 phase_name: "Phase 1".to_string(),
                 phase_order: 1,
             })
@@ -414,6 +416,7 @@ mod tests {
             test_hints: Vec::new(),
             must_haves: Vec::new(),
             gate: None,
+            evaluation_criteria: Vec::new(),
         }
     }
 
@@ -459,6 +462,7 @@ mod tests {
                     test_hints: vec!["test".to_string()],
                     must_haves: Vec::new(),
                     gate: None,
+                    evaluation_criteria: Vec::new(),
                 }
             })
             .collect();
@@ -479,6 +483,7 @@ mod tests {
                 test_hints: vec!["verify compiles".to_string()],
                 must_haves: Vec::new(),
                 gate: None,
+                evaluation_criteria: Vec::new(),
             },
             TaskDef {
                 slug: "domain".to_string(),
@@ -489,6 +494,7 @@ mod tests {
                 test_hints: vec!["unit test parsing".to_string()],
                 must_haves: Vec::new(),
                 gate: None,
+                evaluation_criteria: Vec::new(),
             },
         ];
         let (plan, resolved) = make_plan(tasks, Some("hexagonal".to_string()));

@@ -230,6 +230,11 @@ pub fn apply_split(plan_path: &Path, split: &SplitPlan) -> Result<String> {
             } else {
                 None
             },
+            evaluation_criteria: if i == split.parts.len() - 1 {
+                original.evaluation_criteria.clone()
+            } else {
+                vec![]
+            },
         });
     }
 

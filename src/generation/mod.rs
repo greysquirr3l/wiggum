@@ -1,5 +1,7 @@
 pub mod agents_md;
 pub mod clean;
+pub mod evaluator;
+pub mod features;
 pub mod orchestrator;
 pub mod plan_doc;
 pub mod progress;
@@ -21,6 +23,11 @@ pub struct GeneratedArtifacts {
     pub plan_doc: String,
     pub tasks: Vec<(String, String)>, // (filename, content)
     pub agents_md: Option<String>,
+    /// Structured JSON task feature/criteria registry (`features.json`).
+    pub features_json: String,
+    /// QA evaluator agent prompt (`.vscode/evaluator.prompt.md`).
+    /// Present only when the plan includes an `[evaluator]` section.
+    pub evaluator_prompt: Option<String>,
 }
 
 /// Generate all artifacts from a plan (pure — returns strings, no I/O).
@@ -44,6 +51,8 @@ pub fn generate_all(plan: &Plan) -> Result<GeneratedArtifacts> {
     }
 
     let agents_md = Some(agents_md::render(plan)?);
+    let features_json = features::render(plan, &resolved)?;
+    let evaluator_prompt = evaluator::render(plan, &resolved)?;
 
     Ok(GeneratedArtifacts {
         progress,
@@ -51,6 +60,8 @@ pub fn generate_all(plan: &Plan) -> Result<GeneratedArtifacts> {
         plan_doc,
         tasks,
         agents_md,
+        features_json,
+        evaluator_prompt,
     })
 }
 
@@ -78,6 +89,8 @@ pub fn generate_all_with_overrides(plan: &Plan, project_path: &Path) -> Result<G
     }
 
     let agents_md = Some(agents_md::render_with(&tera, plan)?);
+    let features_json = features::render(plan, &resolved)?;
+    let evaluator_prompt = evaluator::render_with(&tera, plan, &resolved)?;
 
     Ok(GeneratedArtifacts {
         progress,
@@ -85,6 +98,8 @@ pub fn generate_all_with_overrides(plan: &Plan, project_path: &Path) -> Result<G
         plan_doc,
         tasks,
         agents_md,
+        features_json,
+        evaluator_prompt,
     })
 }
 
@@ -125,6 +140,17 @@ pub fn write_artifacts(
     // Write AGENTS.md
     if let Some(agents_md) = &artifacts.agents_md {
         writer.write_file(&project_path.join("AGENTS.md"), agents_md)?;
+    }
+
+    // Write features.json — structured JSON task registry
+    writer.write_file(
+        &project_path.join("features.json"),
+        &artifacts.features_json,
+    )?;
+
+    // Write evaluator prompt when present
+    if let Some(evaluator_prompt) = &artifacts.evaluator_prompt {
+        writer.write_file(&vscode_dir.join("evaluator.prompt.md"), evaluator_prompt)?;
     }
 
     Ok(())

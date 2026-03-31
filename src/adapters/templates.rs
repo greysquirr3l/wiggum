@@ -21,6 +21,8 @@ pub struct TaskTemplate {
     pub test_hints: Vec<String>,
     #[serde(default)]
     pub must_haves: Vec<String>,
+    #[serde(default)]
+    pub evaluation_criteria: Vec<String>,
 }
 
 impl From<&TaskDef> for TaskTemplate {
@@ -32,6 +34,7 @@ impl From<&TaskDef> for TaskTemplate {
             hints: task.hints.clone(),
             test_hints: task.test_hints.clone(),
             must_haves: task.must_haves.clone(),
+            evaluation_criteria: task.evaluation_criteria.clone(),
         }
     }
 }
@@ -47,6 +50,7 @@ impl From<TaskTemplate> for TaskDef {
             test_hints: tmpl.test_hints,
             must_haves: tmpl.must_haves,
             gate: None,
+            evaluation_criteria: tmpl.evaluation_criteria,
         }
     }
 }
@@ -246,6 +250,7 @@ mod tests {
             hints: vec!["Hint 1".into()],
             test_hints: vec![],
             must_haves: vec![],
+            evaluation_criteria: vec![],
         };
 
         let toml_str = toml::to_string_pretty(&template).expect("should serialize");
