@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-04-01
+
+### Fixed
+
+- Added `[evaluator]` section and `evaluation_criteria` fields to the example plan (`reference/example-plan.toml`)
+- Fixed task fields table in docs — removed phantom `context` and `tests` fields, added `test_hints`, `must_haves`, `gate`, and `evaluation_criteria`
+- Added `strategy` field to orchestrator documentation with all three variants (`standard`, `tdd`, `gsd`)
+
 ## [0.5.0] - 2026-03-31
 
 ### Added

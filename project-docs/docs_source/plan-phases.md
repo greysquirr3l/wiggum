@@ -36,9 +36,11 @@ depends_on = ["domain-model", "database-adapter"]
 | `title` | Yes | Human-readable task title |
 | `goal` | Yes | What this task should accomplish |
 | `depends_on` | Yes | Array of task slugs this task depends on (empty array `[]` for no dependencies) |
-| `context` | No | Additional context for the subagent |
 | `hints` | No | Implementation hints or code snippets |
-| `tests` | No | Test requirements |
+| `test_hints` | No | Suggested tests the subagent should write |
+| `must_haves` | No | Hard exit criteria the task must satisfy |
+| `gate` | No | Precondition the orchestrator must verify before starting this task |
+| `evaluation_criteria` | No | Verifiable criteria scored by the [evaluator](./plan-preflight.md#evaluator-configuration) agent |
 
 ## Task numbering
 

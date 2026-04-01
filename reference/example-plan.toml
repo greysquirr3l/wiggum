@@ -47,6 +47,17 @@ rules = [
     "Use Coraline (coraline_* MCP tools) for code navigation when exploring the codebase.",
 ]
 
+# ─── Evaluator ────────────────────────────────────────────────────────────────
+# Optional independent QA agent that scores each task after the subagent
+# marks it complete.  When present, .vscode/evaluator.prompt.md is generated
+# alongside the orchestrator prompt.
+
+[evaluator]
+persona        = "You are a skeptical QA engineer who verifies every claim against the actual codebase."
+pass_threshold = 7        # minimum score (0–10) for a criterion to pass
+hard_fail      = true     # abort the loop on any failed criterion
+test_tool      = "cargo test --workspace"   # defaults to preflight.test if omitted
+
 # ─── Phase 1: Workspace Scaffold ──────────────────────────────────────────────
 
 [[phases]]
@@ -71,6 +82,10 @@ must_haves = [
     "Cargo.toml with edition = \"2024\"",
     ".github/workflows/ci.yml runs cargo build, clippy, and test",
     "deny.toml present",
+]
+evaluation_criteria = [
+    "CI pipeline runs build, clippy, and test on both ubuntu-latest and macos-latest",
+    "cargo-deny configuration covers licenses and advisories",
 ]
 
 # ─── Phase 2: Domain Model ────────────────────────────────────────────────────
@@ -100,6 +115,11 @@ must_haves = [
     "Port traits are object-safe",
     "Zero I/O dependencies in the domain module (enforced by a #![forbid(unsafe_code)] stub)",
 ]
+evaluation_criteria = [
+    "No tokio, reqwest, or sqlx imports anywhere in the domain module",
+    "All domain types implement Serialize and Deserialize",
+    "Port traits are object-safe (usable as dyn Trait)",
+]
 
 [[phases.tasks]]
 slug      = "signature-validation"
@@ -120,6 +140,10 @@ test_hints = [
 must_haves = [
     "Constant-time comparison — no timing side-channel",
     "Function is pure (no I/O, no side effects)",
+]
+evaluation_criteria = [
+    "Uses subtle::ConstantTimeEq — never == on HMAC digests",
+    "Unit tests cover valid signature, tampered payload, wrong secret, and missing header",
 ]
 
 # ─── Phase 3: HTTP Inbound Layer ──────────────────────────────────────────────
@@ -149,6 +173,10 @@ must_haves = [
     "Raw body read before JSON deserialization",
     "Secrets never logged",
     "Structured JSON error responses (not plain text)",
+]
+evaluation_criteria = [
+    "POST /webhook reads raw body bytes before any JSON deserialization",
+    "No secret material appears in any log output at any level",
 ]
 
 # ─── Phase 4: Outbound Dispatch ───────────────────────────────────────────────

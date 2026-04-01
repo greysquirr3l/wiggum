@@ -20,6 +20,7 @@ The `[orchestrator]` section configures the generated orchestrator prompt.
 ```toml
 [orchestrator]
 persona = "You are a senior Rust software engineer"
+strategy = "standard"
 rules = [
     "Never log tokens at any log level",
     "Keep domain crate free of I/O dependencies",
@@ -29,10 +30,11 @@ rules = [
 
 ### Fields
 
-| Field | Required | Description |
-|-------|----------|-------------|
-| `persona` | No | The subagent persona baked into every task prompt |
-| `rules` | No | Project-specific rules included in each subagent prompt |
+| Field | Required | Default | Description |
+|-------|----------|---------|-------------|
+| `persona` | No | `"You are a senior software engineer"` | The subagent persona baked into every task prompt |
+| `strategy` | No | `standard` | Execution strategy: `standard` (goal → implement → test → preflight), `tdd` (red → green → refactor → preflight), `gsd` (must-haves checklist → implement → verify) |
+| `rules` | No | | Project-specific rules included in each subagent prompt |
 
 ## Evaluator configuration
 
