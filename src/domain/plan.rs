@@ -14,6 +14,8 @@ pub struct Plan {
     pub orchestrator: Orchestrator,
     #[serde(default)]
     pub evaluator: Option<EvaluatorConfig>,
+    #[serde(default)]
+    pub security: SecurityConfig,
     pub phases: Vec<Phase>,
 }
 
@@ -34,6 +36,11 @@ pub struct Preflight {
     pub build: String,
     pub test: String,
     pub lint: String,
+    /// Supply-chain / vulnerability audit command appended after lint.
+    /// Defaults to the language profile's `audit_cmd`.
+    /// Set to an empty string to disable auditing for this plan.
+    #[serde(default)]
+    pub audit: Option<String>,
 }
 
 /// Configuration for the evaluator/QA agent generated alongside the subagent.
@@ -237,6 +244,15 @@ impl std::fmt::Display for Strategy {
     }
 }
 
+/// Plan-level security configuration.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct SecurityConfig {
+    /// When `true`, suppress the automatic injection of the `security-hardening`
+    /// task even if web-surface slugs are detected.
+    #[serde(default)]
+    pub skip_hardening_task: bool,
+}
+
 impl Preflight {
     /// Returns preflight commands with language-specific defaults
     /// for any field left empty.
@@ -252,6 +268,16 @@ impl Preflight {
         }
         if self.lint.is_empty() {
             self.lint = profile.lint_cmd.to_string();
+        }
+        // Inherit audit_cmd from profile if the user hasn't overridden it.
+        // An explicit `audit = ""` in TOML leaves the field as Some(""), which
+        // signals "disabled" and will be rendered as None below.
+        if self.audit.is_none() && !profile.audit_cmd.is_empty() {
+            self.audit = Some(profile.audit_cmd.to_string());
+        }
+        // Normalise empty-string override to None so templates can use `if audit_cmd`.
+        if self.audit.as_deref() == Some("") {
+            self.audit = None;
         }
         self
     }
@@ -324,6 +350,131 @@ impl Plan {
             }
         }
 
+        // Auto-inject a security-hardening task when the plan has
+        // web-facing surface (detected from task slugs/titles).
+        if !self.security.skip_hardening_task
+            && !resolved.iter().any(|t| t.slug == "security-hardening")
+            && has_web_surface(&resolved)
+        {
+            let last_slug = resolved.last().map(|t| t.slug.clone());
+            let last_phase = resolved.last().map_or_else(
+                || ("Security".to_string(), 999),
+                |t| (t.phase_name.clone(), t.phase_order),
+            );
+
+            resolved.push(security_hardening_task(
+                number,
+                last_slug,
+                last_phase.0,
+                last_phase.1,
+            ));
+        }
+
         Ok(resolved)
+    }
+}
+
+// ─── Security helpers ────────────────────────────────────────────────────────
+
+/// Keywords in task slugs or titles that suggest the plan has web-facing surface.
+const WEB_SURFACE_KEYWORDS: &[&str] = &[
+    "http",
+    "api",
+    "server",
+    "router",
+    "route",
+    "endpoint",
+    "handler",
+    "webhook",
+    "upload",
+    "auth",
+    "login",
+    "session",
+    "request",
+    "response",
+    "middleware",
+    "web",
+    "rest",
+    "grpc",
+    "graphql",
+];
+
+/// Returns `true` if any resolved task looks like it introduces web-facing code.
+fn has_web_surface(tasks: &[ResolvedTask]) -> bool {
+    tasks.iter().any(|t| {
+        let haystack = format!("{} {}", t.slug, t.title).to_lowercase();
+        WEB_SURFACE_KEYWORDS.iter().any(|kw| haystack.contains(kw))
+    })
+}
+
+/// Build the auto-injected security hardening task.
+fn security_hardening_task(
+    number: u32,
+    last_slug: Option<String>,
+    phase_name: String,
+    phase_order: u32,
+) -> ResolvedTask {
+    let depends_on = last_slug.map(|s| vec![s]).unwrap_or_default();
+
+    ResolvedTask {
+        number,
+        slug: "security-hardening".to_string(),
+        title: "Security hardening and vulnerability review".to_string(),
+        goal: "Verify and enforce the six OWASP baseline security properties \
+               across the entire codebase before declaring the project complete."
+            .to_string(),
+        depends_on,
+        hints: vec![
+            "Audit all source files for hardcoded credentials, API keys, or secrets. \
+             Everything sensitive must be read from environment variables or a secrets manager."
+                .to_string(),
+            "Verify every SQL query uses parameterised inputs — grep for string interpolation \
+             into query strings and replace any found."
+                .to_string(),
+            "Confirm HTTP security headers are set on all responses: \
+             Content-Security-Policy, Strict-Transport-Security, X-Frame-Options, \
+             X-Content-Type-Options."
+                .to_string(),
+            "Verify rate-limiting middleware is applied to the router/mux, not just defined — \
+             write a smoke test that sends >N requests and asserts 429."
+                .to_string(),
+            "Inspect every file-upload handler: validate MIME type server-side, \
+             block executable extensions, enforce a maximum file size."
+                .to_string(),
+            "Find every place the code fetches a URL on behalf of a user. \
+             Confirm the target is validated against an explicit allowlist \
+             (SSRF prevention)."
+                .to_string(),
+        ],
+        test_hints: vec![
+            "Rate-limiting smoke test: send N+1 requests to a rate-limited endpoint and assert \
+             the final response is HTTP 429."
+                .to_string(),
+            "Upload rejection test: submit a file with an executable extension and assert the \
+             server returns an error, not a successful upload."
+                .to_string(),
+            "SSRF test: attempt to fetch an internal metadata URL (e.g. 169.254.169.254) \
+             and assert the server rejects it."
+                .to_string(),
+        ],
+        must_haves: vec![
+            "No hardcoded secrets in any source file".to_string(),
+            "All database queries use parameterised inputs".to_string(),
+            "HTTP security headers present on all responses".to_string(),
+            "Rate-limiting middleware wired to router and verified by test".to_string(),
+            "File upload handler validates MIME type and rejects executable extensions".to_string(),
+            "URL-fetching code validates target against an allowlist".to_string(),
+        ],
+        gate: None,
+        evaluation_criteria: vec![
+            "No secrets found by grep -r for hardcoded keys, passwords, or tokens".to_string(),
+            "Security response headers verified by an integration test or curl assertion"
+                .to_string(),
+            "Rate-limit test sends N+1 requests and receives HTTP 429".to_string(),
+            "File upload test rejects .exe/.sh/.php and oversized files".to_string(),
+            "SSRF test confirms internal metadata URLs are blocked".to_string(),
+        ],
+        phase_name,
+        phase_order,
     }
 }

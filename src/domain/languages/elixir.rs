@@ -16,4 +16,14 @@ pub static PROFILE: &LanguageProfile = &LanguageProfile {
     doc_style: "Module doc (`@moduledoc`) and function doc (`@doc`) with Markdown. Add `@spec` typespecs for public functions.",
     error_handling: "Return `{:ok, value}` / `{:error, reason}` tuples for expected outcomes. Use `with` for chaining. Reserve `raise` for truly exceptional conditions.",
     build_success_phrase: "All code compiles without errors or warnings",
+
+    security_rules: &[
+        "Credentials, API keys, and secrets must only be read from runtime config (runtime.exs / System.get_env) or a secrets manager — never hardcoded in source files.",
+        "All database queries must use Ecto's parameterised query interface — never interpolate user input into raw SQL strings.",
+        "Every Phoenix application must set Content-Security-Policy, Strict-Transport-Security, X-Frame-Options, and X-Content-Type-Options response headers (via plug or phoenix_secure_headers).",
+        "Any controller or LiveView that accepts user input must enforce rate limiting — verify the plug is in the pipeline, not just defined.",
+        "File upload handlers must validate MIME type server-side, reject executable extensions, and enforce a maximum file size.",
+        "Any feature that fetches a URL on behalf of the user must validate the target against an explicit allowlist — never fetch arbitrary user-supplied URLs (SSRF prevention).",
+    ],
+    audit_cmd: "mix deps.audit",
 };

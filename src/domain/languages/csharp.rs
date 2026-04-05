@@ -16,4 +16,14 @@ pub static PROFILE: &LanguageProfile = &LanguageProfile {
     doc_style: "XML doc comments (`/// <summary>...</summary>`) on public types and members.",
     error_handling: "Throw specific exceptions for exceptional conditions. Use result patterns or nullable returns for expected failures. Catch at service boundaries.",
     build_success_phrase: "All code compiles without errors or warnings",
+
+    security_rules: &[
+        "Credentials, API keys, and secrets must only be read from environment variables, appsettings (with user-secrets locally), or Azure Key Vault — never hardcoded.",
+        "All database queries must use Entity Framework parameterised queries or SqlParameter — never concatenate user input into SQL strings.",
+        "Every HTTP server must set Content-Security-Policy, Strict-Transport-Security, X-Frame-Options, and X-Content-Type-Options response headers (e.g. via middleware).",
+        "Any endpoint that accepts user input must enforce rate limiting — verify the middleware is added to the pipeline, not just configured.",
+        "File upload handlers must validate MIME type server-side, reject executable extensions, and enforce a maximum file size.",
+        "Any feature that fetches a URL on behalf of the user must validate the target against an explicit allowlist — never fetch arbitrary user-supplied URLs (SSRF prevention).",
+    ],
+    audit_cmd: "dotnet list package --vulnerable",
 };

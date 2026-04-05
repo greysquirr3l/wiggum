@@ -44,6 +44,8 @@ pub fn render_with(tera: &Tera, plan: &Plan, task: &ResolvedTask) -> Result<Stri
     ctx.insert("test_file_pattern", profile.test_file_pattern);
     ctx.insert("doc_style", profile.doc_style);
     ctx.insert("error_handling", profile.error_handling);
+    let audit_cmd = plan.preflight.audit.as_deref().unwrap_or("");
+    ctx.insert("audit_cmd", &audit_cmd);
 
     // Dependency description
     let depends_on_desc = if task.depends_on.is_empty() {

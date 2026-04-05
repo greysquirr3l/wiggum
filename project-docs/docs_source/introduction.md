@@ -20,4 +20,5 @@ Setting up an AI orchestration loop currently requires hand-authoring all of the
 
 - **Agent-agnostic** — Wiggum generates artifacts, not agent invocations. Works with any AI coding tool that can read markdown.
 - **Scaffold, don't execute** — Wiggum produces plans and task files. Execution is someone else's job.
-- **Language-aware** — Ships with profiles for Rust, Go, TypeScript, Python, Java, C#, Kotlin, Swift, Ruby, and Elixir, providing sensible defaults for build, test, and lint commands.
+- **Language-aware** — Ships with profiles for Rust, Go, TypeScript, Python, Java, C#, Kotlin, Swift, Ruby, and Elixir, providing sensible defaults for build, test, lint, and security audit commands.
+- **Security by default** — Six OWASP-derived rules are injected into every task and orchestrator prompt automatically. Supply-chain audits run on every task completion. Plans with web-facing surface get an auto-appended security hardening task with verifiable exit criteria. None of this requires configuration.

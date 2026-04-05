@@ -71,7 +71,7 @@ After generating artifacts, open your AI coding tool in agent mode and load the 
 1. Read `PROGRESS.md` to find the next incomplete task
 2. Open the corresponding `tasks/T{NN}-{slug}.md` file
 3. Spawn a subagent to implement the task
-4. Run preflight checks (build, test, lint) to verify the work
+4. Run preflight checks (build, test, lint **+ security audit**) to verify the work
 5. Independently verify — re-runs preflight before trusting the subagent's completion mark
 6. Updates `features.json` with per-criterion pass/fail results
 7. If an `[evaluator]` agent is configured, spawns it to score the task independently
@@ -113,7 +113,26 @@ The generated task file opens with a `⛔ GATE` banner, and the orchestrator pro
 
 ## Language support
 
-Rust, Go, TypeScript, Python, Java, C#, Kotlin, Swift, Ruby, Elixir — each with idiomatic defaults for build, test, and lint commands.
+Rust, Go, TypeScript, Python, Java, C#, Kotlin, Swift, Ruby, Elixir — each with idiomatic defaults for build, test, lint, and **security audit** commands.
+
+## Security
+
+Wiggum bakes security into every generated plan at three levels:
+
+**1. Non-negotiable rules in every subagent prompt**
+Six OWASP-derived rules are injected automatically into the `## Security` section of every task file and orchestrator prompt — covering secrets management, parameterised queries, HTTP security headers, rate limiting, file upload validation, and SSRF prevention. You don't have to add them; they're always there.
+
+**2. Vulnerability audit in every preflight**
+The language profile's audit command (`cargo audit`, `govulncheck`, `npm audit`, `pip-audit`, etc.) is appended to every task's preflight chain and exit criteria. Supply-chain CVEs are checked on every task completion, not just at the end. Override or disable per-plan with `preflight.audit`.
+
+**3. Automatic security hardening task**
+When your plan contains web-facing surface (detected from task slugs containing `http`, `api`, `server`, `webhook`, `upload`, `auth`, etc.), Wiggum auto-appends a `security-hardening` task as the final task in your plan. Its `must_haves` and `evaluation_criteria` map directly to the six OWASP categories with concrete, verifiable conditions. Suppress with `[security] skip_hardening_task = true` if you're handling security separately.
+
+```toml
+# Opt out of the auto-injected security task if desired
+[security]
+skip_hardening_task = true
+```
 
 ## Documentation
 

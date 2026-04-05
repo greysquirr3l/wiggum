@@ -6,7 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
-## [0.5.1] - 2026-04-01
+## [0.6.0] - 2026-04-05
+
+### Added
+
+- Security rules embedded in every generated subagent prompt — six OWASP-derived, language-specific rules (`security_rules` field on `LanguageProfile`) covering secrets management, parameterised queries, HTTP security headers, rate limiting, file upload validation, and SSRF prevention; always injected into the `## Security (non-negotiable)` section of orchestrator and task prompts
+- `audit_cmd` on `LanguageProfile` — per-language vulnerability audit command (`cargo audit`, `govulncheck ./...`, `npm audit --audit-level=high`, `pip-audit`, etc.) appended to every task's preflight chain and added as an exit criterion automatically
+- `preflight.audit` field in plan TOML — overrides or disables the language-default audit command; inherits from the language profile when absent; set to `""` to disable
+- `[security]` section in plan TOML — `skip_hardening_task` boolean (default `false`) to suppress the auto-injected security hardening task
+- Auto-injected `security-hardening` task — appended as the final task when web-facing surface is detected from task slugs/titles (`http`, `api`, `server`, `webhook`, `upload`, `auth`, etc.); includes pre-populated `hints`, `test_hints`, `must_haves`, and `evaluation_criteria` for all six OWASP categories; can be suppressed with `[security] skip_hardening_task = true` or by including a task with the slug `security-hardening` manually
+- New `Security` book chapter (`docs_source/security.md`) covering all three hardening levels with override and opt-out examples
+
+### Changed
+
+- `LanguageProfile` extended with `security_rules` and `audit_cmd` fields (all ten language profiles updated)
+- `Preflight` struct gains optional `audit` field; `with_defaults` populates it from the language profile
+- `Plan` struct gains `security: SecurityConfig` field
+- `plan-preflight.md`, `language-profiles.md`, `generated-artifacts.md`, and `introduction.md` updated to document the new fields and behavior
+- `SUMMARY.md` updated to include the new Security page
 
 ### Fixed
 

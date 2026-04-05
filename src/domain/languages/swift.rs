@@ -16,4 +16,14 @@ pub static PROFILE: &LanguageProfile = &LanguageProfile {
     doc_style: "Swift doc comments (`///` or `/** */`) with Markdown. Use `- Parameters:`, `- Returns:`, `- Throws:` callouts.",
     error_handling: "Use `throws` functions with typed errors. Handle with `do/try/catch`. Use `Result<T, E>` for async or callback-based APIs.",
     build_success_phrase: "All code compiles without errors or warnings",
+
+    security_rules: &[
+        "Credentials, API keys, and secrets must only be read from the Keychain, environment variables, or a secrets manager — never hardcoded in source files.",
+        "All database queries must use parameterised queries or a type-safe query builder — never format user input into SQL strings.",
+        "Any HTTP server component must set Content-Security-Policy, Strict-Transport-Security, X-Frame-Options, and X-Content-Type-Options response headers.",
+        "Any endpoint that accepts user input must enforce rate limiting — verify the middleware is mounted on the router.",
+        "File upload handlers must validate MIME type server-side, reject executable extensions, and enforce a maximum file size.",
+        "Any feature that fetches a URL on behalf of the user must validate the target against an explicit allowlist — never fetch arbitrary user-supplied URLs (SSRF prevention).",
+    ],
+    audit_cmd: "",
 };

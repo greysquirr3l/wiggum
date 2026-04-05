@@ -1,0 +1,102 @@
+# Security
+
+Wiggum bakes security into every generated plan at three levels: rules embedded in subagent prompts, a vulnerability audit command appended to every preflight chain, and an automatically injected security hardening task for plans with web-facing surface.
+
+## Why it's automatic
+
+Independent security research consistently finds that AI-generated code introduces OWASP Top 10 vulnerabilities at high rates — particularly hardcoded secrets, SQL injection, missing HTTP security headers, disconnected rate limiting, unsafe file uploads, and SSRF. Wiggum treats these as structural concerns that belong in every plan by default, not optional additions the user must remember to include.
+
+## Level 1 — Security rules in every subagent prompt
+
+Every generated task file and orchestrator prompt includes a `## Security (non-negotiable)` section populated from the language profile. These six rules are always injected:
+
+| Category | Rule |
+|----------|------|
+| Secrets | Credentials and API keys must only be read from environment variables or a secrets manager — never hardcoded |
+| SQL injection | All database queries must use parameterised inputs — never interpolate user input into query strings |
+| Security headers | HTTP servers must set Content-Security-Policy, Strict-Transport-Security, X-Frame-Options, and X-Content-Type-Options |
+| Rate limiting | Rate-limiting middleware must be wired to the router, not just defined — verified by a smoke test |
+| File uploads | Upload handlers must validate MIME type server-side, reject executable extensions, and enforce a maximum file size |
+| SSRF | Any feature fetching URLs on behalf of a user must validate the target against an explicit allowlist |
+
+Rules are language-specific (e.g. the SQL rule references `sqlx` for Rust, `PreparedStatement` for Java, Ecto for Elixir) but cover the same six categories for every language.
+
+You can add project-specific security rules on top via `[orchestrator] rules`:
+
+```toml
+[orchestrator]
+rules = [
+    "HMAC secrets must never appear in log output at any log level.",
+    "All outbound HTTP requests must use a timeout of 10 seconds.",
+]
+```
+
+## Level 2 — Vulnerability audit in every preflight
+
+Each language profile includes an `audit_cmd` that is appended to the preflight chain run after every task:
+
+| Language | Audit command |
+|----------|--------------|
+| Rust | `cargo audit` |
+| Go | `govulncheck ./...` |
+| TypeScript | `npm audit --audit-level=high` |
+| Python | `pip-audit` |
+| Java | `mvn dependency-check:check` |
+| C# | `dotnet list package --vulnerable` |
+| Kotlin | `gradle dependencyCheckAnalyze` |
+| Ruby | `bundle exec bundler-audit check --update` |
+| Elixir | `mix deps.audit` |
+| Swift | _(no standard tool; field left empty)_ |
+
+So for a Rust plan, every task's preflight block becomes:
+
+```bash
+cargo build --workspace && cargo test --workspace && cargo clippy --workspace -- -D warnings && cargo audit
+```
+
+And the task's exit criteria automatically includes:
+
+- [ ] `cargo audit` reports no vulnerabilities
+
+### Overriding the audit command
+
+Override per-plan in `[preflight]`:
+
+```toml
+[preflight]
+audit = "cargo audit --deny warnings"
+```
+
+### Disabling the audit
+
+Set `audit` to an empty string:
+
+```toml
+[preflight]
+audit = ""
+```
+
+## Level 3 — Auto-injected security hardening task
+
+When your plan contains web-facing surface, Wiggum automatically appends a `security-hardening` task as the final task. Web surface is detected from task slugs and titles containing any of: `http`, `api`, `server`, `router`, `route`, `endpoint`, `handler`, `webhook`, `upload`, `auth`, `login`, `session`, `request`, `response`, `middleware`, `web`, `rest`, `grpc`, `graphql`.
+
+The injected task has:
+
+- **Goal** — Verify and enforce the six OWASP baseline security properties across the entire codebase
+- **Hints** — One concrete guidance item per category (grep for secrets, verify parameterised queries, check headers are wired, write a rate-limit smoke test, inspect upload handlers, check URL-fetching allowlists)
+- **Test hints** — Rate-limit smoke test (assert HTTP 429 at N+1 requests), upload rejection test, SSRF rejection test
+- **Must-haves** — Six items, one per OWASP category
+- **Evaluation criteria** — Five verifiable conditions scored by the evaluator
+
+This task depends on the last explicit task in your plan, so it always runs last. The evaluator will hard-fail if any criterion is not met when `[evaluator] hard_fail = true`.
+
+### Opting out
+
+If you're handling security via a separate process or your plan doesn't actually have web surface, suppress injection with:
+
+```toml
+[security]
+skip_hardening_task = true
+```
+
+You can also manually include a task with the slug `security-hardening` in your plan — if that slug is already present, auto-injection is skipped automatically.

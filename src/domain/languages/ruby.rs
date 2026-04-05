@@ -16,4 +16,14 @@ pub static PROFILE: &LanguageProfile = &LanguageProfile {
     doc_style: "YARD doc comments (`# @param`, `# @return`) or plain comments above methods. Use `README.md` for high-level documentation.",
     error_handling: "Raise specific exceptions (subclass `StandardError`). Rescue at boundaries. Avoid bare `rescue`. Use custom error hierarchies per domain.",
     build_success_phrase: "All source files parse without syntax errors",
+
+    security_rules: &[
+        "Credentials, API keys, and secrets must only be read from environment variables or a secrets manager (e.g. credentials.yml.enc) — never hardcoded in source files.",
+        "All database queries must use ActiveRecord's parameterised interface or `?` placeholders — never interpolate user input into SQL strings.",
+        "Every Rack/Rails application must set Content-Security-Policy, Strict-Transport-Security, X-Frame-Options, and X-Content-Type-Options headers (e.g. via SecureHeaders gem).",
+        "Any endpoint that accepts user input must enforce rate limiting — verify the middleware is mounted in the stack, not just configured.",
+        "File upload handlers must validate MIME type server-side (e.g. via Marcel), reject executable extensions, and enforce a maximum file size.",
+        "Any feature that fetches a URL on behalf of the user must validate the target against an explicit allowlist — never fetch arbitrary user-supplied URLs (SSRF prevention).",
+    ],
+    audit_cmd: "bundle exec bundler-audit check --update",
 };

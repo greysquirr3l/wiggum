@@ -52,3 +52,4 @@ docs/dev/
 reference/
 !reference/example-plan.toml
 
+ai_assisted_development-security.md

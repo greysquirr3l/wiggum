@@ -16,4 +16,14 @@ pub static PROFILE: &LanguageProfile = &LanguageProfile {
     doc_style: "Javadoc (`/** ... */`) on public classes, methods, and fields. Include `@param`, `@return`, `@throws` tags.",
     error_handling: "Use checked exceptions for recoverable errors, unchecked for programming bugs. Catch at appropriate boundaries. Never swallow exceptions silently.",
     build_success_phrase: "All code compiles without errors",
+
+    security_rules: &[
+        "Credentials, API keys, and secrets must only be read from environment variables or a secrets manager — never hardcoded in source files.",
+        "All database queries must use PreparedStatement or a type-safe query builder — never concatenate user input into SQL strings.",
+        "Every HTTP server must set Content-Security-Policy, Strict-Transport-Security, X-Frame-Options, and X-Content-Type-Options response headers.",
+        "Any endpoint that accepts user input must enforce rate limiting — verify the filter or interceptor is registered in the application context.",
+        "File upload handlers must validate MIME type server-side, reject executable extensions, and enforce a maximum file size.",
+        "Any feature that fetches a URL on behalf of the user must validate the target against an explicit allowlist — never fetch arbitrary user-supplied URLs (SSRF prevention).",
+    ],
+    audit_cmd: "mvn dependency-check:check",
 };

@@ -33,6 +33,10 @@ pub fn render_with(tera: &Tera, plan: &Plan, tasks: &[ResolvedTask]) -> Result<S
     ctx.insert("strategy", &plan.orchestrator.strategy.to_string());
     ctx.insert("has_evaluator", &plan.evaluator.is_some());
 
+    // Security rules from the language profile, always injected.
+    let profile = plan.project.language.profile();
+    ctx.insert("security_rules", &profile.security_rules);
+
     tera.render("orchestrator.md", &ctx)
         .map_err(|e| WiggumError::Template(e.to_string()))
 }

@@ -16,4 +16,14 @@ pub static PROFILE: &LanguageProfile = &LanguageProfile {
     doc_style: "Docstrings (triple-quoted) on modules, classes, and public functions. Follow Google or NumPy docstring style.",
     error_handling: "Raise specific exceptions (subclass `Exception`). Use try/except at boundaries. Avoid bare `except:`. Document raised exceptions in docstrings.",
     build_success_phrase: "All source files parse without syntax errors",
+
+    security_rules: &[
+        "Credentials, API keys, and secrets must only be read from environment variables or a secrets manager — never hardcoded in source files or committed .env files.",
+        "All database queries must use parameterised queries (e.g. `cursor.execute(sql, params)` or an ORM's safe query builder) — never use f-strings or % formatting to build SQL.",
+        "Every HTTP server must set Content-Security-Policy, Strict-Transport-Security, X-Frame-Options, and X-Content-Type-Options response headers.",
+        "Any endpoint that accepts user input must enforce rate limiting — verify the limiter is applied to the route, not just instantiated.",
+        "File upload handlers must validate MIME type server-side, reject executable extensions, and enforce a maximum file size.",
+        "Any feature that fetches a URL on behalf of the user must validate the target against an explicit allowlist — never fetch arbitrary user-supplied URLs (SSRF prevention).",
+    ],
+    audit_cmd: "pip-audit",
 };

@@ -133,6 +133,7 @@ pub fn build_plan_from_scan(scan: &ScanResult, project_path: &Path) -> Plan {
             rules: scan.rules.clone(),
         },
         evaluator: None,
+        security: crate::domain::plan::SecurityConfig::default(),
         phases: vec![Phase {
             name: "TODO — rename this phase".to_string(),
             order: 1,

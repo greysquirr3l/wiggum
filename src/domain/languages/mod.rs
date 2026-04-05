@@ -52,6 +52,17 @@ pub struct LanguageProfile {
     // ─── Exit criteria wording ───────────────────────────────────
     /// How to phrase "code compiles" for this language.
     pub build_success_phrase: &'static str,
+    // ─── Security ────────────────────────────────────────────────
+    /// Non-negotiable OWASP-derived security rules injected into every
+    /// generated subagent prompt alongside the user-supplied rules.
+    /// These rules are language-specific but cover the same universal
+    /// risk categories: secrets, injection, rate limiting, uploads,
+    /// security headers, and SSRF.
+    pub security_rules: &'static [&'static str],
+
+    /// Command to run a supply-chain / vulnerability audit (e.g. `cargo audit`).
+    /// Appended to every preflight check after lint. Empty string = skipped.
+    pub audit_cmd: &'static str,
 }
 
 /// Get the profile for a language.

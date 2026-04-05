@@ -29,11 +29,13 @@ fn parse_example_plan() {
 fn resolve_tasks_numbering() {
     let plan = load_example_plan();
     let resolved = plan.resolve_tasks().expect("Failed to resolve tasks");
-    assert_eq!(resolved.len(), 5);
+    // 5 explicit tasks + 1 auto-injected security-hardening task (http-client triggers detection)
+    assert_eq!(resolved.len(), 6);
     assert_eq!(resolved[0].number, 1);
     assert_eq!(resolved[0].slug, "workspace-scaffold");
     assert_eq!(resolved[4].number, 5);
     assert_eq!(resolved[4].slug, "persistence");
+    assert_eq!(resolved[5].slug, "security-hardening");
 }
 
 #[test]
@@ -64,8 +66,8 @@ fn generate_all_artifacts() {
     assert!(artifacts.plan_doc.contains("example-project"));
     assert!(artifacts.plan_doc.contains("hexagonal"));
 
-    // Check task files
-    assert_eq!(artifacts.tasks.len(), 5);
+    // Check task files (5 explicit + 1 auto-injected security-hardening)
+    assert_eq!(artifacts.tasks.len(), 6);
     let (filename, content) = &artifacts.tasks[0];
     assert_eq!(filename, "T01-workspace-scaffold.md");
     assert!(content.contains("# T01"));

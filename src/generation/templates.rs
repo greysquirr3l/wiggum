@@ -285,6 +285,10 @@ Focus on must-haves. No gold-plating.
 - Implement THIS TASK ONLY. Do not touch code from other tasks.
 {% for rule in rules %}- {{ rule }}
 {% endfor %}
+## Security (non-negotiable)
+{% for rule in security_rules %}
+- {{ rule }}
+{% endfor %}
 {% if architecture == "hexagonal" %}
 ## Architecture: Hexagonal
 
@@ -423,7 +427,7 @@ If none are found, move on.
 ## Preflight
 
 ```bash
-{{ preflight_build }} && {{ preflight_test }} && {{ preflight_lint }}
+{{ preflight_build }} && {{ preflight_test }} && {{ preflight_lint }}{% if audit_cmd %} && {{ audit_cmd }}{% endif %}
 ```
 
 ## Exit Criteria
@@ -431,7 +435,8 @@ If none are found, move on.
 - [ ] {{ build_success_phrase }}
 - [ ] All tests pass
 - [ ] Linter passes with no warnings
-- [ ] Implementation matches the goal described above
+{% if audit_cmd %}- [ ] `{{ audit_cmd }}` reports no vulnerabilities
+{% endif %}- [ ] Implementation matches the goal described above
 - [ ] No unresolved TODO/FIXME/HACK markers that belong to this task's scope
 {% if evaluation_criteria %}
 {% for criterion in evaluation_criteria %}- [ ] {{ criterion }}

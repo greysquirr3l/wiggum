@@ -11,8 +11,9 @@ Each task becomes a numbered markdown file with a consistent structure:
 - **Project Context** — Where this fits in the architecture
 - **Implementation** — Guidance, file paths, type signatures, code snippets
 - **Tests** — What to test and where
-- **Preflight** — Commands to run before marking complete
-- **Exit Criteria** — Verifiable conditions for completion
+- **Security** — Six non-negotiable OWASP rules from the language profile, always present
+- **Preflight** — Commands to run before marking complete (build, test, lint, and security audit)
+- **Exit Criteria** — Verifiable conditions for completion, including a `cargo audit` (or equivalent) check
 
 ## Progress tracker — `PROGRESS.md`
 
@@ -62,6 +63,12 @@ A structured JSON file listing every task with its pass/fail state and per-crite
 ```
 
 Custom criteria can be added per-task via the `evaluation_criteria` field in your plan TOML.
+
+## Auto-injected security hardening task
+
+When your plan contains web-facing surface (task slugs or titles containing `http`, `api`, `server`, `webhook`, `upload`, `auth`, etc.), Wiggum automatically appends a `security-hardening` task as the final task in the resolved task list. This task has pre-populated `hints`, `test_hints`, `must_haves`, and `evaluation_criteria` covering all six OWASP baseline categories.
+
+Suppress with `[security] skip_hardening_task = true` in your plan, or by including your own task with the slug `security-hardening`. See [Security](./security.md) for details.
 
 ## Evaluator prompt — `.vscode/evaluator.prompt.md`
 

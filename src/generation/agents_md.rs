@@ -40,7 +40,7 @@ pub fn render_with(tera: &Tera, plan: &Plan) -> Result<String> {
 mod tests {
     use super::*;
     use crate::domain::plan::{
-        Language, Orchestrator, Phase, Plan, Preflight, Project, Strategy, TaskDef,
+        Language, Orchestrator, Phase, Plan, Preflight, Project, SecurityConfig, Strategy, TaskDef,
     };
 
     fn sample_plan() -> Plan {
@@ -56,6 +56,7 @@ mod tests {
                 build: "cargo build --workspace".to_string(),
                 test: "cargo test --workspace".to_string(),
                 lint: "cargo clippy --workspace -- -D warnings".to_string(),
+                audit: None,
             },
             orchestrator: Orchestrator {
                 persona: "You are a senior rust software engineer".to_string(),
@@ -66,6 +67,7 @@ mod tests {
                 ],
             },
             evaluator: None,
+            security: SecurityConfig::default(),
             phases: vec![Phase {
                 name: "Foundation".to_string(),
                 order: 1,
@@ -173,6 +175,7 @@ mod tests {
             build: "go build ./...".to_string(),
             test: "go test -v ./...".to_string(),
             lint: "go vet ./... && golangci-lint run ./...".to_string(),
+            audit: None,
         };
         let output = render(&plan).unwrap();
         assert!(output.contains("go"));

@@ -71,7 +71,7 @@ mod tests {
     use super::*;
     use crate::domain::plan::{
         EvaluatorConfig, Language, Orchestrator, Phase, Plan, Preflight, Project, ResolvedTask,
-        TaskDef,
+        SecurityConfig, TaskDef,
     };
 
     fn make_plan(with_evaluator: bool) -> Plan {
@@ -87,6 +87,7 @@ mod tests {
                 build: "cargo build".to_string(),
                 test: "cargo test".to_string(),
                 lint: "cargo clippy".to_string(),
+                audit: None,
             },
             orchestrator: Orchestrator::default(),
             evaluator: if with_evaluator {
@@ -94,6 +95,7 @@ mod tests {
             } else {
                 None
             },
+            security: SecurityConfig::default(),
             phases: vec![Phase {
                 name: "Foundation".to_string(),
                 order: 1,

@@ -11,6 +11,7 @@
   - [Project Configuration](./plan-project.md)
   - [Phases and Tasks](./plan-phases.md)
   - [Preflight and Orchestrator](./plan-preflight.md)
+- [Security](./security.md)
 - [CLI Reference](./cli-reference.md)
 - [MCP Server](./mcp-server.md)
 
