@@ -157,8 +157,12 @@ Repeat until all tasks (T01–T{{ task_count_padded }}) in PROGRESS.md are `[x]`
 3. **Check for a gate** — if the task file begins with a `⛔ GATE` banner, emit it verbatim
    and **stop**. The human must confirm (e.g. by restarting the orchestrator) before you proceed.
 4. Mark it `[~]` in PROGRESS.md.
-5. **Read the Accumulated Learnings and Codebase State sections** — apply any relevant insights.
-6. Start a subagent with the SUBAGENT_PROMPT below.
+5. **Extract context for the subagent** — read PROGRESS.md and copy out the full text of
+   the **Accumulated Learnings** section and the **Codebase State** section verbatim.
+   You will inject this content directly into the subagent dispatch message in step 6.
+6. Start a subagent with the SUBAGENT_PROMPT below, **prepending the extracted
+   Accumulated Learnings and Codebase State content at the top of the dispatch message**
+   so the subagent receives it as live context, not a file reference.
 7. Wait for the subagent to complete.
 8. **Independently verify** — run the preflight yourself before trusting the subagent's `[x]`:
    ```bash
@@ -204,49 +208,24 @@ If this tool is not available, fail immediately with:
 
 Follow the Red-Green-Refactor cycle strictly:
 
+> The **Accumulated Learnings** and **Codebase State** from PROGRESS.md have been
+> injected above by the orchestrator. Apply them before writing any code.
+
 1. Read PROGRESS.md.
-2. **Read the Accumulated Learnings and Codebase State sections** — apply relevant insights from prior tasks.
-3. Find the highest-priority task that is `[ ]` and whose dependencies are all `[x]`.
-4. Mark it `[~]` in PROGRESS.md immediately.
-5. Read the corresponding task file in `tasks/`.
-6. **Sprint contract** — Before writing any code, state explicitly:
+2. Find the highest-priority task that is `[ ]` and whose dependencies are all `[x]`.
+3. Mark it `[~]` in PROGRESS.md immediately.
+4. Read the corresponding task file in `tasks/`.
+5. **Sprint contract** — Before writing any code, state explicitly:
    - What you will build (files, functions, types)
    - How you will verify each exit criterion in the task file
-7. **RED** — Write failing tests first based on the test hints. Run them to confirm they fail.
-8. **GREEN** — Write the minimum code to make all tests pass. Do not add extra functionality.
-9. **REFACTOR** — Clean up the code while keeping all tests green. Remove duplication, improve naming.
-10. Run the preflight check from the task file:
+6. **RED** — Write failing tests first based on the test hints. Run them to confirm they fail.
+7. **GREEN** — Write the minimum code to make all tests pass. Do not add extra functionality.
+8. **REFACTOR** — Clean up the code while keeping all tests green. Remove duplication, improve naming.
+9. Run the preflight check from the task file:
     ```bash
     {{ preflight_build }} && {{ preflight_test }} && {{ preflight_lint }}
     ```
     Fix all errors and warnings until preflight passes.
-11. Verify every exit criterion from the task file is met.
-12. Update PROGRESS.md: change `[~]` to `[x]` for this task.
-13. **Update Codebase State** in PROGRESS.md — briefly describe what now exists after this task.
-14. **Append any learnings** to the Accumulated Learnings section in PROGRESS.md.
-    Format: `- T{NN}: {what you learned}`
-15. Commit with a conventional commit message focused on user impact (not file counts or line numbers).
-16. Stop.
-{% elif strategy == "gsd" %}
-## Strategy: Get Stuff Done (GSD)
-
-Focus on must-haves. No gold-plating.
-
-1. Read PROGRESS.md.
-2. **Read the Accumulated Learnings and Codebase State sections** — apply relevant insights from prior tasks.
-3. Find the highest-priority task that is `[ ]` and whose dependencies are all `[x]`.
-4. Mark it `[~]` in PROGRESS.md immediately.
-5. Read the corresponding task file in `tasks/`.
-6. **Sprint contract** — Before writing any code, state explicitly:
-   - Which must-haves you will implement
-   - How you will verify each one is present and working
-7. **Implement each must-have** — work through them one by one. No extras.
-8. **Verify all must-haves** — confirm every deliverable is present and working.
-9. Run the preflight check from the task file:
-   ```bash
-   {{ preflight_build }} && {{ preflight_test }} && {{ preflight_lint }}
-   ```
-   Fix all errors and warnings until preflight passes.
 10. Verify every exit criterion from the task file is met.
 11. Update PROGRESS.md: change `[~]` to `[x]` for this task.
 12. **Update Codebase State** in PROGRESS.md — briefly describe what now exists after this task.
@@ -254,18 +233,23 @@ Focus on must-haves. No gold-plating.
     Format: `- T{NN}: {what you learned}`
 14. Commit with a conventional commit message focused on user impact (not file counts or line numbers).
 15. Stop.
-{% else %}
-## Your job
+{% elif strategy == "gsd" %}
+## Strategy: Get Stuff Done (GSD)
+
+Focus on must-haves. No gold-plating.
+
+> The **Accumulated Learnings** and **Codebase State** from PROGRESS.md have been
+> injected above by the orchestrator. Apply them before writing any code.
 
 1. Read PROGRESS.md.
-2. **Read the Accumulated Learnings and Codebase State sections** — apply relevant insights from prior tasks.
-3. Find the highest-priority task that is `[ ]` and whose dependencies are all `[x]`.
-4. Mark it `[~]` in PROGRESS.md immediately.
-5. Read the corresponding task file in `tasks/`.
-6. **Sprint contract** — Before writing any code, state explicitly:
-   - What you will build (files, functions, types)
-   - How you will verify each exit criterion listed in the task file
-7. Implement the task completely — create all files, write all code, add all tests specified.
+2. Find the highest-priority task that is `[ ]` and whose dependencies are all `[x]`.
+3. Mark it `[~]` in PROGRESS.md immediately.
+4. Read the corresponding task file in `tasks/`.
+5. **Sprint contract** — Before writing any code, state explicitly:
+   - Which must-haves you will implement
+   - How you will verify each one is present and working
+6. **Implement each must-have** — work through them one by one. No extras.
+7. **Verify all must-haves** — confirm every deliverable is present and working.
 8. Run the preflight check from the task file:
    ```bash
    {{ preflight_build }} && {{ preflight_test }} && {{ preflight_lint }}
@@ -278,6 +262,32 @@ Focus on must-haves. No gold-plating.
     Format: `- T{NN}: {what you learned}`
 13. Commit with a conventional commit message focused on user impact (not file counts or line numbers).
 14. Stop.
+{% else %}
+## Your job
+
+> The **Accumulated Learnings** and **Codebase State** from PROGRESS.md have been
+> injected above by the orchestrator. Apply them before writing any code.
+
+1. Read PROGRESS.md.
+2. Find the highest-priority task that is `[ ]` and whose dependencies are all `[x]`.
+3. Mark it `[~]` in PROGRESS.md immediately.
+4. Read the corresponding task file in `tasks/`.
+5. **Sprint contract** — Before writing any code, state explicitly:
+   - What you will build (files, functions, types)
+   - How you will verify each exit criterion listed in the task file
+6. Implement the task completely — create all files, write all code, add all tests specified.
+7. Run the preflight check from the task file:
+   ```bash
+   {{ preflight_build }} && {{ preflight_test }} && {{ preflight_lint }}
+   ```
+   Fix all errors and warnings until preflight passes.
+8. Verify every exit criterion from the task file is met.
+9. Update PROGRESS.md: change `[~]` to `[x]` for this task.
+10. **Update Codebase State** in PROGRESS.md — briefly describe what now exists after this task.
+11. **Append any learnings** to the Accumulated Learnings section in PROGRESS.md.
+    Format: `- T{NN}: {what you learned}`
+12. Commit with a conventional commit message focused on user impact (not file counts or line numbers).
+13. Stop.
 {% endif %}
 
 ## Rules

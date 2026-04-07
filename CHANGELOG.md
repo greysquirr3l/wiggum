@@ -6,7 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
-## [0.6.0] - 2026-04-05
+## [0.6.1] - 2026-04-07
+
+### Changed
+
+- Orchestrator template now explicitly extracts the **Accumulated Learnings** and **Codebase State** sections from `PROGRESS.md` and injects them verbatim into the subagent dispatch message, rather than instructing the subagent to read the file itself — ensures context is active and cannot be skipped
+- Subagent prompt preamble in all three strategy variants (`standard`, `tdd`, `gsd`) updated to note that learnings are pre-injected by the orchestrator rather than requiring a redundant file read step
 
 ### Added
 
