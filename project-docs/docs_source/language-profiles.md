@@ -11,7 +11,7 @@ Wiggum ships with built-in profiles for 10 programming languages. Each profile p
 | TypeScript | `tsc --noEmit` | `vitest run` | `eslint .` | `npm audit --audit-level=high` |
 | Python | `python -m py_compile` | `pytest -v` | `ruff check .` | `pip-audit` |
 | Java | `mvn compile` | `mvn test` | `mvn checkstyle:check` | `mvn dependency-check:check` |
-| C# | `dotnet build` | `dotnet test` | `dotnet format --verify-no-changes` | `dotnet list package --vulnerable` |
+| C# / .NET | `dotnet build --nologo -v q` | `dotnet test --nologo -v q` | `dotnet format --verify-no-changes` | `dotnet list package --vulnerable` |
 | Kotlin | `gradle build` | `gradle test` | `gradle detekt` | `gradle dependencyCheckAnalyze` |
 | Swift | `swift build` | `swift test` | `swiftlint` | _(none)_ |
 | Ruby | `ruby -c` | `bundle exec rspec` | `bundle exec rubocop` | `bundle exec bundler-audit check --update` |

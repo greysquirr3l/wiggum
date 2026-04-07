@@ -29,6 +29,8 @@ The `language` field determines which [language profile](./language-profiles.md)
 
 Supported values: `rust`, `go`, `typescript`, `python`, `java`, `csharp`, `kotlin`, `swift`, `ruby`, `elixir`.
 
+> **Note for .NET projects:** use `language = "csharp"` — this covers all .NET SDK project types (ASP.NET Core, console, class library, etc.) regardless of whether you write C#, F#, or VB.NET.
+
 ## Architecture
 
 The optional `architecture` field provides hints to the generated task files about how code should be organized. This influences implementation guidance in the generated artifacts.
