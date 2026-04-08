@@ -163,7 +163,7 @@ fn handle_request(request: &JsonRpcRequest) -> JsonRpcResponse {
     match request.method.as_str() {
         "initialize" => {
             match serde_json::to_value(InitializeResult {
-                protocol_version: "2024-11-05".to_string(),
+                protocol_version: "2025-06-18".to_string(),
                 capabilities: Capabilities {
                     tools: ToolsCapability {
                         list_changed: false,

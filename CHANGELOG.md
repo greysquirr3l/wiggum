@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Changed
+
+- Updated MCP server protocol version to `2025-06-18` (latest official MCP spec)
+- Enhanced Cargo.toml with comprehensive clippy linting configuration: enabled `clippy::all`, `clippy::pedantic`, `clippy::nursery`, `clippy::cargo`, and `clippy::perf` with targeted allow/deny overrides for production-grade code quality enforcement
+
 ## [0.6.1] - 2026-04-07
 
 ### Changed
