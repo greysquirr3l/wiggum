@@ -30,7 +30,7 @@ Wiggum is a scaffold generator that reads TOML plan files and writes markdown ar
 - **Dependency auditing** — `cargo-audit` runs on every push; supply-chain CVEs caught early
 - **Automated security analysis** — CodeQL SAST scans on every push and PR
 - **Automated dependency updates** — Dependabot weekly updates with PR reviews; major versions reviewed manually
-- **OSSF Scorecard** — Continuous security posture monitoring; results at https://api.securityscorecards.dev/projects/github.com/greysquirr3l/wiggum
+- **OSSF Scorecard** — Continuous security posture monitoring; results at <https://api.securityscorecards.dev/projects/github.com/greysquirr3l/wiggum>
 - **Token permissions** — GitHub Actions use minimal required permissions (least privilege)
 - **Dangerous workflow protection** — No `pull_request_target` or `workflow_run` with token escalation
 
