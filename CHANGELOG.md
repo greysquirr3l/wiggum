@@ -6,10 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-04-08
+
 ### Changed
 
 - Updated MCP server protocol version to `2025-06-18` (latest official MCP spec)
 - Enhanced Cargo.toml with comprehensive clippy linting configuration: enabled `clippy::all`, `clippy::pedantic`, `clippy::nursery`, `clippy::cargo`, and `clippy::perf` with targeted allow/deny overrides for production-grade code quality enforcement
+
+### Dependencies
+
+- Updated all dependencies to latest versions (clap 4.6.0, tokio 1.51.1, toml 1.1.2, and others)
 
 ## [0.6.1] - 2026-04-07
 
@@ -122,8 +128,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - VCS-aware reporting with git timeline
 - mdBook documentation site
 
-[Unreleased]: https://github.com/greysquirr3l/wiggum/compare/v0.5.0...HEAD
-[0.5.0]: https://github.com/greysquirr3l/wiggum/compare/v0.4.0...v0.5.0
+[Unreleased]: https://github.com/greysquirr3l/wiggum/compare/v0.6.2...HEAD
+[0.6.2]: https://github.com/greysquirr3l/wiggum/compare/v0.6.1...v0.6.2
+[0.6.1]: https://github.com/greysquirr3l/wiggum/compare/v0.5.0...v0.6.1
 [0.4.0]: https://github.com/greysquirr3l/wiggum/compare/v0.3.2...v0.4.0
 [0.3.2]: https://github.com/greysquirr3l/wiggum/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/greysquirr3l/wiggum/compare/v0.3.0...v0.3.1
