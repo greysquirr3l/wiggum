@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Added
+
+- CodeQL static analysis security testing (SAST) — automatic code scanning on every push and PR
+- Dependabot automation — weekly dependency updates for cargo and GitHub Actions
+- Comprehensive security practices documentation in SECURITY.md
+
 ## [0.6.2] - 2026-04-08
 
 ### Changed
