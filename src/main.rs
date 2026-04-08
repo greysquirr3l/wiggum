@@ -83,6 +83,10 @@ fn main() {
         Command::Split { plan, task, into } => cmd_split(&plan, &task, into),
         Command::Templates(sub) => cmd_templates(sub),
         Command::Prices { update } => cmd_prices(update),
+        Command::Version => {
+            println!("wiggum {}", env!("CARGO_PKG_VERSION"));
+            Ok(())
+        }
     };
 
     if let Err(e) = result {

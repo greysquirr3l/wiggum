@@ -5,8 +5,7 @@ use clap::{Parser, Subcommand};
 #[derive(Debug, Parser)]
 #[command(
     name = "wiggum",
-    about = "AI orchestration scaffold generator for the Ralph Wiggum loop",
-    version
+    about = "AI orchestration scaffold generator for the Ralph Wiggum loop"
 )]
 pub struct Cli {
     #[command(subcommand)]
@@ -189,6 +188,9 @@ pub enum Command {
         #[arg(long)]
         update: bool,
     },
+
+    /// Show version information
+    Version,
 }
 
 #[derive(Debug, Subcommand)]
