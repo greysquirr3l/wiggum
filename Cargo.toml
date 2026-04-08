@@ -32,9 +32,9 @@ expect_used = "deny"
 panic = "deny"
 indexing_slicing = "deny"
 cast_ptr_alignment = "deny"
-suspicious = "deny"
+suspicious = { level = "deny", priority = -1 }
 
-# Lint over warnings
+[lints.rust]
 warnings = "deny"
 
 [dependencies]
