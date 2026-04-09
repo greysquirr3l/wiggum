@@ -43,6 +43,7 @@ wiggum generate plan.toml
 | `retro` | Generate improvement suggestions from PROGRESS.md |
 | `split` | Split an oversized task into smaller units |
 | `templates` | Manage reusable task templates |
+| `version` | Show CLI version with embedded git SHA (`wiggum <version> (<sha\|unknown>)`) |
 | `serve --mcp` | Start the MCP server |
 | `report` | Generate a post-execution report |
 | `watch` | Live progress monitoring |

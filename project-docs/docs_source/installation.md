@@ -17,5 +17,11 @@ cargo install --path .
 ## Verify installation
 
 ```bash
-wiggum --version
+wiggum version
+```
+
+Expected output format:
+
+```text
+wiggum <version> (<sha|unknown>)
 ```

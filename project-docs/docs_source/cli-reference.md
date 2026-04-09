@@ -72,6 +72,20 @@ Start the MCP server for agent integration.
 wiggum serve --mcp
 ```
 
+## `wiggum version`
+
+Show the CLI version and embedded git SHA.
+
+```bash
+wiggum version
+```
+
+Output format:
+
+```text
+wiggum <version> (<sha|unknown>)
+```
+
 ## `wiggum report`
 
 Generate a post-execution report from `PROGRESS.md`.
