@@ -84,7 +84,8 @@ fn main() {
         Command::Templates(sub) => cmd_templates(sub),
         Command::Prices { update } => cmd_prices(update),
         Command::Version => {
-            println!("wiggum {}", env!("CARGO_PKG_VERSION"));
+            let git_sha = option_env!("WIGGUM_GIT_SHA").unwrap_or("unknown");
+            println!("wiggum {} ({git_sha})", env!("CARGO_PKG_VERSION"));
             Ok(())
         }
     };

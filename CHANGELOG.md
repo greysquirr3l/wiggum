@@ -11,11 +11,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - CodeQL static analysis security testing (SAST) — automatic code scanning on every push and PR
 - Dependabot automation — weekly dependency updates for cargo and GitHub Actions
 - Comprehensive security practices documentation in SECURITY.md
+- `build.rs` compile-time git metadata embedding (`WIGGUM_GIT_SHA`) with fallback to `unknown` when git metadata is unavailable
+- MCP tool `wiggum_version` for explicit version introspection (package version, git SHA, protocol version)
+- CLI integration test for `wiggum version` output (`tests/version_cli_test.rs`)
 
 ### Changed
 
 - OSSF main branch protection policy documented with explicit admin commit override for emergency maintainer commits
 - Dependabot commit message prefixes normalized to avoid duplicate scope segments: cargo updates use auto scope, and GitHub Actions updates use explicit `ci(actions)` scope
+- `wiggum version` now reports package version plus embedded git SHA (`wiggum <version> (<sha|unknown>)`)
 
 ## [0.6.2] - 2026-04-08
 

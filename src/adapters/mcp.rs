@@ -232,6 +232,12 @@ fn tool_definitions() -> Vec<ToolDefinition> {
 fn core_tool_definitions() -> Vec<ToolDefinition> {
     vec![
         ToolDefinition {
+            name: "wiggum_version".to_string(),
+            description: "Return wiggum version metadata (package, git SHA, MCP protocol)"
+                .to_string(),
+            input_schema: serde_json::json!({"type": "object", "properties": {}}),
+        },
+        ToolDefinition {
             name: "wiggum_generate_plan".to_string(),
             description: "Generate full scaffold from a plan TOML file path".to_string(),
             input_schema: serde_json::json!({
@@ -363,6 +369,7 @@ fn handle_tool_call(id: Value, params: &Value) -> JsonRpcResponse {
         .unwrap_or_else(|| Value::Object(serde_json::Map::new()));
 
     let result = match tool_name {
+        "wiggum_version" => Ok(tool_version()),
         "wiggum_generate_plan" => tool_generate_plan(&arguments),
         "wiggum_validate_plan" => tool_validate_plan(&arguments),
         "wiggum_read_progress" => tool_read_progress(&arguments),
@@ -408,6 +415,14 @@ fn handle_tool_call(id: Value, params: &Value) -> JsonRpcResponse {
 }
 
 // ─── Tool implementations ───────────────────────────────────────────
+
+fn tool_version() -> String {
+    let git_sha = option_env!("WIGGUM_GIT_SHA").unwrap_or("unknown");
+    format!(
+        "wiggum {}\nGit SHA: {git_sha}\nMCP protocol: 2025-06-18",
+        env!("CARGO_PKG_VERSION")
+    )
+}
 
 fn tool_generate_plan(args: &Value) -> Result<String> {
     let plan_path = args
