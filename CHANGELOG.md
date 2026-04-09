@@ -12,6 +12,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - Dependabot automation — weekly dependency updates for cargo and GitHub Actions
 - Comprehensive security practices documentation in SECURITY.md
 
+### Changed
+
+- OSSF main branch protection policy documented with explicit admin commit override for emergency maintainer commits
+- Dependabot commit message prefixes normalized to avoid duplicate scope segments: cargo updates use auto scope, and GitHub Actions updates use explicit `ci(actions)` scope
+
 ## [0.6.2] - 2026-04-08
 
 ### Changed

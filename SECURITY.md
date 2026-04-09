@@ -43,6 +43,7 @@ To further strengthen this repository's security:
    - Require status checks to pass (CI, clippy, tests, CodeQL)
    - Dismiss stale pull request approvals when new commits are pushed
    - Restrict who can push to main (admin/maintainers only)
+   - Keep **admin bypass enabled** for emergency direct commits while preserving all protections for non-admin contributors
 
 2. **Consider signing commits:**
    - Enable "Vigilant mode" in GitHub user settings to require GPG-signed commits
