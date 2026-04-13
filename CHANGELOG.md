@@ -8,6 +8,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Added
 
+- **Integration audits** — auto-injected late-stage tasks when plan has 3+ explicit tasks:
+  - `integration-wiring` task verifies all components are properly connected (routes registered, services instantiated, middleware mounted)
+  - `stub-cleanup` task finds placeholder implementations (`todo!()`, `NotImplementedError`, etc.) that compile but crash at runtime
+- **AI pattern avoidance** — `[style] avoid_ai_patterns` toggle (default `true`) injects guidance to avoid "slop" vocabulary, filler phrases, prompt leakage, and tutorial-style comments
+- `IntegrationConfig` struct with `skip_wiring_audit` and `skip_stub_audit` booleans to suppress auto-injection
+- `StyleConfig` struct with `avoid_ai_patterns` boolean
+- `stub_patterns`, `wiring_hints`, `ai_avoidance_rules`, and `comment_guidelines` fields on `LanguageProfile` (all 10 profiles updated)
+- Expanded security rules from 6 to 14 per language profile: weak crypto detection (MD5, SHA-1), TLS validation, CSPRNG requirements, unsafe deserialization, path traversal prevention, credential logging detection, auth placeholder detection, hardcoded IV/nonce detection
+- `[integration]` and `[style]` sections documented in `example-plan.toml`
+- MDBook documentation for integration audits and AI pattern avoidance
+
+### Changed
+
+- `Plan` struct extended with `integration: IntegrationConfig` and `style: StyleConfig` fields
+- `LanguageProfile` extended with integration audit and AI avoidance fields
+- Integration audit threshold uses explicit (user-defined) task count, not post-injection count
+- Orchestrator template conditionally injects AI avoidance rules when `avoid_ai_patterns` is enabled
+
 - CodeQL static analysis security testing (SAST) — automatic code scanning on every push and PR
 - Dependabot automation — weekly dependency updates for cargo and GitHub Actions
 - Comprehensive security practices documentation in SECURITY.md
