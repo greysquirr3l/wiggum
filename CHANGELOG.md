@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-04-13
+
 ### Added
 
 - **Integration audits** — auto-injected late-stage tasks when plan has 3+ explicit tasks:
@@ -18,14 +20,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - Expanded security rules from 6 to 14 per language profile: weak crypto detection (MD5, SHA-1), TLS validation, CSPRNG requirements, unsafe deserialization, path traversal prevention, credential logging detection, auth placeholder detection, hardcoded IV/nonce detection
 - `[integration]` and `[style]` sections documented in `example-plan.toml`
 - MDBook documentation for integration audits and AI pattern avoidance
-
-### Changed
-
-- `Plan` struct extended with `integration: IntegrationConfig` and `style: StyleConfig` fields
-- `LanguageProfile` extended with integration audit and AI avoidance fields
-- Integration audit threshold uses explicit (user-defined) task count, not post-injection count
-- Orchestrator template conditionally injects AI avoidance rules when `avoid_ai_patterns` is enabled
-
 - CodeQL static analysis security testing (SAST) — automatic code scanning on every push and PR
 - Dependabot automation — weekly dependency updates for cargo and GitHub Actions
 - Comprehensive security practices documentation in SECURITY.md
@@ -35,8 +29,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Changed
 
+- `Plan` struct extended with `integration: IntegrationConfig` and `style: StyleConfig` fields
+- `LanguageProfile` extended with integration audit and AI avoidance fields
+- Integration audit threshold uses explicit (user-defined) task count, not post-injection count
+- Orchestrator template conditionally injects AI avoidance rules when `avoid_ai_patterns` is enabled
 - OSSF main branch protection policy documented with explicit admin commit override for emergency maintainer commits
-- Dependabot commit message prefixes normalized to avoid duplicate scope segments: cargo updates use auto scope, and GitHub Actions updates use explicit `ci(actions)` scope
+- Dependabot commit message prefixes normalized to avoid duplicate scope segments
 - `wiggum version` now reports package version plus embedded git SHA (`wiggum <version> (<sha|unknown>)`)
 
 ## [0.6.2] - 2026-04-08
