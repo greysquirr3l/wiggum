@@ -16,6 +16,8 @@ pub struct Plan {
     pub evaluator: Option<EvaluatorConfig>,
     #[serde(default)]
     pub security: SecurityConfig,
+    #[serde(default)]
+    pub integration: IntegrationConfig,
     pub phases: Vec<Phase>,
 }
 
@@ -253,6 +255,23 @@ pub struct SecurityConfig {
     pub skip_hardening_task: bool,
 }
 
+/// Plan-level integration audit configuration.
+///
+/// Integration audits run as the final tasks before project completion to catch
+/// common AI-generated code issues: unwired components and stub implementations.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct IntegrationConfig {
+    /// When `true`, suppress the automatic injection of the `integration-wiring`
+    /// task that verifies all components are properly connected.
+    #[serde(default)]
+    pub skip_wiring_audit: bool,
+
+    /// When `true`, suppress the automatic injection of the `stub-cleanup`
+    /// task that finds and replaces placeholder implementations.
+    #[serde(default)]
+    pub skip_stub_audit: bool,
+}
+
 impl Preflight {
     /// Returns preflight commands with language-specific defaults
     /// for any field left empty.
@@ -350,6 +369,9 @@ impl Plan {
             }
         }
 
+        // Get language profile for integration audit patterns
+        let profile = self.project.language.profile();
+
         // Auto-inject a security-hardening task when the plan has
         // web-facing surface (detected from task slugs/titles).
         if !self.security.skip_hardening_task
@@ -368,6 +390,53 @@ impl Plan {
                 last_phase.0,
                 last_phase.1,
             ));
+            number += 1;
+        }
+
+        // Auto-inject integration wiring audit when the plan has enough complexity.
+        // This catches the common AI failure mode of creating modules that compile
+        // but aren't actually wired into the application.
+        if !self.integration.skip_wiring_audit
+            && !resolved.iter().any(|t| t.slug == "integration-wiring")
+            && needs_integration_audit(&resolved)
+        {
+            let last_slug = resolved.last().map(|t| t.slug.clone());
+            let last_phase = resolved.last().map_or_else(
+                || ("Integration".to_string(), 999),
+                |t| (t.phase_name.clone(), t.phase_order),
+            );
+
+            resolved.push(integration_wiring_task(
+                number,
+                last_slug,
+                last_phase.0,
+                last_phase.1,
+                profile.wiring_hints,
+            ));
+            number += 1;
+        }
+
+        // Auto-inject stub cleanup audit to find and fix placeholder implementations.
+        // This catches the common AI failure mode of leaving todo!() / NotImplementedError
+        // stubs that compile but crash at runtime.
+        if !self.integration.skip_stub_audit
+            && !resolved.iter().any(|t| t.slug == "stub-cleanup")
+            && needs_integration_audit(&resolved)
+        {
+            let last_slug = resolved.last().map(|t| t.slug.clone());
+            let last_phase = resolved.last().map_or_else(
+                || ("Integration".to_string(), 999),
+                |t| (t.phase_name.clone(), t.phase_order),
+            );
+
+            resolved.push(stub_cleanup_task(
+                number,
+                last_slug,
+                last_phase.0,
+                last_phase.1,
+                profile.stub_patterns,
+            ));
+            // number += 1; // uncomment if adding more auto-injected tasks
         }
 
         Ok(resolved)
@@ -477,4 +546,124 @@ fn security_hardening_task(
         phase_name,
         phase_order,
     }
+}
+
+// ─── Integration audit helpers ───────────────────────────────────────────────
+
+/// Build the auto-injected integration wiring audit task.
+/// This task verifies all components are properly connected and wired together.
+fn integration_wiring_task(
+    number: u32,
+    last_slug: Option<String>,
+    phase_name: String,
+    phase_order: u32,
+    wiring_hints: &[&str],
+) -> ResolvedTask {
+    let depends_on = last_slug.map(|s| vec![s]).unwrap_or_default();
+
+    let hints: Vec<String> = wiring_hints.iter().map(|s| (*s).to_string()).collect();
+
+    ResolvedTask {
+        number,
+        slug: "integration-wiring".to_string(),
+        title: "Integration wiring audit".to_string(),
+        goal: "Verify all components are properly connected and wired together. \
+               AI-generated code often creates modules that compile but aren't actually \
+               integrated into the application — this task catches those gaps."
+            .to_string(),
+        depends_on,
+        hints,
+        test_hints: vec![
+            "Write an integration test that exercises the full request/response path from \
+             entry point to exit."
+                .to_string(),
+            "For each major feature, trace the call chain from the public API to the \
+             underlying implementation and verify nothing is disconnected."
+                .to_string(),
+        ],
+        must_haves: vec![
+            "All public exports from library modules are imported and used somewhere".to_string(),
+            "All route handlers/controllers are registered with the router/framework".to_string(),
+            "All service/repository interfaces have implementations that are instantiated"
+                .to_string(),
+            "All background tasks/workers are spawned in the application startup".to_string(),
+            "All middleware/interceptors are mounted on the request pipeline".to_string(),
+            "Configuration values are read and passed to components that need them".to_string(),
+        ],
+        gate: None,
+        evaluation_criteria: vec![
+            "No dead code: every public function/type is reachable from main or tests".to_string(),
+            "Integration test passes exercising the primary user flow end-to-end".to_string(),
+            "Manual trace confirms each feature's wiring from entry to implementation".to_string(),
+        ],
+        phase_name,
+        phase_order,
+    }
+}
+
+/// Build the auto-injected stub cleanup audit task.
+/// This task finds and replaces all placeholder/stub implementations.
+fn stub_cleanup_task(
+    number: u32,
+    last_slug: Option<String>,
+    phase_name: String,
+    phase_order: u32,
+    stub_patterns: &[&str],
+) -> ResolvedTask {
+    let depends_on = last_slug.map(|s| vec![s]).unwrap_or_default();
+
+    let pattern_hints: Vec<String> = stub_patterns
+        .iter()
+        .map(|p| format!("Search for: `{p}`"))
+        .collect();
+
+    let mut hints = vec![
+        "Run a grep search for each stub pattern across the entire codebase.".to_string(),
+        "For each match, either implement the functionality or remove the dead code.".to_string(),
+        "TODO comments referencing future tasks (e.g. `// TODO(T15): ...`) may remain \
+         if the referenced task is not yet complete."
+            .to_string(),
+    ];
+    hints.extend(pattern_hints);
+
+    ResolvedTask {
+        number,
+        slug: "stub-cleanup".to_string(),
+        title: "Stub and placeholder cleanup".to_string(),
+        goal: "Find and replace all stub implementations, placeholder code, TODO markers, \
+               and unimplemented functions. AI-generated code frequently leaves behind \
+               placeholder implementations that compile but don't actually work."
+            .to_string(),
+        depends_on,
+        hints,
+        test_hints: vec![
+            "After cleanup, run the full test suite to confirm no test was relying on \
+             stub behavior."
+                .to_string(),
+            "Add tests for any functions that were previously stubbed but are now implemented."
+                .to_string(),
+        ],
+        must_haves: vec![
+            "No todo!() / unimplemented!() / NotImplementedError remaining in production code"
+                .to_string(),
+            "No functions that just return default/dummy values as placeholders".to_string(),
+            "No TODO/FIXME comments for work that should have been done in earlier tasks"
+                .to_string(),
+            "All code paths are reachable and functional".to_string(),
+        ],
+        gate: None,
+        evaluation_criteria: vec![
+            "grep for stub patterns returns zero matches in src/ (excluding tests)".to_string(),
+            "All previously-stubbed functions now have real implementations with tests".to_string(),
+            "Test suite passes with full coverage of formerly-stubbed code paths".to_string(),
+        ],
+        phase_name,
+        phase_order,
+    }
+}
+
+/// Returns `true` if the plan warrants integration audits.
+/// Triggered when there are 3+ tasks, suggesting enough complexity for wiring issues.
+const fn needs_integration_audit(tasks: &[ResolvedTask]) -> bool {
+    tasks.len() >= 3
 }

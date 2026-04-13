@@ -26,4 +26,24 @@ pub static PROFILE: &LanguageProfile = &LanguageProfile {
         "Any feature that fetches a URL on behalf of the user must validate the target against an explicit allowlist — never fetch arbitrary user-supplied URLs (SSRF prevention).",
     ],
     audit_cmd: "dotnet list package --vulnerable",
+
+    stub_patterns: &[
+        "throw new NotImplementedException()",
+        "throw new NotSupportedException()",
+        "// TODO",
+        "// FIXME",
+        "// HACK",
+        "// XXX",
+        "return default; // stub",
+        "/* TODO */",
+    ],
+
+    wiring_hints: &[
+        "Verify all services registered in DI container (AddScoped, AddSingleton, AddTransient) are actually injected somewhere.",
+        "Check that all controller endpoints are reachable and have proper route attributes.",
+        "Ensure all interface implementations are registered in the DI container.",
+        "Verify hosted services (IHostedService) are registered with AddHostedService.",
+        "Confirm middleware is added to the pipeline in the correct order in Program.cs.",
+        "Check that all configuration sections (IOptions<T>) are bound to appsettings.json sections.",
+    ],
 };

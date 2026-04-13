@@ -26,4 +26,25 @@ pub static PROFILE: &LanguageProfile = &LanguageProfile {
         "Any feature that fetches a URL on behalf of the user must validate the target against an explicit allowlist — never fetch arbitrary user-supplied URLs (SSRF prevention).",
     ],
     audit_cmd: "",
+
+    stub_patterns: &[
+        "fatalError(\"Not implemented\")",
+        "fatalError(\"TODO\")",
+        "preconditionFailure(\"Not implemented\")",
+        "// TODO:",
+        "// FIXME:",
+        "// HACK:",
+        "// XXX:",
+        "return nil // stub",
+        "/* TODO */",
+    ],
+
+    wiring_hints: &[
+        "Verify all public types/functions from modules are actually imported and used somewhere.",
+        "Check that all route handlers are registered with Vapor/Hummingbird router.",
+        "Ensure all protocol implementations are instantiated and passed to consumers.",
+        "Verify async tasks are actually awaited and not fire-and-forget.",
+        "Confirm middleware is added to the application's middleware stack.",
+        "Check that all environment variables are documented and have fallback values.",
+    ],
 };

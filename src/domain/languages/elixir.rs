@@ -26,4 +26,24 @@ pub static PROFILE: &LanguageProfile = &LanguageProfile {
         "Any feature that fetches a URL on behalf of the user must validate the target against an explicit allowlist — never fetch arbitrary user-supplied URLs (SSRF prevention).",
     ],
     audit_cmd: "mix deps.audit",
+
+    stub_patterns: &[
+        "raise \"Not implemented\"",
+        "raise \"TODO\"",
+        "# TODO",
+        "# FIXME",
+        "# HACK",
+        "# XXX",
+        ":not_implemented",
+        "nil # stub",
+    ],
+
+    wiring_hints: &[
+        "Verify all modules are actually used/called from somewhere in the application.",
+        "Check that all Phoenix controllers have routes defined in router.ex.",
+        "Ensure all GenServers/Agents are started in the supervision tree.",
+        "Verify all plugs defined are actually included in a pipeline.",
+        "Confirm PubSub subscriptions are set up in init/1 callbacks.",
+        "Check that all Ecto schemas have corresponding contexts that use them.",
+    ],
 };

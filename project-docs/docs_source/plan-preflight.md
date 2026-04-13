@@ -93,3 +93,24 @@ skip_hardening_task = false
 | `skip_hardening_task` | No | `false` | When `true`, suppresses auto-injection of the `security-hardening` task even if web-surface keywords are detected in task slugs |
 
 See [Security](./security.md) for a complete description of all three levels of automatic security hardening.
+
+## Integration configuration
+
+The optional `[integration]` section controls Wiggum's automatic integration audit tasks that catch common AI failure modes.
+
+```toml
+[integration]
+skip_wiring_audit = false
+skip_stub_audit = false
+```
+
+### Fields
+
+| Field | Required | Default | Description |
+|-------|----------|---------|-------------|
+| `skip_wiring_audit` | No | `false` | When `true`, suppresses auto-injection of the `integration-wiring` task |
+| `skip_stub_audit` | No | `false` | When `true`, suppresses auto-injection of the `stub-cleanup` task |
+
+Both audit tasks are auto-injected when your plan has 3+ tasks. The wiring audit verifies that all components are properly connected (routes registered, services instantiated, middleware mounted). The stub cleanup audit searches for placeholder implementations like `todo!()`, `unimplemented!()`, or `raise NotImplementedError`.
+
+See [Security — Integration Audits](./security.md#integration-audits) for full details.

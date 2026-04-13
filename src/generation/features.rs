@@ -97,7 +97,8 @@ fn build_task(task: &ResolvedTask) -> FeatureTask {
 mod tests {
     use super::*;
     use crate::domain::plan::{
-        Language, Orchestrator, Phase, Preflight, Project, ResolvedTask, SecurityConfig, TaskDef,
+        IntegrationConfig, Language, Orchestrator, Phase, Preflight, Project, ResolvedTask,
+        SecurityConfig, TaskDef,
     };
 
     fn make_plan_and_tasks() -> (Plan, Vec<ResolvedTask>) {
@@ -113,6 +114,7 @@ mod tests {
             orchestrator: Orchestrator::default(),
             evaluator: None,
             security: SecurityConfig::default(),
+            integration: IntegrationConfig::default(),
             phases: vec![Phase {
                 name: "Foundation".to_string(),
                 order: 1,

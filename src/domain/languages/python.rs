@@ -26,4 +26,25 @@ pub static PROFILE: &LanguageProfile = &LanguageProfile {
         "Any feature that fetches a URL on behalf of the user must validate the target against an explicit allowlist — never fetch arbitrary user-supplied URLs (SSRF prevention).",
     ],
     audit_cmd: "pip-audit",
+
+    stub_patterns: &[
+        "raise NotImplementedError",
+        "pass  # TODO",
+        "# TODO",
+        "# FIXME",
+        "# HACK",
+        "# XXX",
+        "...",
+        "return None  # stub",
+        "raise NotImplementedError(\"Not implemented\")",
+    ],
+
+    wiring_hints: &[
+        "Verify all classes/functions defined in modules are actually imported and used somewhere.",
+        "Check that all route decorators (@app.route, @router.get, etc.) are registered with the application.",
+        "Ensure all service classes are instantiated and injected into consumers.",
+        "Verify signal handlers and event listeners are actually connected.",
+        "Confirm middleware is added to the ASGI/WSGI application.",
+        "Check that all environment variables referenced in code are documented in .env.example.",
+    ],
 };

@@ -26,4 +26,27 @@ pub static PROFILE: &LanguageProfile = &LanguageProfile {
         "Any feature that fetches a URL on behalf of the user must validate the target against an explicit allowlist — never fetch arbitrary user-supplied URLs (SSRF prevention).",
     ],
     audit_cmd: "cargo audit",
+
+    stub_patterns: &[
+        "todo!()",
+        "unimplemented!()",
+        "panic!(\"not implemented\")",
+        "panic!(\"unimplemented\")",
+        "// TODO",
+        "// FIXME",
+        "// HACK",
+        "// XXX",
+        "Default::default() // placeholder",
+        "unreachable!(\"stub\")",
+    ],
+
+    wiring_hints: &[
+        "Verify all `pub` items in `lib.rs` are actually imported/used somewhere in the binary or tests.",
+        "For hexagonal architecture: confirm every port trait has at least one adapter implementation wired in `main.rs`.",
+        "Check that all route handlers are registered with the router — grep for handler function names in route definitions.",
+        "Ensure all `impl` blocks for traits are instantiated and passed to consumers.",
+        "Verify background workers/tasks are spawned (look for `tokio::spawn` or `thread::spawn` calls).",
+        "Confirm error types are properly converted — look for `From` impls or `.map_err()` chains.",
+        "Check that all configured features/endpoints in config are actually wired to implementations.",
+    ],
 };

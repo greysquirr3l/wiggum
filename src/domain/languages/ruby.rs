@@ -26,4 +26,24 @@ pub static PROFILE: &LanguageProfile = &LanguageProfile {
         "Any feature that fetches a URL on behalf of the user must validate the target against an explicit allowlist — never fetch arbitrary user-supplied URLs (SSRF prevention).",
     ],
     audit_cmd: "bundle exec bundler-audit check --update",
+
+    stub_patterns: &[
+        "raise NotImplementedError",
+        "raise 'Not implemented'",
+        "# TODO",
+        "# FIXME",
+        "# HACK",
+        "# XXX",
+        "nil # stub",
+        "fail 'Not implemented'",
+    ],
+
+    wiring_hints: &[
+        "Verify all classes/modules defined are actually required/autoloaded and used somewhere.",
+        "Check that all controllers have routes defined in routes.rb.",
+        "Ensure all services/interactors are instantiated and called from controllers or jobs.",
+        "Verify ActiveJob classes are enqueued somewhere.",
+        "Confirm Rack middleware is mounted in the application.",
+        "Check that all initializers actually configure the services they set up.",
+    ],
 };

@@ -26,4 +26,25 @@ pub static PROFILE: &LanguageProfile = &LanguageProfile {
         "Any feature that fetches a URL on behalf of the user must validate the target against an explicit allowlist — never fetch arbitrary user-supplied URLs (SSRF prevention).",
     ],
     audit_cmd: "mvn dependency-check:check",
+
+    stub_patterns: &[
+        "throw new UnsupportedOperationException()",
+        "throw new UnsupportedOperationException(\"Not implemented\")",
+        "throw new RuntimeException(\"TODO\")",
+        "// TODO",
+        "// FIXME",
+        "// HACK",
+        "// XXX",
+        "return null; // stub",
+        "/* TODO */",
+    ],
+
+    wiring_hints: &[
+        "Verify all @Component, @Service, @Repository beans are actually injected somewhere via @Autowired or constructor injection.",
+        "Check that all @Controller/@RestController endpoints are reachable and have proper request mappings.",
+        "Ensure all interface implementations have corresponding @Bean definitions or @Component annotations.",
+        "Verify @Scheduled methods are in beans managed by Spring context.",
+        "Confirm @EventListener methods are in beans that are component-scanned.",
+        "Check that all configuration properties classes are actually bound to properties files.",
+    ],
 };

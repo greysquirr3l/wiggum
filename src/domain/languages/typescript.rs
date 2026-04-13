@@ -26,4 +26,26 @@ pub static PROFILE: &LanguageProfile = &LanguageProfile {
         "Any feature that fetches a URL on behalf of the user must validate the target against an explicit allowlist — never fetch arbitrary user-supplied URLs (SSRF prevention).",
     ],
     audit_cmd: "npm audit --audit-level=high",
+
+    stub_patterns: &[
+        "throw new Error('Not implemented')",
+        "throw new Error(\"not implemented\")",
+        "// TODO",
+        "// FIXME",
+        "// HACK",
+        "// XXX",
+        "return undefined as any",
+        "return null as any",
+        "return {} as any",
+        "console.log('TODO:')",
+    ],
+
+    wiring_hints: &[
+        "Verify all exported functions/classes from modules are actually imported and used somewhere.",
+        "Check that all route handlers are registered with the Express/Fastify/Hono router.",
+        "Ensure all service classes are instantiated and injected into consumers (DI container or manual).",
+        "Verify event handlers are actually subscribed to their events.",
+        "Confirm middleware is applied to routes (app.use() or route-level middleware).",
+        "Check that all environment variables referenced in code are documented and have fallbacks.",
+    ],
 };

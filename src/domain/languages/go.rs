@@ -26,4 +26,25 @@ pub static PROFILE: &LanguageProfile = &LanguageProfile {
         "Any feature that fetches a URL on behalf of the user must validate the target against an explicit allowlist — never fetch arbitrary user-supplied URLs (SSRF prevention).",
     ],
     audit_cmd: "govulncheck ./...",
+
+    stub_patterns: &[
+        "panic(\"not implemented\")",
+        "panic(\"TODO\")",
+        "panic(\"unimplemented\")",
+        "// TODO",
+        "// FIXME",
+        "// HACK",
+        "// XXX",
+        "return nil // stub",
+        "return errors.New(\"not implemented\")",
+    ],
+
+    wiring_hints: &[
+        "Verify all exported functions/types from packages are actually imported and used somewhere.",
+        "Check that all HTTP handlers are registered with the router/mux.",
+        "Ensure all interface implementations are instantiated and injected into consumers.",
+        "Verify goroutines for background work are actually started (look for `go func()`).",
+        "Confirm middleware is mounted on the router, not just defined.",
+        "Check that all config values are actually read and used by the application.",
+    ],
 };

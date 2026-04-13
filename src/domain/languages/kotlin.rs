@@ -26,4 +26,25 @@ pub static PROFILE: &LanguageProfile = &LanguageProfile {
         "Any feature that fetches a URL on behalf of the user must validate the target against an explicit allowlist — never fetch arbitrary user-supplied URLs (SSRF prevention).",
     ],
     audit_cmd: "gradle dependencyCheckAnalyze",
+
+    stub_patterns: &[
+        "TODO()",
+        "throw NotImplementedError()",
+        "throw UnsupportedOperationException()",
+        "// TODO",
+        "// FIXME",
+        "// HACK",
+        "// XXX",
+        "return null // stub",
+        "/* TODO */",
+    ],
+
+    wiring_hints: &[
+        "Verify all @Component, @Service, @Repository beans are actually injected somewhere.",
+        "Check that all @Controller/@RestController endpoints are reachable and have proper request mappings.",
+        "Ensure all interface implementations have corresponding @Bean definitions or @Component annotations.",
+        "Verify @Scheduled methods are in beans managed by the application context.",
+        "Confirm Ktor routing modules are actually installed in the application.",
+        "Check that all configuration properties are bound to actual config files.",
+    ],
 };
