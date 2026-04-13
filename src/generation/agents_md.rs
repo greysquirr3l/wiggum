@@ -41,7 +41,7 @@ mod tests {
     use super::*;
     use crate::domain::plan::{
         IntegrationConfig, Language, Orchestrator, Phase, Plan, Preflight, Project, SecurityConfig,
-        Strategy, TaskDef,
+        Strategy, StyleConfig, TaskDef,
     };
 
     fn sample_plan() -> Plan {
@@ -70,6 +70,7 @@ mod tests {
             evaluator: None,
             security: SecurityConfig::default(),
             integration: IntegrationConfig::default(),
+            style: StyleConfig::default(),
             phases: vec![Phase {
                 name: "Foundation".to_string(),
                 order: 1,

@@ -145,12 +145,14 @@ AI-generated code often compiles successfully but has two common failure modes:
 Wiggum auto-injects two late-stage audit tasks when your plan has 3+ tasks:
 
 **Integration wiring audit** — verifies all components are properly connected:
+
 - All public exports are actually imported and used somewhere
 - All route handlers/controllers are registered with the router
 - All service interfaces have implementations that are instantiated
 - Middleware is mounted on the request pipeline
 
 **Stub cleanup audit** — finds and replaces placeholder implementations:
+
 - Searches for language-specific stub patterns (`todo!()`, `NotImplementedError`, etc.)
 - Ensures all TODOs for completed tasks are resolved
 - Verifies all code paths are reachable and functional

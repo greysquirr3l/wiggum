@@ -297,3 +297,13 @@ skip_hardening_task = false
 skip_wiring_audit = false
 # Set to true to disable the stub cleanup audit task
 skip_stub_audit = false
+
+# ─── Style ────────────────────────────────────────────────────────────────────
+# Controls writing style guidance to reduce detectability of AI-generated code.
+# When enabled, prompts receive hints to avoid "slop" vocabulary (robust,
+# leverage, comprehensive, delve, etc.) and filler phrases, write self-documenting
+# code, and use natural commenting style.
+
+[style]
+# Set to false to disable AI avoidance hints in generated prompts
+avoid_ai_patterns = true

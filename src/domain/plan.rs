@@ -18,6 +18,8 @@ pub struct Plan {
     pub security: SecurityConfig,
     #[serde(default)]
     pub integration: IntegrationConfig,
+    #[serde(default)]
+    pub style: StyleConfig,
     pub phases: Vec<Phase>,
 }
 
@@ -270,6 +272,33 @@ pub struct IntegrationConfig {
     /// task that finds and replaces placeholder implementations.
     #[serde(default)]
     pub skip_stub_audit: bool,
+}
+
+/// Plan-level style configuration for AI pattern avoidance.
+///
+/// When enabled, injects guidance into generated prompts to avoid common
+/// AI-generated code tells: slop vocabulary, obvious comments, and structural
+/// patterns that reveal machine authorship.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StyleConfig {
+    /// When `true` (default), inject AI pattern avoidance rules into generated
+    /// task files. These rules guide subagents to write code that reads as
+    /// human-authored: avoiding "slop" vocabulary, tutorial-style comments,
+    /// and cookie-cutter structure.
+    #[serde(default = "default_avoid_ai_patterns")]
+    pub avoid_ai_patterns: bool,
+}
+
+const fn default_avoid_ai_patterns() -> bool {
+    true
+}
+
+impl Default for StyleConfig {
+    fn default() -> Self {
+        Self {
+            avoid_ai_patterns: default_avoid_ai_patterns(),
+        }
+    }
 }
 
 impl Preflight {

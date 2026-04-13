@@ -98,7 +98,7 @@ mod tests {
     use super::*;
     use crate::domain::plan::{
         IntegrationConfig, Language, Orchestrator, Phase, Preflight, Project, ResolvedTask,
-        SecurityConfig, TaskDef,
+        SecurityConfig, StyleConfig, TaskDef,
     };
 
     fn make_plan_and_tasks() -> (Plan, Vec<ResolvedTask>) {
@@ -115,6 +115,7 @@ mod tests {
             evaluator: None,
             security: SecurityConfig::default(),
             integration: IntegrationConfig::default(),
+            style: StyleConfig::default(),
             phases: vec![Phase {
                 name: "Foundation".to_string(),
                 order: 1,
