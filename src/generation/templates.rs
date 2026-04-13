@@ -299,6 +299,18 @@ Focus on must-haves. No gold-plating.
 {% for rule in security_rules %}
 - {{ rule }}
 {% endfor %}
+{% if avoid_ai_patterns %}
+## Writing style (non-negotiable)
+
+Avoid patterns that reveal AI authorship.
+{% for rule in ai_avoidance_rules %}
+- {{ rule }}
+{% endfor %}
+### Commenting guidelines
+{% for guideline in comment_guidelines %}
+- {{ guideline }}
+{% endfor %}
+{% endif %}
 {% if architecture == "hexagonal" %}
 ## Architecture: Hexagonal
 

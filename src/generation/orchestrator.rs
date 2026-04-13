@@ -37,6 +37,13 @@ pub fn render_with(tera: &Tera, plan: &Plan, tasks: &[ResolvedTask]) -> Result<S
     let profile = plan.project.language.profile();
     ctx.insert("security_rules", &profile.security_rules);
 
+    // AI pattern avoidance rules, conditionally injected.
+    ctx.insert("avoid_ai_patterns", &plan.style.avoid_ai_patterns);
+    if plan.style.avoid_ai_patterns {
+        ctx.insert("ai_avoidance_rules", &profile.ai_avoidance_rules);
+        ctx.insert("comment_guidelines", &profile.comment_guidelines);
+    }
+
     tera.render("orchestrator.md", &ctx)
         .map_err(|e| WiggumError::Template(e.to_string()))
 }

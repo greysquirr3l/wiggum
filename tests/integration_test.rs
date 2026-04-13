@@ -31,8 +31,8 @@ fn resolve_tasks_numbering() {
     let resolved = plan.resolve_tasks().expect("Failed to resolve tasks");
     // 5 explicit tasks + 3 auto-injected tasks:
     // - security-hardening (http-client triggers web surface detection)
-    // - integration-wiring (5+ tasks triggers complexity threshold)
-    // - stub-cleanup (5+ tasks triggers complexity threshold)
+    // - integration-wiring (3+ tasks triggers complexity threshold)
+    // - stub-cleanup (3+ tasks triggers complexity threshold)
     assert_eq!(resolved.len(), 8);
     assert_eq!(resolved[0].number, 1);
     assert_eq!(resolved[0].slug, "workspace-scaffold");

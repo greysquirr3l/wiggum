@@ -162,8 +162,8 @@ Each language profile includes specific patterns and hints tailored to its ecosy
 ```toml
 # Opt out of the auto-injected integration audits if desired
 [integration]
-skip_wiring_audit = false  # Disable wiring audit
-skip_stub_audit = false    # Disable stub cleanup audit
+skip_wiring_audit = true   # Disable wiring audit
+skip_stub_audit = true     # Disable stub cleanup audit
 ```
 
 ## Documentation

@@ -401,6 +401,10 @@ impl Plan {
         // Get language profile for integration audit patterns
         let profile = self.project.language.profile();
 
+        // Capture explicit (user-defined) task count before any auto-injection.
+        // This is used to decide whether to inject integration audit tasks.
+        let explicit_task_count = resolved.len();
+
         // Auto-inject a security-hardening task when the plan has
         // web-facing surface (detected from task slugs/titles).
         if !self.security.skip_hardening_task
@@ -427,7 +431,7 @@ impl Plan {
         // but aren't actually wired into the application.
         if !self.integration.skip_wiring_audit
             && !resolved.iter().any(|t| t.slug == "integration-wiring")
-            && needs_integration_audit(&resolved)
+            && needs_integration_audit(explicit_task_count)
         {
             let last_slug = resolved.last().map(|t| t.slug.clone());
             let last_phase = resolved.last().map_or_else(
@@ -450,7 +454,7 @@ impl Plan {
         // stubs that compile but crash at runtime.
         if !self.integration.skip_stub_audit
             && !resolved.iter().any(|t| t.slug == "stub-cleanup")
-            && needs_integration_audit(&resolved)
+            && needs_integration_audit(explicit_task_count)
         {
             let last_slug = resolved.last().map(|t| t.slug.clone());
             let last_phase = resolved.last().map_or_else(
@@ -692,7 +696,7 @@ fn stub_cleanup_task(
 }
 
 /// Returns `true` if the plan warrants integration audits.
-/// Triggered when there are 3+ tasks, suggesting enough complexity for wiring issues.
-const fn needs_integration_audit(tasks: &[ResolvedTask]) -> bool {
-    tasks.len() >= 3
+/// Triggered when there are 3+ explicit (user-defined) tasks.
+const fn needs_integration_audit(explicit_task_count: usize) -> bool {
+    explicit_task_count >= 3
 }

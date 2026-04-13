@@ -99,44 +99,6 @@ If you're handling security via a separate process or your plan doesn't actually
 skip_hardening_task = true
 ```
 
-## Integration Audits
-
-AI-generated code often compiles successfully but has two common failure modes:
-
-1. **Disconnected wiring** — modules, services, and handlers are created but never actually connected to the application (e.g., a service class exists but is never instantiated and used)
-2. **Stub implementations** — placeholder code like `todo!()`, `unimplemented!()`, or `raise NotImplementedError` that compiles but crashes at runtime
-
-Wiggum auto-injects two late-stage audit tasks when your plan has 3+ tasks:
-
-### Integration wiring audit
-
-Verifies all components are properly connected:
-
-- All public exports are actually imported and used somewhere
-- All route handlers/controllers are registered with the router
-- All service interfaces have implementations that are instantiated
-- Middleware is mounted on the request pipeline
-
-### Stub cleanup audit
-
-Finds and replaces placeholder implementations:
-
-- Searches for language-specific stub patterns (`todo!()`, `NotImplementedError`, etc.)
-- Ensures all TODOs for completed tasks are resolved
-- Verifies all code paths are reachable and functional
-
-Each language profile includes specific patterns and hints tailored to its ecosystem.
-
-### Opting out of integration audits
-
-```toml
-[integration]
-skip_wiring_audit = true   # Disable wiring audit
-skip_stub_audit = true     # Disable stub cleanup audit
-```
-
-See [Preflight and Orchestrator — Integration configuration](./plan-preflight.md#integration-configuration) for field details.
-
 You can also manually include a task with the slug `security-hardening` in your plan — if that slug is already present, auto-injection is skipped automatically.
 
 ## Integration Audits
@@ -167,14 +129,15 @@ Each language profile provides specific wiring hints tailored to its ecosystem (
 
 The `stub-cleanup` task finds and replaces placeholder implementations:
 
-| Language | Stub patterns searched |
-|----------|----------------------|
+| Language | Sample stub patterns (not exhaustive) |
+|----------|---------------------------------------|
 | Rust | `todo!()`, `unimplemented!()`, `panic!("not implemented")`, `// TODO`, `// FIXME` |
-| Go | `panic("not implemented")`, `// TODO:`, `return nil, errors.New("not implemented")` |
-| TypeScript | `throw new Error("Not implemented")`, `// TODO:`, `// @ts-ignore` |
-| Python | `raise NotImplementedError`, `pass # TODO`, `# FIXME:` |
+| Go | `panic("not implemented")`, `// TODO`, `return nil // stub`, `return errors.New("not implemented")` |
+| TypeScript | `throw new Error('Not implemented')`, `// TODO`, `return undefined as any` |
+| Python | `raise NotImplementedError`, `pass  # TODO`, `# FIXME` |
 | Java | `throw new UnsupportedOperationException()`, `// TODO`, `return null; // stub` |
-| ... | (full list in each language profile) |
+
+Each language profile contains the full list of patterns — see the `stub_patterns` field in `src/domain/languages/*.rs` for the complete set.
 
 ### Opting out
 
