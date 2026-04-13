@@ -277,3 +277,33 @@ must_haves = [
     "Startup log line includes version and bound address",
     "RUST_LOG respected",
 ]
+
+# ─── Security ─────────────────────────────────────────────────────────────────
+# Controls automatic injection of security-related audit tasks.
+# By default, a security-hardening task is auto-injected when the plan has
+# web-facing surface (detected from task slugs/titles containing http, api, etc.).
+
+[security]
+# Set to true to disable the auto-injected security-hardening task
+skip_hardening_task = false
+
+# ─── Integration ──────────────────────────────────────────────────────────────
+# Controls automatic injection of integration audit tasks.
+# These catch common AI failure modes: modules that compile but aren't wired,
+# and stub implementations (todo!(), NotImplementedError) left in place.
+
+[integration]
+# Set to true to disable the integration wiring audit task
+skip_wiring_audit = false
+# Set to true to disable the stub cleanup audit task
+skip_stub_audit = false
+
+# ─── Style ────────────────────────────────────────────────────────────────────
+# Controls writing style guidance to reduce detectability of AI-generated code.
+# When enabled, prompts receive hints to avoid "slop" vocabulary (robust,
+# leverage, comprehensive, delve, etc.) and filler phrases, write self-documenting
+# code, and use natural commenting style.
+
+[style]
+# Set to false to disable AI avoidance hints in generated prompts
+avoid_ai_patterns = true

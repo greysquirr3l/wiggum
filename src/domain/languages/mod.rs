@@ -63,6 +63,26 @@ pub struct LanguageProfile {
     /// Command to run a supply-chain / vulnerability audit (e.g. `cargo audit`).
     /// Appended to every preflight check after lint. Empty string = skipped.
     pub audit_cmd: &'static str,
+
+    // ─── Integration audit patterns ──────────────────────────────
+    /// Language-specific patterns that indicate stub/placeholder implementations.
+    /// These are grepped for during the stub-cleanup audit task.
+    /// Examples: `todo!()`, `unimplemented!()`, `raise NotImplementedError`.
+    pub stub_patterns: &'static [&'static str],
+
+    /// Language-specific wiring verification hints for the integration audit.
+    /// Describes what to check for to ensure components are properly connected.
+    pub wiring_hints: &'static [&'static str],
+
+    // ─── AI pattern avoidance ────────────────────────────────────
+    /// Vocabulary and phrasing patterns to avoid in generated code.
+    /// Injects guidance to write human-like prose instead of AI-typical
+    /// "slop" words like "robust", "leverage", "utilize".
+    pub ai_avoidance_rules: &'static [&'static str],
+
+    /// Guidelines for writing non-obvious, useful comments rather than
+    /// tutorial-style narration that restates what code obviously does.
+    pub comment_guidelines: &'static [&'static str],
 }
 
 /// Get the profile for a language.

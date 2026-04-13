@@ -360,7 +360,8 @@ fn lint_wide_fan_out(tasks: &[ResolvedTask], out: &mut Vec<Diagnostic>) {
 mod tests {
     use super::*;
     use crate::domain::plan::{
-        Language, Orchestrator, Phase, Plan, Preflight, Project, SecurityConfig, Strategy, TaskDef,
+        IntegrationConfig, Language, Orchestrator, Phase, Plan, Preflight, Project, SecurityConfig,
+        Strategy, StyleConfig, TaskDef,
     };
 
     fn make_plan(tasks: Vec<TaskDef>, architecture: Option<String>) -> (Plan, Vec<ResolvedTask>) {
@@ -380,6 +381,8 @@ mod tests {
             },
             evaluator: None,
             security: SecurityConfig::default(),
+            integration: IntegrationConfig::default(),
+            style: StyleConfig::default(),
             phases: vec![Phase {
                 name: "Phase 1".to_string(),
                 order: 1,

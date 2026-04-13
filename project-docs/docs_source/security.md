@@ -100,3 +100,53 @@ skip_hardening_task = true
 ```
 
 You can also manually include a task with the slug `security-hardening` in your plan — if that slug is already present, auto-injection is skipped automatically.
+
+## Integration Audits
+
+Beyond security vulnerabilities, AI-generated code frequently has two structural failure modes that lead to runtime crashes:
+
+1. **Disconnected wiring** — modules, services, and handlers are created but never actually connected to the application
+2. **Stub implementations** — placeholder code like `todo!()`, `unimplemented!()`, or `raise NotImplementedError` that compiles but crashes at runtime
+
+Wiggum auto-injects two late-stage audit tasks when your plan has 3+ tasks:
+
+### Integration wiring audit
+
+The `integration-wiring` task verifies all components are properly connected:
+
+| Check | Description |
+|-------|-------------|
+| Public exports | All public items from library modules are imported and used somewhere |
+| Route registration | All handlers/controllers are registered with the router/framework |
+| Service instantiation | All interfaces have implementations that are actually instantiated |
+| Background tasks | All workers/jobs are spawned in application startup |
+| Middleware | All middleware/interceptors are mounted on the request pipeline |
+| Configuration | Config values are read and passed to components that need them |
+
+Each language profile provides specific wiring hints tailored to its ecosystem (e.g., "Confirm every port trait has at least one adapter implementation wired in `main.rs`" for Rust hexagonal architecture).
+
+### Stub cleanup audit
+
+The `stub-cleanup` task finds and replaces placeholder implementations:
+
+| Language | Sample stub patterns (not exhaustive) |
+|----------|---------------------------------------|
+| Rust | `todo!()`, `unimplemented!()`, `panic!("not implemented")`, `// TODO`, `// FIXME` |
+| Go | `panic("not implemented")`, `// TODO`, `return nil // stub`, `return errors.New("not implemented")` |
+| TypeScript | `throw new Error('Not implemented')`, `// TODO`, `return undefined as any` |
+| Python | `raise NotImplementedError`, `pass  # TODO`, `# FIXME` |
+| Java | `throw new UnsupportedOperationException()`, `// TODO`, `return null; // stub` |
+
+Each language profile contains the full list of patterns — see the `stub_patterns` field in `src/domain/languages/*.rs` for the complete set.
+
+### Opting out
+
+Suppress either or both audits with:
+
+```toml
+[integration]
+skip_wiring_audit = true   # Disable wiring audit
+skip_stub_audit = true     # Disable stub cleanup audit
+```
+
+You can also manually include tasks with slugs `integration-wiring` or `stub-cleanup` — if either slug is already present, the corresponding auto-injection is skipped.

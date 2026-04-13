@@ -134,6 +134,8 @@ pub fn build_plan_from_scan(scan: &ScanResult, project_path: &Path) -> Plan {
         },
         evaluator: None,
         security: crate::domain::plan::SecurityConfig::default(),
+        integration: crate::domain::plan::IntegrationConfig::default(),
+        style: crate::domain::plan::StyleConfig::default(),
         phases: vec![Phase {
             name: "TODO — rename this phase".to_string(),
             order: 1,

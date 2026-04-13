@@ -40,6 +40,8 @@ pub fn run_init(output_plan: Option<&Path>) -> Result<(Plan, PathBuf)> {
         },
         evaluator: None,
         security: crate::domain::plan::SecurityConfig::default(),
+        integration: crate::domain::plan::IntegrationConfig::default(),
+        style: crate::domain::plan::StyleConfig::default(),
         phases,
     };
     plan.preflight = plan.preflight.with_defaults(language);

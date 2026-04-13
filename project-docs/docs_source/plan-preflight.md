@@ -93,3 +93,56 @@ skip_hardening_task = false
 | `skip_hardening_task` | No | `false` | When `true`, suppresses auto-injection of the `security-hardening` task even if web-surface keywords are detected in task slugs |
 
 See [Security](./security.md) for a complete description of all three levels of automatic security hardening.
+
+## Integration configuration
+
+The optional `[integration]` section controls Wiggum's automatic integration audit tasks that catch common AI failure modes.
+
+```toml
+[integration]
+skip_wiring_audit = false
+skip_stub_audit = false
+```
+
+### Fields
+
+| Field | Required | Default | Description |
+|-------|----------|---------|-------------|
+| `skip_wiring_audit` | No | `false` | When `true`, suppresses auto-injection of the `integration-wiring` task |
+| `skip_stub_audit` | No | `false` | When `true`, suppresses auto-injection of the `stub-cleanup` task |
+
+Both audit tasks are auto-injected when your plan has 3+ tasks. The wiring audit verifies that all components are properly connected (routes registered, services instantiated, middleware mounted). The stub cleanup audit searches for placeholder implementations like `todo!()`, `unimplemented!()`, or `raise NotImplementedError`.
+
+See [Security — Integration Audits](./security.md#integration-audits) for full details.
+
+## Style configuration
+
+The optional `[style]` section controls writing style guidance to reduce detectability of AI-generated code.
+
+```toml
+[style]
+avoid_ai_patterns = true
+```
+
+### Fields
+
+| Field | Required | Default | Description |
+|-------|----------|---------|-------------|
+| `avoid_ai_patterns` | No | `true` | When enabled, prompts receive hints to avoid common AI writing patterns |
+
+When `avoid_ai_patterns` is enabled, generated prompts include guidance to:
+
+- **Avoid "slop" vocabulary** — Words like "robust", "comprehensive", "leverage", "utilize", "delve", "embark", "streamlined", "cutting-edge", "pivotal", "seamless", "synergistic", "transformative", "harness", "facilitate", "innovative"
+- **Skip filler phrases** — Phrases like "it's worth noting that", "at its core", "let's break this down", "in order to", "from a broader perspective", "a key takeaway is"
+- **Prevent prompt leakage** — Avoid echoing instructions or stating "As an AI..." in comments
+- **Write naturally** — Prefer direct, human-like language over formal or corporate phrasing
+- **Self-documenting code** — Favor meaningful names over excessive comments
+
+Each language profile includes `ai_avoidance_rules` and `comment_guidelines` that are injected when this setting is enabled.
+
+### Disabling AI pattern avoidance
+
+```toml
+[style]
+avoid_ai_patterns = false
+```
