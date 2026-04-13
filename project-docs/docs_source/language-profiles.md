@@ -25,12 +25,12 @@ Each language profile includes:
 - **Test file pattern** — Where test files are typically found (e.g., `tests/` for Rust, `*_test.go` for Go)
 - **Doc style** — Documentation conventions (e.g., `///` doc comments for Rust, GoDoc for Go)
 - **Error handling** — Idiomatic error handling approach (e.g., `Result<T, E>` for Rust, `error` return values for Go)
-- **Security rules** — 14 language-specific rules covering OWASP categories plus crypto, deserialization, and path traversal (see [Security](./security.md))
+- **Security rules** — Language-specific rules covering OWASP categories plus crypto, deserialization, and path traversal (see [Security](./security.md)); profiles currently define 14 or 15 rules depending on the language
 - **Audit command** — Supply-chain vulnerability scanner appended to every task's preflight chain
 - **AI avoidance rules** — Guidelines to reduce detectability of AI-generated code (see below)
 - **Comment guidelines** — Best practices for meaningful, non-robotic comments
 
-These values are injected into generated task files and exit criteria templates, making the output idiomatic for the target language.
+Profile defaults are applied in different places during generation: build/test/audit settings flow into generated task and preflight content, while security, AI-avoidance, and comment guidance are injected through the orchestrator and exit-criteria templates rather than directly into `task.md`.
 
 ## AI avoidance rules
 
@@ -46,15 +46,15 @@ When `[style] avoid_ai_patterns = true` (the default), each language profile inj
 
 ## Comment guidelines
 
-Each profile also includes five comment guidelines:
+Profiles also include language-specific comment guidance. Common themes include:
 
 | Guideline | Description |
 |-----------|-------------|
-| WHY not WHAT | Explain reasoning, not mechanics |
-| Preserve safety comments | Keep `// SAFETY:` and `// SECURITY:` annotations |
-| Delete tutorial comments | Remove instructional comments after implementation |
-| TODO markers | Use `TODO(username):` format with ownership |
-| Doc contracts | Document preconditions, postconditions, and error cases |
+| WHY not WHAT | Prefer comments that explain reasoning, tradeoffs, or intent rather than restating the code |
+| Preserve important annotations | Keep existing structured comments such as safety or security annotations when the target language and codebase use them |
+| Delete tutorial comments | Remove temporary instructional or step-by-step comments after implementation |
+| Use project conventions for TODOs | Follow the repository's existing TODO/FIXME ownership and formatting conventions |
+| Doc contracts | Document preconditions, postconditions, and error cases when they are important to callers |
 
 ## Overriding defaults
 

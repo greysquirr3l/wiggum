@@ -277,14 +277,15 @@ pub struct IntegrationConfig {
 /// Plan-level style configuration for AI pattern avoidance.
 ///
 /// When enabled, injects guidance into generated prompts to avoid common
-/// AI-generated code tells: slop vocabulary, obvious comments, and structural
-/// patterns that reveal machine authorship.
+/// When enabled, injects guidance into the orchestrator prompt to avoid
+/// common AI-generated code tells: slop vocabulary, obvious comments, and
+/// structural patterns that reveal machine authorship.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StyleConfig {
-    /// When `true` (default), inject AI pattern avoidance rules into generated
-    /// task files. These rules guide subagents to write code that reads as
-    /// human-authored: avoiding "slop" vocabulary, tutorial-style comments,
-    /// and cookie-cutter structure.
+    /// When `true` (default), inject AI pattern avoidance rules into the
+    /// orchestrator prompt. These rules guide subagents to write code that
+    /// reads as human-authored: avoiding "slop" vocabulary, tutorial-style
+    /// comments, and cookie-cutter structure.
     #[serde(default = "default_avoid_ai_patterns")]
     pub avoid_ai_patterns: bool,
 }
@@ -469,7 +470,8 @@ impl Plan {
                 last_phase.1,
                 profile.stub_patterns,
             ));
-            // number += 1; // uncomment if adding more auto-injected tasks
+            number += 1;
+            let _ = number; // silence unused warning; keeps numbering correct for future auto-injections
         }
 
         Ok(resolved)
@@ -653,9 +655,7 @@ fn stub_cleanup_task(
     let mut hints = vec![
         "Run a grep search for each stub pattern across the entire codebase.".to_string(),
         "For each match, either implement the functionality or remove the dead code.".to_string(),
-        "TODO comments referencing future tasks (e.g. `// TODO(T15): ...`) may remain \
-         if the referenced task is not yet complete."
-            .to_string(),
+        "Resolve or remove TODO/FIXME comments in `src/` before completing this task.".to_string(),
     ];
     hints.extend(pattern_hints);
 

@@ -142,7 +142,7 @@ AI-generated code often compiles successfully but has two common failure modes:
 1. **Disconnected wiring** — modules, services, and handlers are created but never actually connected to the application (e.g., a service class exists but is never instantiated and used)
 2. **Stub implementations** — placeholder code like `todo!()`, `unimplemented!()`, or `raise NotImplementedError` that compiles but crashes at runtime
 
-Wiggum auto-injects two late-stage audit tasks when your plan has 3+ tasks:
+Wiggum auto-injects two late-stage audit tasks when your plan has 3+ explicit (user-defined) tasks:
 
 **Integration wiring audit** — verifies all components are properly connected:
 
