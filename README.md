@@ -121,7 +121,7 @@ Rust, Go, TypeScript, Python, Java, C#, Kotlin, Swift, Ruby, Elixir — each wit
 Wiggum bakes security into every generated plan at three levels:
 
 **1. Non-negotiable rules in every subagent prompt**
-Six OWASP-derived rules are injected automatically into the `## Security` section of every task file and orchestrator prompt — covering secrets management, parameterised queries, HTTP security headers, rate limiting, file upload validation, and SSRF prevention. You don't have to add them; they're always there.
+14 security rules are injected automatically into the `## Security` section of every task file and orchestrator prompt — covering the original 6 OWASP categories (secrets, SQL injection, headers, rate limiting, file uploads, SSRF) plus 8 additional rules: weak crypto detection (MD5, SHA-1), TLS validation, CSPRNG requirements, unsafe deserialization, path traversal prevention, credential logging, auth placeholder detection, and hardcoded IV/nonce detection. You don't have to add them; they're always there.
 
 **2. Vulnerability audit in every preflight**
 The language profile's audit command (`cargo audit`, `govulncheck`, `npm audit`, `pip-audit`, etc.) is appended to every task's preflight chain and exit criteria. Supply-chain CVEs are checked on every task completion, not just at the end. Override or disable per-plan with `preflight.audit`.
@@ -164,6 +164,26 @@ Each language profile includes specific patterns and hints tailored to its ecosy
 [integration]
 skip_wiring_audit = true   # Disable wiring audit
 skip_stub_audit = true     # Disable stub cleanup audit
+```
+
+## AI Pattern Avoidance
+
+AI-generated code often contains telltale patterns that reveal its origin — "slop" vocabulary like "robust" and "comprehensive", filler phrases, prompt leakage, and tutorial-style comments that restate the obvious.
+
+When `[style] avoid_ai_patterns = true` (the default), Wiggum injects guidance into the orchestrator prompt to help subagents write code that reads as human-authored:
+
+- **Avoid slop vocabulary** — words like "leverage", "utilize", "facilitate", "seamless", "transformative"
+- **Avoid filler phrases** — "it's worth noting that", "let's break this down", "from a broader perspective"
+- **No prompt leakage** — never include "as an AI", "here's the updated", "analysis:"
+- **Natural writing** — short direct sentences, varied length, contractions where appropriate
+- **Comment guidelines** — explain WHY not WHAT, preserve safety comments, delete tutorial noise
+
+Each language profile includes 5 AI avoidance rules and 5 comment guidelines tailored to its ecosystem.
+
+```toml
+# Disable if you prefer unfiltered AI output
+[style]
+avoid_ai_patterns = false
 ```
 
 ## Documentation
