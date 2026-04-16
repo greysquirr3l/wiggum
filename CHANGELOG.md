@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Fixed
+
+- `generate --force` flag now correctly suppresses the VCS-dirty warning instead of being silently ignored
+- `wiggum serve` without `--mcp` now returns a proper error through the unified result pipeline instead of calling `process::exit` directly
+- `apply_split` no longer uses panic-prone direct indexing; bounds are validated with contextual error messages including `original_slug`, `phase_idx`, `task_idx`, and counts
+- `apply_split` now rejects split plans with fewer than 2 parts before mutating the plan, preventing silent task deletion
+- Dependency rewiring in `apply_split` converted from index-position mutation to iterator-based replacement, eliminating a residual `#[allow(clippy::indexing_slicing)]` suppression
+- `generate --force` help text updated to accurately describe its behaviour (skips VCS-dirty warning; does not gate file overwrites)
+
 ## [0.7.0] - 2026-04-13
 
 ### Added
