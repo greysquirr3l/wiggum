@@ -156,7 +156,6 @@ pub fn run_interactive_split(plan_path: &Path, task_slug: &str) -> Result<SplitP
 /// # Errors
 ///
 /// Returns an error if the plan cannot be read or written.
-#[allow(clippy::indexing_slicing)] // indices are validated by find_map before use
 pub fn apply_split(plan_path: &Path, split: &SplitPlan) -> Result<String> {
     let fs = FsAdapter;
     let toml_content = fs.read_plan(plan_path)?;
@@ -180,7 +179,13 @@ pub fn apply_split(plan_path: &Path, split: &SplitPlan) -> Result<String> {
             WiggumError::Validation(format!("Task '{}' not found", split.original_slug))
         })?;
 
-    let original = plan.phases[phase_idx].tasks.remove(task_idx);
+    let phase = plan.phases.get_mut(phase_idx).ok_or_else(|| {
+        WiggumError::Validation("Invalid phase index while splitting task".to_string())
+    })?;
+    let original = phase.tasks.get(task_idx).cloned().ok_or_else(|| {
+        WiggumError::Validation("Invalid task index while splitting task".to_string())
+    })?;
+    phase.tasks.remove(task_idx);
 
     // Create new tasks from split parts
     let mut new_tasks: Vec<TaskDef> = Vec::new();
@@ -240,7 +245,7 @@ pub fn apply_split(plan_path: &Path, split: &SplitPlan) -> Result<String> {
 
     // Insert new tasks at the same position
     for (i, task) in new_tasks.into_iter().enumerate() {
-        plan.phases[phase_idx].tasks.insert(task_idx + i, task);
+        phase.tasks.insert(task_idx + i, task);
     }
 
     // Rewire dependents if requested
@@ -248,12 +253,10 @@ pub fn apply_split(plan_path: &Path, split: &SplitPlan) -> Result<String> {
         let final_slug = split.parts.last().map_or(&split.original_slug, |p| &p.slug);
         for phase in &mut plan.phases {
             for task in &mut phase.tasks {
-                if let Some(pos) = task
-                    .depends_on
-                    .iter()
-                    .position(|d| d == &split.original_slug)
-                {
-                    final_slug.clone_into(&mut task.depends_on[pos]);
+                for dependency in &mut task.depends_on {
+                    if dependency == &split.original_slug {
+                        final_slug.clone_into(dependency);
+                    }
                 }
             }
         }
