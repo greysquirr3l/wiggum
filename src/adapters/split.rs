@@ -262,10 +262,26 @@ fn build_split_tasks(original: &TaskDef, split: &SplitPlan) -> Vec<TaskDef> {
                     part.goal.clone()
                 },
                 depends_on,
-                hints: if i == 0 { original.hints.clone() } else { vec![] },
-                test_hints: if i == last { original.test_hints.clone() } else { vec![] },
-                must_haves: if i == last { original.must_haves.clone() } else { vec![] },
-                gate: if i == last { original.gate.clone() } else { None },
+                hints: if i == 0 {
+                    original.hints.clone()
+                } else {
+                    vec![]
+                },
+                test_hints: if i == last {
+                    original.test_hints.clone()
+                } else {
+                    vec![]
+                },
+                must_haves: if i == last {
+                    original.must_haves.clone()
+                } else {
+                    vec![]
+                },
+                gate: if i == last {
+                    original.gate.clone()
+                } else {
+                    None
+                },
                 evaluation_criteria: if i == last {
                     original.evaluation_criteria.clone()
                 } else {
@@ -359,8 +375,8 @@ pub fn format_split_preview(analysis: &SplitAnalysis) -> String {
 mod tests {
     use super::*;
     use crate::domain::plan::{
-        IntegrationConfig, Language, Orchestrator, Phase, Plan, Preflight, Project,
-        SecurityConfig, Strategy, StyleConfig, TaskDef,
+        IntegrationConfig, Language, Orchestrator, Phase, Plan, Preflight, Project, SecurityConfig,
+        Strategy, StyleConfig, TaskDef,
     };
 
     #[test]
