@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-04-15
+
 ### Fixed
 
 - `generate --force` flag now correctly suppresses the VCS-dirty warning instead of being silently ignored
@@ -14,6 +16,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - `apply_split` now rejects split plans with fewer than 2 parts before mutating the plan, preventing silent task deletion
 - Dependency rewiring in `apply_split` converted from index-position mutation to iterator-based replacement, eliminating a residual `#[allow(clippy::indexing_slicing)]` suppression
 - `generate --force` help text updated to accurately describe its behaviour (skips VCS-dirty warning; does not gate file overwrites)
+
+### Dependencies
+
+- Updated `clap` 4.6.0 → 4.6.1
+- Updated `tokio` 1.51.1 → 1.52.0
+
+### Security
+
+- `rand 0.8.5` (RUSTSEC-2026-0097, unsound warning) — transitive dependency via `tera`; no upstream fix available yet, tracked for remediation when `tera` resolves it
 
 ## [0.7.0] - 2026-04-13
 

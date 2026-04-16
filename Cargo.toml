@@ -1,6 +1,6 @@
 [package]
 name = "wiggum"
-version = "0.7.0"
+version = "0.7.1"
 edition = "2024"
 rust-version = "1.94.0"
 description = "AI orchestration scaffold generator for the Ralph Wiggum loop"
@@ -39,7 +39,7 @@ warnings = "deny"
 
 [dependencies]
 # CLI
-clap = { version = "4", features = ["derive"] }
+clap = { version = "4.6.1", features = ["derive"] }
 
 # Interactive prompts
 dialoguer = "0.12"
@@ -60,7 +60,7 @@ tera = "1"
 petgraph = "0.8"
 
 # Async runtime (MCP server)
-tokio = { version = "1", features = ["full"] }
+tokio = { version = "1.52.0", features = ["full"] }
 
 # Error handling
 thiserror = "2"
