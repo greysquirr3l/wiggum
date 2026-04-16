@@ -23,7 +23,7 @@ pub enum Command {
         #[arg(short, long)]
         output: Option<PathBuf>,
 
-        /// Overwrite existing files without prompting
+        /// Skip VCS-dirty warning and continue generating (does not affect file overwrite behaviour)
         #[arg(long)]
         force: bool,
 

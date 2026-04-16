@@ -13,8 +13,23 @@ use wiggum::domain::dag::{parallel_groups, validate_dag};
 use wiggum::domain::lint;
 use wiggum::domain::plan::Plan;
 use wiggum::domain::pricing::PricingData;
+use wiggum::error::WiggumError;
 use wiggum::generation;
 use wiggum::ports::PlanReader;
+
+#[derive(Clone, Copy)]
+enum VcsWarningMode {
+    WarnIfDirty,
+    Skip,
+}
+
+#[derive(Clone, Copy)]
+struct GenerateOptions {
+    vcs_warning_mode: VcsWarningMode,
+    dry_run: bool,
+    estimate_tokens: bool,
+    skip_agents_md: bool,
+}
 
 fn main() {
     tracing_subscriber::fmt()
@@ -33,26 +48,32 @@ fn main() {
         Command::Generate {
             plan,
             output,
-            force: _force,
+            force,
             dry_run,
             estimate_tokens,
             skip_agents_md,
         } => cmd_generate(
             &plan,
             output.as_deref(),
-            dry_run,
-            estimate_tokens,
-            skip_agents_md,
+            GenerateOptions {
+                vcs_warning_mode: if force {
+                    VcsWarningMode::Skip
+                } else {
+                    VcsWarningMode::WarnIfDirty
+                },
+                dry_run,
+                estimate_tokens,
+                skip_agents_md,
+            },
         ),
         Command::Validate { plan, lint } => cmd_validate(&plan, lint),
         Command::Serve { mcp: true } => {
             info!("Starting wiggum MCP server (stdio)");
             mcp::run_mcp_server()
         }
-        Command::Serve { mcp: false } => {
-            error!("Use --mcp flag to start the MCP server");
-            process::exit(1);
-        }
+        Command::Serve { mcp: false } => Err(WiggumError::Validation(
+            "Use --mcp flag to start the MCP server".to_string(),
+        )),
         Command::Report {
             progress,
             project_dir,
@@ -112,9 +133,7 @@ fn cmd_add_task(plan_path: &Path) -> wiggum::error::Result<()> {
 fn cmd_generate(
     plan_path: &Path,
     output_override: Option<&std::path::Path>,
-    dry_run: bool,
-    estimate_tokens: bool,
-    skip_agents_md: bool,
+    opts: GenerateOptions,
 ) -> wiggum::error::Result<()> {
     let fs = FsAdapter;
     let toml_content = fs.read_plan(plan_path)?;
@@ -135,7 +154,10 @@ fn cmd_generate(
         output_override.map_or_else(|| PathBuf::from(&plan.project.path), Path::to_path_buf);
 
     // VCS pre-check: warn if target has uncommitted changes
-    if !dry_run && let vcs::VcsStatus::Dirty(status) = vcs::check_vcs_status(&project_path) {
+    if !opts.dry_run
+        && matches!(opts.vcs_warning_mode, VcsWarningMode::WarnIfDirty)
+        && let vcs::VcsStatus::Dirty(status) = vcs::check_vcs_status(&project_path)
+    {
         println!("⚠️  Target directory has uncommitted changes:");
         for line in status.lines().take(5) {
             println!("   {line}");
@@ -146,16 +168,16 @@ fn cmd_generate(
 
     let mut artifacts = generation::generate_all_with_overrides(&plan, &project_path)?;
 
-    if skip_agents_md {
+    if opts.skip_agents_md {
         artifacts.agents_md = None;
     }
 
-    if dry_run {
-        print_dry_run(&artifacts, &project_path, &resolved, estimate_tokens)?;
+    if opts.dry_run {
+        print_dry_run(&artifacts, &project_path, &resolved, opts.estimate_tokens)?;
         return Ok(());
     }
 
-    if estimate_tokens {
+    if opts.estimate_tokens {
         println!();
         println!("{}", generation::tokens::format_report(&artifacts));
         println!();

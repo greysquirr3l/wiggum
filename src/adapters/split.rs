@@ -156,7 +156,6 @@ pub fn run_interactive_split(plan_path: &Path, task_slug: &str) -> Result<SplitP
 /// # Errors
 ///
 /// Returns an error if the plan cannot be read or written.
-#[allow(clippy::indexing_slicing)] // indices are validated by find_map before use
 pub fn apply_split(plan_path: &Path, split: &SplitPlan) -> Result<String> {
     let fs = FsAdapter;
     let toml_content = fs.read_plan(plan_path)?;
@@ -180,67 +179,32 @@ pub fn apply_split(plan_path: &Path, split: &SplitPlan) -> Result<String> {
             WiggumError::Validation(format!("Task '{}' not found", split.original_slug))
         })?;
 
-    let original = plan.phases[phase_idx].tasks.remove(task_idx);
-
-    // Create new tasks from split parts
-    let mut new_tasks: Vec<TaskDef> = Vec::new();
-    for (i, part) in split.parts.iter().enumerate() {
-        let depends_on = if i == 0 {
-            original.depends_on.clone()
-        } else if part.depends_on_previous {
-            split
-                .parts
-                .get(i - 1)
-                .map(|prev| vec![prev.slug.clone()])
-                .unwrap_or_default()
-        } else {
-            vec![]
-        };
-
-        new_tasks.push(TaskDef {
-            slug: part.slug.clone(),
-            title: if part.goal.is_empty() {
-                format!("{} (part {})", original.title, i + 1)
-            } else {
-                part.goal.clone()
-            },
-            goal: if part.goal.is_empty() {
-                format!("Part {} of: {}", i + 1, original.goal)
-            } else {
-                part.goal.clone()
-            },
-            depends_on,
-            hints: if i == 0 {
-                original.hints.clone()
-            } else {
-                vec![]
-            },
-            test_hints: if i == split.parts.len() - 1 {
-                original.test_hints.clone()
-            } else {
-                vec![]
-            },
-            must_haves: if i == split.parts.len() - 1 {
-                original.must_haves.clone()
-            } else {
-                vec![]
-            },
-            gate: if i == split.parts.len() - 1 {
-                original.gate.clone()
-            } else {
-                None
-            },
-            evaluation_criteria: if i == split.parts.len() - 1 {
-                original.evaluation_criteria.clone()
-            } else {
-                vec![]
-            },
-        });
+    if split.parts.len() < 2 {
+        return Err(WiggumError::Validation(format!(
+            "Cannot split task '{}': split plan must have at least 2 parts, got {}",
+            split.original_slug,
+            split.parts.len()
+        )));
     }
 
-    // Insert new tasks at the same position
+    let phase_count = plan.phases.len();
+    let phase = plan.phases.get_mut(phase_idx).ok_or_else(|| {
+        WiggumError::Validation(format!(
+            "Invalid phase index while splitting task '{}': phase_idx={phase_idx} but phase_count={phase_count}",
+            split.original_slug
+        ))
+    })?;
+    let task_count = phase.tasks.len();
+    if task_idx >= task_count {
+        return Err(WiggumError::Validation(format!(
+            "Invalid task index while splitting task '{}': phase_idx={phase_idx}, task_idx={task_idx} but task_count={task_count}",
+            split.original_slug
+        )));
+    }
+    let original = phase.tasks.remove(task_idx);
+    let new_tasks = build_split_tasks(&original, split);
     for (i, task) in new_tasks.into_iter().enumerate() {
-        plan.phases[phase_idx].tasks.insert(task_idx + i, task);
+        phase.tasks.insert(task_idx + i, task);
     }
 
     // Rewire dependents if requested
@@ -248,12 +212,10 @@ pub fn apply_split(plan_path: &Path, split: &SplitPlan) -> Result<String> {
         let final_slug = split.parts.last().map_or(&split.original_slug, |p| &p.slug);
         for phase in &mut plan.phases {
             for task in &mut phase.tasks {
-                if let Some(pos) = task
-                    .depends_on
-                    .iter()
-                    .position(|d| d == &split.original_slug)
-                {
-                    final_slug.clone_into(&mut task.depends_on[pos]);
+                for dependency in &mut task.depends_on {
+                    if dependency == &split.original_slug {
+                        final_slug.clone_into(dependency);
+                    }
                 }
             }
         }
@@ -267,6 +229,67 @@ pub fn apply_split(plan_path: &Path, split: &SplitPlan) -> Result<String> {
     std::fs::write(plan_path, &new_toml)?;
 
     Ok(new_toml)
+}
+
+fn build_split_tasks(original: &TaskDef, split: &SplitPlan) -> Vec<TaskDef> {
+    let last = split.parts.len() - 1;
+    split
+        .parts
+        .iter()
+        .enumerate()
+        .map(|(i, part)| {
+            let depends_on = if i == 0 {
+                original.depends_on.clone()
+            } else if part.depends_on_previous {
+                split
+                    .parts
+                    .get(i - 1)
+                    .map(|prev| vec![prev.slug.clone()])
+                    .unwrap_or_default()
+            } else {
+                vec![]
+            };
+            TaskDef {
+                slug: part.slug.clone(),
+                title: if part.goal.is_empty() {
+                    format!("{} (part {})", original.title, i + 1)
+                } else {
+                    part.goal.clone()
+                },
+                goal: if part.goal.is_empty() {
+                    format!("Part {} of: {}", i + 1, original.goal)
+                } else {
+                    part.goal.clone()
+                },
+                depends_on,
+                hints: if i == 0 {
+                    original.hints.clone()
+                } else {
+                    vec![]
+                },
+                test_hints: if i == last {
+                    original.test_hints.clone()
+                } else {
+                    vec![]
+                },
+                must_haves: if i == last {
+                    original.must_haves.clone()
+                } else {
+                    vec![]
+                },
+                gate: if i == last {
+                    original.gate.clone()
+                } else {
+                    None
+                },
+                evaluation_criteria: if i == last {
+                    original.evaluation_criteria.clone()
+                } else {
+                    vec![]
+                },
+            }
+        })
+        .collect()
 }
 
 fn prompt_string(prompt: &str, default: &str) -> Result<String> {
@@ -348,12 +371,128 @@ pub fn format_split_preview(analysis: &SplitAnalysis) -> String {
 }
 
 #[cfg(test)]
+#[allow(clippy::expect_used, clippy::unwrap_used)]
 mod tests {
     use super::*;
+    use crate::domain::plan::{
+        IntegrationConfig, Language, Orchestrator, Phase, Plan, Preflight, Project, SecurityConfig,
+        Strategy, StyleConfig, TaskDef,
+    };
 
     #[test]
     fn oversized_threshold_is_reasonable() {
         const { assert!(OVERSIZED_THRESHOLD >= 2000) };
         const { assert!(OVERSIZED_THRESHOLD <= 5000) };
+    }
+
+    fn make_plan_file(tasks: Vec<TaskDef>) -> tempfile::NamedTempFile {
+        let plan = Plan {
+            project: Project {
+                name: "test".to_string(),
+                description: "test project".to_string(),
+                language: Language::Rust,
+                path: "/tmp/test".to_string(),
+                architecture: None,
+            },
+            preflight: Preflight::default(),
+            orchestrator: Orchestrator {
+                persona: "test".to_string(),
+                strategy: Strategy::default(),
+                rules: Vec::new(),
+            },
+            evaluator: None,
+            security: SecurityConfig::default(),
+            integration: IntegrationConfig::default(),
+            style: StyleConfig::default(),
+            phases: vec![Phase {
+                name: "Phase 1".to_string(),
+                order: 1,
+                tasks,
+            }],
+        };
+        let toml = toml::to_string_pretty(&plan).expect("serializable plan");
+        let tmp = tempfile::NamedTempFile::new().expect("temp file");
+        std::fs::write(tmp.path(), toml).expect("write temp plan");
+        tmp
+    }
+
+    fn task(slug: &str) -> TaskDef {
+        TaskDef {
+            slug: slug.to_string(),
+            title: format!("Task {slug}"),
+            goal: format!("Goal for {slug}"),
+            depends_on: Vec::new(),
+            hints: Vec::new(),
+            test_hints: Vec::new(),
+            must_haves: Vec::new(),
+            gate: None,
+            evaluation_criteria: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn apply_split_rejects_empty_parts() {
+        let tmp = make_plan_file(vec![task("t1")]);
+        let split = SplitPlan {
+            original_slug: "t1".to_string(),
+            parts: vec![],
+            rewire_dependents: false,
+        };
+        let err = apply_split(tmp.path(), &split).unwrap_err();
+        assert!(
+            err.to_string().contains("at least 2 parts"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn apply_split_rejects_single_part() {
+        let tmp = make_plan_file(vec![task("t1")]);
+        let split = SplitPlan {
+            original_slug: "t1".to_string(),
+            parts: vec![SplitPart {
+                slug: "t1a".to_string(),
+                goal: "part a".to_string(),
+                depends_on_previous: false,
+            }],
+            rewire_dependents: false,
+        };
+        let err = apply_split(tmp.path(), &split).unwrap_err();
+        assert!(
+            err.to_string().contains("at least 2 parts"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn apply_split_replaces_task_and_rewires() {
+        let mut t2 = task("t2");
+        t2.depends_on = vec!["t1".to_string()];
+        let tmp = make_plan_file(vec![task("t1"), t2]);
+        let split = SplitPlan {
+            original_slug: "t1".to_string(),
+            parts: vec![
+                SplitPart {
+                    slug: "t1a".to_string(),
+                    goal: "part a".to_string(),
+                    depends_on_previous: false,
+                },
+                SplitPart {
+                    slug: "t1b".to_string(),
+                    goal: "part b".to_string(),
+                    depends_on_previous: true,
+                },
+            ],
+            rewire_dependents: true,
+        };
+        apply_split(tmp.path(), &split).expect("apply_split succeeded");
+        let content = std::fs::read_to_string(tmp.path()).expect("read plan");
+        // original task is gone, both parts are present
+        assert!(!content.contains("slug = \"t1\""), "original slug found");
+        assert!(content.contains("slug = \"t1a\""));
+        assert!(content.contains("slug = \"t1b\""));
+        // t2 was rewired to final part (t1b)
+        assert!(content.contains("t1b"));
+        assert!(!content.contains("\"t1\""));
     }
 }
