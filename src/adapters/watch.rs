@@ -320,7 +320,7 @@ mod tests {
 
     #[test]
     fn render_contains_project_name() {
-        let output = render_display(SAMPLE, std::time::Duration::from_secs(60));
+        let output = render_display(SAMPLE, std::time::Duration::from_mins(1));
         assert!(output.contains("my-project"));
     }
 

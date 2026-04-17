@@ -9,7 +9,7 @@ on:
 env:
   CARGO_TERM_COLOR: always
   RUSTFLAGS: "-Dwarnings"
-  RUST_VERSION: "1.94.0"
+  RUST_VERSION: "1.95.0"
 
 # Restrict permissions to minimum required
 permissions:

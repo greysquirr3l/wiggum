@@ -439,9 +439,15 @@ mod tests {
             rewire_dependents: false,
         };
         let err = apply_split(tmp.path(), &split).unwrap_err();
+        let message = if let WiggumError::Validation(message) = err {
+            message
+        } else {
+            String::new()
+        };
+        assert!(!message.is_empty(), "expected validation error variant");
         assert!(
-            err.to_string().contains("at least 2 parts"),
-            "unexpected error: {err}"
+            message.contains("at least 2 parts"),
+            "unexpected validation message: {message}"
         );
     }
 
@@ -458,9 +464,15 @@ mod tests {
             rewire_dependents: false,
         };
         let err = apply_split(tmp.path(), &split).unwrap_err();
+        let message = if let WiggumError::Validation(message) = err {
+            message
+        } else {
+            String::new()
+        };
+        assert!(!message.is_empty(), "expected validation error variant");
         assert!(
-            err.to_string().contains("at least 2 parts"),
-            "unexpected error: {err}"
+            message.contains("at least 2 parts"),
+            "unexpected validation message: {message}"
         );
     }
 

@@ -91,8 +91,7 @@ pub fn remove_artifacts(plan: &Plan, project_path: &Path) -> Result<Vec<PathBuf>
 
 fn is_dir_empty(path: &Path) -> bool {
     path.read_dir()
-        .map(|mut entries| entries.next().is_none())
-        .unwrap_or(false)
+        .is_ok_and(|mut entries| entries.next().is_none())
 }
 
 #[cfg(test)]
