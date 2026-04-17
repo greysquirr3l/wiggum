@@ -150,3 +150,27 @@ skip_stub_audit = true     # Disable stub cleanup audit
 ```
 
 You can also manually include tasks with slugs `integration-wiring` or `stub-cleanup` — if either slug is already present, the corresponding auto-injection is skipped.
+
+## Repository security posture (Wiggum itself)
+
+The sections above describe security controls injected into generated plans. Wiggum's own repository and release pipeline are also hardened:
+
+- **Least-privilege Actions tokens** — workflows use minimum required permissions.
+- **No privileged trigger patterns** — no `pull_request_target`; `workflow_run` is used only for safe workflow chaining.
+- **CI-gated tagging** — auto-tag only runs after CI succeeds on `main`.
+- **CI-gated publishing** — release workflow verifies CI passed for the tagged commit SHA before publishing to crates.io.
+- **Version/tag integrity checks** — release workflow verifies Cargo package version matches the release tag.
+- **Continuous security checks** — CodeQL, `cargo audit`, and dependency updates (Dependabot) run continuously.
+
+### Why release uses `workflow_run` chaining
+
+GitHub does not trigger downstream `on: push: tags` workflows when a tag is pushed by another workflow using the default `GITHUB_TOKEN`.
+
+To keep releases automated without introducing elevated tokens, Wiggum uses this chain:
+
+1. CI succeeds on `main`.
+2. Auto-tag workflow creates/pushes `v*` tag.
+3. Release workflow is triggered via `workflow_run` on auto-tag completion.
+4. Release verifies CI status for the tagged SHA, then publishes.
+
+This avoids token escalation while keeping publish automation deterministic.

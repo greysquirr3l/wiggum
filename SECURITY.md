@@ -4,6 +4,7 @@
 
 | Version | Supported |
 |---------|-----------|
+| 0.7.x   | Yes       |
 | 0.6.x   | Yes       |
 | < 0.6.0 | No        |
 
@@ -32,7 +33,8 @@ Wiggum is a scaffold generator that reads TOML plan files and writes markdown ar
 - **Automated dependency updates** — Dependabot weekly updates with PR reviews; major versions reviewed manually
 - **OSSF Scorecard** — Continuous security posture monitoring; results at <https://api.securityscorecards.dev/projects/github.com/greysquirr3l/wiggum>
 - **Token permissions** — GitHub Actions use minimal required permissions (least privilege)
-- **Dangerous workflow protection** — No `pull_request_target` or `workflow_run` with token escalation
+- **Release-chain hardening** — Auto-tag runs only after CI succeeds on `main`; release publishing is gated on CI success for the tagged SHA
+- **Dangerous workflow protection** — No `pull_request_target`; `workflow_run` is used only for non-privileged chaining (no token escalation)
 
 ## Recommendations for maintainers
 
@@ -56,3 +58,8 @@ To further strengthen this repository's security:
 4. **Publish releases:**
    - Create GitHub Releases from tags with signed tags (optional GPG signing)
    - Keep release notes updated in CHANGELOG.md
+
+5. **Protect release tags and secrets:**
+   - Restrict who can create `v*` tags
+   - Keep `CARGO_REGISTRY_TOKEN` scoped to crates publish only
+   - Rotate registry tokens periodically and after maintainer changes
