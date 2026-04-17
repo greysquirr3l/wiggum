@@ -6,6 +6,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Changed
+
+- Bumped MSRV and CI/security/release workflow Rust toolchain pins from `1.94.0` to `1.95.0`
+- Updated release automation to require a successful CI run before auto-tagging release commits and before publishing to crates.io
+
+### Fixed
+
+- Resolved new Rust 1.95 clippy findings in generated artifact cleanup logic (`map(...).unwrap_or(false)` → `is_ok_and(...)`)
+- Updated watch adapter test duration construction to satisfy `clippy::duration_suboptimal_units`
+- Hardened split adapter tests to validate `WiggumError::Validation` without relying on unsupported conversion methods
+- Silenced false-positive `Cargo.toml` schema diagnostics from Even Better TOML at workspace level while preserving cargo/rustc/clippy validation
+
+### Dependencies
+
+- Updated `tokio` 1.52.0 → 1.52.1
+
+### Security
+
+- `cargo audit` still reports `RUSTSEC-2026-0097` for transitive `rand 0.8.5` via `tera`; no upstream fix available yet
+
 ## [0.7.1] - 2026-04-15
 
 ### Fixed
@@ -179,9 +199,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - VCS-aware reporting with git timeline
 - mdBook documentation site
 
-[Unreleased]: https://github.com/greysquirr3l/wiggum/compare/v0.6.2...HEAD
+[Unreleased]: https://github.com/greysquirr3l/wiggum/compare/v0.7.1...HEAD
+[0.7.1]: https://github.com/greysquirr3l/wiggum/compare/v0.7.0...v0.7.1
+[0.7.0]: https://github.com/greysquirr3l/wiggum/compare/v0.6.2...v0.7.0
 [0.6.2]: https://github.com/greysquirr3l/wiggum/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/greysquirr3l/wiggum/compare/v0.5.0...v0.6.1
+[0.5.0]: https://github.com/greysquirr3l/wiggum/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/greysquirr3l/wiggum/compare/v0.3.2...v0.4.0
 [0.3.2]: https://github.com/greysquirr3l/wiggum/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/greysquirr3l/wiggum/compare/v0.3.0...v0.3.1
