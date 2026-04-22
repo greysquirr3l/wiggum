@@ -192,4 +192,26 @@ mod tests {
         let output = render(&plan).unwrap();
         assert!(output.starts_with("# AGENTS.md"));
     }
+
+    #[test]
+    fn render_hexagonal_avoid_god_files_includes_port_first_rule() {
+        // sample_plan() has architecture = "hexagonal" and style defaults to avoid_god_files = true
+        let plan = sample_plan();
+        let output = render(&plan).unwrap();
+        assert!(
+            output.contains("introduce the port trait first"),
+            "expected interface-first split rule when avoid_god_files=true and architecture=hexagonal"
+        );
+    }
+
+    #[test]
+    fn render_avoid_god_files_false_omits_port_first_rule() {
+        let mut plan = sample_plan();
+        plan.style.avoid_god_files = false;
+        let output = render(&plan).unwrap();
+        assert!(
+            !output.contains("introduce the port trait first"),
+            "interface-first split rule must be absent when avoid_god_files=false"
+        );
+    }
 }
