@@ -30,6 +30,7 @@ pub fn render_with(tera: &Tera, plan: &Plan) -> Result<String> {
     ctx.insert("preflight_lint", &plan.preflight.lint);
     ctx.insert("rules", &plan.orchestrator.rules);
     ctx.insert("strategy", &plan.orchestrator.strategy.to_string());
+    ctx.insert("avoid_god_files", &plan.style.avoid_god_files);
 
     tera.render("agents.md", &ctx)
         .map_err(|e| WiggumError::Template(e.to_string()))
@@ -190,5 +191,27 @@ mod tests {
         let plan = sample_plan();
         let output = render(&plan).unwrap();
         assert!(output.starts_with("# AGENTS.md"));
+    }
+
+    #[test]
+    fn render_hexagonal_avoid_god_files_includes_port_first_rule() {
+        // sample_plan() has architecture = "hexagonal" and style defaults to avoid_god_files = true
+        let plan = sample_plan();
+        let output = render(&plan).unwrap();
+        assert!(
+            output.contains("introduce the port trait first"),
+            "expected interface-first split rule when avoid_god_files=true and architecture=hexagonal"
+        );
+    }
+
+    #[test]
+    fn render_avoid_god_files_false_omits_port_first_rule() {
+        let mut plan = sample_plan();
+        plan.style.avoid_god_files = false;
+        let output = render(&plan).unwrap();
+        assert!(
+            !output.contains("introduce the port trait first"),
+            "interface-first split rule must be absent when avoid_god_files=false"
+        );
     }
 }

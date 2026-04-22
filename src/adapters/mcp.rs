@@ -163,7 +163,7 @@ fn handle_request(request: &JsonRpcRequest) -> JsonRpcResponse {
     match request.method.as_str() {
         "initialize" => {
             match serde_json::to_value(InitializeResult {
-                protocol_version: "2025-06-18".to_string(),
+                protocol_version: "2025-11-25".to_string(),
                 capabilities: Capabilities {
                     tools: ToolsCapability {
                         list_changed: false,
@@ -178,7 +178,11 @@ fn handle_request(request: &JsonRpcRequest) -> JsonRpcResponse {
                 Err(e) => error_response(id, -32603, &format!("Internal error: {e}")),
             }
         }
-        "notifications/initialized" => success_response(id, Value::Null),
+        "notifications/initialized" | "notifications/cancelled" => {
+            // Notifications must not be responded to; caller skips write when id is None
+            success_response(id, Value::Null)
+        }
+        "ping" => success_response(id, serde_json::json!({})),
         "tools/list" => handle_tools_list(id),
         "tools/call" => handle_tool_call(id, &request.params),
         _ => error_response(id, -32601, &format!("Unknown method: {}", request.method)),
@@ -235,7 +239,7 @@ fn core_tool_definitions() -> Vec<ToolDefinition> {
             name: "wiggum_version".to_string(),
             description: "Return wiggum version metadata (package, git SHA, MCP protocol)"
                 .to_string(),
-            input_schema: serde_json::json!({"type": "object", "properties": {}}),
+            input_schema: serde_json::json!({"type": "object", "additionalProperties": false}),
         },
         ToolDefinition {
             name: "wiggum_generate_plan".to_string(),
@@ -297,7 +301,7 @@ fn core_tool_definitions() -> Vec<ToolDefinition> {
         ToolDefinition {
             name: "wiggum_list_templates".to_string(),
             description: "List available language/architecture templates".to_string(),
-            input_schema: serde_json::json!({"type": "object", "properties": {}}),
+            input_schema: serde_json::json!({"type": "object", "additionalProperties": false}),
         },
     ]
 }
@@ -419,7 +423,7 @@ fn handle_tool_call(id: Value, params: &Value) -> JsonRpcResponse {
 fn tool_version() -> String {
     let git_sha = option_env!("WIGGUM_GIT_SHA").unwrap_or("unknown");
     format!(
-        "wiggum {}\nGit SHA: {git_sha}\nMCP protocol: 2025-06-18",
+        "wiggum {}\nGit SHA: {git_sha}\nMCP protocol: 2025-11-25",
         env!("CARGO_PKG_VERSION")
     )
 }

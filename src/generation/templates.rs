@@ -311,6 +311,15 @@ Avoid patterns that reveal AI authorship.
 - {{ guideline }}
 {% endfor %}
 {% endif %}
+{% if avoid_god_files %}
+## File structure (non-negotiable)
+
+- Do not create or expand "God" files. Keep each file focused on one primary responsibility.
+- If a change introduces a new concern, create a focused module/file instead of extending an unrelated one.
+- Avoid catch-all files (`utils`, `helpers`, `common`) containing unrelated logic.
+- Keep domain logic, adapters, and orchestration in separate files that mirror the selected architecture.
+- If an existing file is already overloaded, prefer extracting cohesive pieces into new files before adding more behavior.
+{% endif %}
 {% if architecture == "hexagonal" %}
 ## Architecture: Hexagonal
 
@@ -318,6 +327,7 @@ Avoid patterns that reveal AI authorship.
 - All external interactions go through port traits
 - Adapters implement port traits and live in `adapters/`
 - New capabilities require a new port trait before an adapter
+{% if avoid_god_files %}- When splitting an overloaded file, introduce the port trait first, then move the implementation — never invent the interface and migrate code in the same step.{% endif %}
 {% elif architecture == "layered" %}
 ## Architecture: Layered
 
@@ -525,6 +535,7 @@ const AGENTS_MD_TEMPLATE: &str = r#"# AGENTS.md
 - Adapters implement port traits and live in `adapters/`
 - New capabilities require a new port trait before an adapter
 - Depend inward: adapters → ports ← domain
+{% if avoid_god_files %}- When splitting an overloaded file, introduce the port trait first, then move the implementation — never invent the interface and migrate code in the same step.{% endif %}
 {% elif architecture == "layered" %}
 ## Architecture: Layered
 
