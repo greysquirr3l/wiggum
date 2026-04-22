@@ -307,3 +307,5 @@ skip_stub_audit = false
 [style]
 # Set to false to disable AI avoidance hints in generated prompts
 avoid_ai_patterns = true
+# Set to false to disable guidance that discourages creating "God" files
+avoid_god_files = true

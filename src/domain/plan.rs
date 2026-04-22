@@ -288,9 +288,19 @@ pub struct StyleConfig {
     /// comments, and cookie-cutter structure.
     #[serde(default = "default_avoid_ai_patterns")]
     pub avoid_ai_patterns: bool,
+
+    /// When `true` (default), inject guidance that discourages creating
+    /// "God" files (single files accumulating unrelated responsibilities).
+    /// Encourages focused modules and splitting by concern.
+    #[serde(default = "default_avoid_god_files")]
+    pub avoid_god_files: bool,
 }
 
 const fn default_avoid_ai_patterns() -> bool {
+    true
+}
+
+const fn default_avoid_god_files() -> bool {
     true
 }
 
@@ -298,6 +308,7 @@ impl Default for StyleConfig {
     fn default() -> Self {
         Self {
             avoid_ai_patterns: default_avoid_ai_patterns(),
+            avoid_god_files: default_avoid_god_files(),
         }
     }
 }

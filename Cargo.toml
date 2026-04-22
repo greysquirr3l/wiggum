@@ -1,6 +1,6 @@
 [package]
 name = "wiggum"
-version = "0.7.2"
+version = "0.8.0"
 edition = "2024"
 rust-version = "1.95.0"
 description = "AI orchestration scaffold generator for the Ralph Wiggum loop"

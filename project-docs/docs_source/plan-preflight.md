@@ -122,6 +122,7 @@ The optional `[style]` section controls writing style guidance to reduce detecta
 ```toml
 [style]
 avoid_ai_patterns = true
+avoid_god_files = true
 ```
 
 ### Fields
@@ -129,6 +130,7 @@ avoid_ai_patterns = true
 | Field | Required | Default | Description |
 |-------|----------|---------|-------------|
 | `avoid_ai_patterns` | No | `true` | When enabled, prompts receive hints to avoid common AI writing patterns |
+| `avoid_god_files` | No | `true` | When enabled, prompts include file-structure guidance that discourages creating "God" files |
 
 When `avoid_ai_patterns` is enabled, generated prompts include guidance to:
 
@@ -140,9 +142,21 @@ When `avoid_ai_patterns` is enabled, generated prompts include guidance to:
 
 Each language profile includes `ai_avoidance_rules` and `comment_guidelines` that are injected when this setting is enabled.
 
+When `avoid_god_files` is enabled, generated prompts also include guidance to:
+
+- Keep files focused on one primary responsibility
+- Create a focused module/file for new concerns instead of extending unrelated files
+- Avoid catch-all files (`utils`, `helpers`, `common`) containing unrelated logic
+- Split overloaded files before adding more behavior
+
+When `avoid_god_files` is enabled **and** `architecture = "hexagonal"`, prompts additionally include:
+
+- Introduce the port trait first when splitting an overloaded file, then move the implementation — never invent the interface and migrate code in the same step
+
 ### Disabling AI pattern avoidance
 
 ```toml
 [style]
 avoid_ai_patterns = false
+avoid_god_files = false
 ```

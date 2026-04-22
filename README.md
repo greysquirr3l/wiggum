@@ -170,20 +170,26 @@ skip_stub_audit = true     # Disable stub cleanup audit
 
 AI-generated code often contains telltale patterns that reveal its origin — "slop" vocabulary like "robust" and "comprehensive", filler phrases, prompt leakage, and tutorial-style comments that restate the obvious.
 
-When `[style] avoid_ai_patterns = true` (the default), Wiggum injects guidance into the orchestrator prompt to help subagents write code that reads as human-authored:
+When style guidance is enabled (defaults shown below), Wiggum injects prompt guidance to improve code quality and maintainable structure:
 
 - **Avoid slop vocabulary** — words like "leverage", "utilize", "facilitate", "seamless", "transformative"
 - **Avoid filler phrases** — "it's worth noting that", "let's break this down", "from a broader perspective"
 - **No prompt leakage** — never include "as an AI", "here's the updated", "analysis:"
 - **Natural writing** — short direct sentences, varied length, contractions where appropriate
 - **Comment guidelines** — explain WHY not WHAT, preserve safety comments, delete tutorial noise
+- **Avoid God files** — keep files focused by concern and avoid dumping unrelated logic into catch-all modules
 
-Each language profile includes 5 AI avoidance rules and 5 comment guidelines tailored to its ecosystem.
+Each language profile includes AI avoidance and comment guidance tailored to its ecosystem.
 
 ```toml
-# Disable if you prefer unfiltered AI output
+# Disable either rule set independently if needed
 [style]
-avoid_ai_patterns = false
+avoid_ai_patterns = true
+avoid_god_files = true
+
+# Example opt-out
+# avoid_ai_patterns = false
+# avoid_god_files = false
 ```
 
 ## Documentation

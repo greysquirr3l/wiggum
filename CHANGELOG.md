@@ -6,6 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-04-22
+
+### Added
+
+- `StyleConfig` now includes `avoid_god_files` (default `true`) to inject file-structure guidance that discourages creating "God" files
+- Orchestrator prompt gains a conditional **File structure (non-negotiable)** section when `[style] avoid_god_files = true`
+- Hexagonal architecture block in both orchestrator and AGENTS.md templates now includes an interface-first split rule when `avoid_god_files` is also enabled: introduce the port trait before migrating implementation code
+- `reference/example-plan.toml` and README updated with the new `[style] avoid_god_files` toggle
+
+### Changed
+
+- MCP server now declares `protocolVersion: "2025-11-25"` (was `"2025-06-18"`) in `initialize` responses
+- MCP server responds to `ping` requests with an empty result at any lifecycle phase (required by spec)
+- MCP server silently ignores `notifications/cancelled` alongside `notifications/initialized` (both are notification-type messages with no `id`)
+- No-parameter MCP tools (`wiggum_version`, `wiggum_list_templates`) now declare `inputSchema: {"type":"object","additionalProperties":false}` per spec recommendation
+- `avoid_god_files` is now injected into the AGENTS.md render context so its hexagonal block can use the same conditional guidance
+
 ## [0.7.2] - 2026-04-16
 
 ### Changed

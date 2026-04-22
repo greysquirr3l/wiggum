@@ -44,6 +44,9 @@ pub fn render_with(tera: &Tera, plan: &Plan, tasks: &[ResolvedTask]) -> Result<S
         ctx.insert("comment_guidelines", &profile.comment_guidelines);
     }
 
+    // File-structure guidance, conditionally injected.
+    ctx.insert("avoid_god_files", &plan.style.avoid_god_files);
+
     tera.render("orchestrator.md", &ctx)
         .map_err(|e| WiggumError::Template(e.to_string()))
 }

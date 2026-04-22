@@ -30,6 +30,7 @@ pub fn render_with(tera: &Tera, plan: &Plan) -> Result<String> {
     ctx.insert("preflight_lint", &plan.preflight.lint);
     ctx.insert("rules", &plan.orchestrator.rules);
     ctx.insert("strategy", &plan.orchestrator.strategy.to_string());
+    ctx.insert("avoid_god_files", &plan.style.avoid_god_files);
 
     tera.render("agents.md", &ctx)
         .map_err(|e| WiggumError::Template(e.to_string()))
