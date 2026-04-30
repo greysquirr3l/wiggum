@@ -53,8 +53,17 @@ rules = [
 | Field | Required | Default | Description |
 |-------|----------|---------|-------------|
 | `persona` | No | `"You are a senior software engineer"` | The subagent persona baked into every task prompt |
-| `strategy` | No | `standard` | Execution strategy: `standard` (goal → implement → test → preflight), `tdd` (red → green → refactor → preflight), `gsd` (must-haves checklist → implement → verify) |
+| `strategy` | No | `standard` | Execution strategy: `standard` (goal → implement → test → preflight), `tdd` (red → green → refactor → preflight), `gsd` (must-haves checklist → implement → verify), `complete` (root-fix end-to-end → tests including failure paths → docs update → preflight) |
 | `rules` | No | | Project-specific rules included in each subagent prompt. Appended after the automatic security rules from the language profile. |
+
+### `complete` strategy
+
+Use `strategy = "complete"` when you want each task treated as a finished deliverable instead of a partial checkpoint. Generated prompts will require:
+
+- Root-cause fix (not workaround) when in scope
+- Tests for behavior changes, including edge/failure path coverage
+- Documentation updates in the same task
+- Full preflight pass before task completion
 
 ## Evaluator configuration
 

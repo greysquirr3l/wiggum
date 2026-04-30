@@ -109,6 +109,8 @@ pub enum Strategy {
     Tdd,
     /// Must-haves checklist → implement → verify all must-haves.
     Gsd,
+    /// Complete end-to-end delivery: implement root fix + tests + docs + preflight.
+    Complete,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -244,6 +246,7 @@ impl std::fmt::Display for Strategy {
             Self::Standard => write!(f, "standard"),
             Self::Tdd => write!(f, "tdd"),
             Self::Gsd => write!(f, "gsd"),
+            Self::Complete => write!(f, "complete"),
         }
     }
 }

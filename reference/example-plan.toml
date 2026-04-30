@@ -36,7 +36,7 @@ lint  = "cargo clippy --workspace -- -D warnings"
 
 [orchestrator]
 persona  = "You are a senior Rust engineer specialising in async HTTP services and hexagonal architecture."
-strategy = "standard"   # standard | tdd | gsd
+strategy = "standard"   # standard | tdd | gsd | complete
 rules = [
     "Rust edition 2024, stable toolchain only — no nightly features.",
     "Keep the domain module free of I/O dependencies (no tokio, no reqwest, no sqlx).",

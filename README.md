@@ -99,6 +99,13 @@ wiggum watch
 
 See [`reference/example-plan.toml`](reference/example-plan.toml) for a fully annotated plan covering all supported fields — project metadata, preflight commands, orchestrator persona and rules, multiple phases with dependency wiring, and per-task hints, test hints, must-haves, and gates.
 
+Execution strategies supported in `[orchestrator].strategy`:
+
+- `standard` — goal → implement → test → preflight
+- `tdd` — red → green → refactor → preflight
+- `gsd` — must-haves checklist → implement → verify
+- `complete` — root-fix end-to-end, include tests (with failure paths), update docs, then preflight
+
 ### Gates (human-in-the-loop stops)
 
 Add a `gate` to any task to require human confirmation before the orchestrator proceeds:

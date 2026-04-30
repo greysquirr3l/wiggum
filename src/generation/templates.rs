@@ -262,6 +262,39 @@ Focus on must-haves. No gold-plating.
     Format: `- T{NN}: {what you learned}`
 13. Commit with a conventional commit message focused on user impact (not file counts or line numbers).
 14. Stop.
+{% elif strategy == "complete" %}
+## Strategy: Complete (End-to-End)
+
+Complete the real fix in one pass. No workaround when the root fix is in scope.
+
+> The **Accumulated Learnings** and **Codebase State** from PROGRESS.md have been
+> injected above by the orchestrator. Apply them before writing any code.
+
+1. Read PROGRESS.md.
+2. Find the highest-priority task that is `[ ]` and whose dependencies are all `[x]`.
+3. Mark it `[~]` in PROGRESS.md immediately.
+4. Read the corresponding task file in `tasks/`.
+5. **Completion contract** — Before writing any code, state explicitly:
+    - The root fix you will implement (not a temporary workaround)
+    - Which tests you will add/update and why they prove behavior
+    - Which user/developer docs will be updated in this task
+6. Search before building — inspect the existing code paths and reuse established patterns when correct.
+7. Implement the root fix end-to-end, including required wiring and failure-path handling.
+8. Add/update tests for happy path and at least one edge/failure path changed by this task.
+9. Update documentation impacted by the change (README, docs, or task-relevant ADR/notes).
+10. Run the preflight check from the task file:
+    ```bash
+    {{ preflight_build }} && {{ preflight_test }} && {{ preflight_lint }}
+    ```
+    Fix all errors and warnings until preflight passes.
+11. Verify every exit criterion from the task file is met.
+12. Ensure no dangling threads remain inside this task's scope.
+13. Update PROGRESS.md: change `[~]` to `[x]` for this task.
+14. **Update Codebase State** in PROGRESS.md — briefly describe what now exists after this task.
+15. **Append any learnings** to the Accumulated Learnings section in PROGRESS.md.
+     Format: `- T{NN}: {what you learned}`
+16. Commit with a conventional commit message focused on user impact (not file counts or line numbers).
+17. Stop.
 {% else %}
 ## Your job
 
@@ -429,12 +462,46 @@ const TASK_TEMPLATE: &str = r#"# T{{ number_padded }} — {{ title }}
 {% if test_hints %}{% for hint in test_hints %}- {{ hint }}
 {% endfor %}{% else %}<!-- TODO: Add test requirements here. -->
 {% endif %}
+{% elif strategy == "complete" %}
+## Strategy: Complete (End-to-End)
+
+### Completion contract
+
+- Implement the root fix for this task end-to-end (avoid temporary workaround paths)
+- Add/update tests for behavior changes, including at least one edge/failure case
+- Update relevant documentation in this task before marking complete
+
+### Implementation
+
+{% if hints %}{% for hint in hints %}- {{ hint }}
+{% endfor %}{% else %}<!-- TODO: Add implementation guidance here. -->
+{% endif %}
+
+### Tests
+
+{% if test_hints %}{% for hint in test_hints %}- {{ hint }}
+{% endfor %}{% else %}<!-- TODO: Add test requirements here. -->
+{% endif %}
+
+### Docs updates
+
+- Update README/docs/notes that are affected by this task's behavior or public contract changes
 {% else %}
 ## Implementation
 
 {% if hints %}{% for hint in hints %}- {{ hint }}
 {% endfor %}{% else %}<!-- TODO: Add implementation guidance here before running the orchestrator.
    Include: file paths, type signatures, key design decisions, code snippets where helpful. -->
+{% endif %}
+
+{% if avoid_god_files %}
+## File Structure (Anti-Godfile)
+
+- Keep each changed file focused on one primary responsibility.
+- If this task introduces a new concern, create a focused module/file instead of extending an unrelated catch-all file.
+- Do not expand `utils`, `helpers`, or `common` into multi-purpose dumping grounds.
+- If a file is already overloaded, extract cohesive pieces before adding new behavior.
+{% if architecture == "hexagonal" %}- In hexagonal code, introduce or refine the port trait first, then move implementation into adapters/domain boundaries as needed.{% endif %}
 {% endif %}
 
 ## Tests
@@ -561,6 +628,7 @@ const AGENTS_MD_TEMPLATE: &str = r#"# AGENTS.md
 - Language: {{ language }}
 {% if strategy == "tdd" %}- Strategy: TDD — write a failing test before any implementation code
 {% elif strategy == "gsd" %}- Strategy: GSD — focus on must-haves, no gold-plating
+{% elif strategy == "complete" %}- Strategy: Complete — ship root fix end-to-end with tests and docs in the same task
 {% endif %}
 {% if rules | length > 0 %}
 ## Rules
