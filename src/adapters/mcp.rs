@@ -180,9 +180,7 @@ fn evaluate_session_guardrail(tool_name: &str) -> Option<String> {
                 "MCP guardrail event"
             );
             if strict_guardrail_mode_enabled() {
-                return Some(
-                    "session_guardrail_state_unavailable reason=poisoned".to_string(),
-                );
+                return Some("session_guardrail_state_unavailable reason=poisoned".to_string());
             }
             poisoned.into_inner()
         }
@@ -347,11 +345,17 @@ fn run_tool(tool_name: &str, arguments: &Value) -> Result<String> {
         "wiggum_report" => tool_report(arguments),
         "wiggum_generate_agents_md" => tool_generate_agents_md(arguments),
         "wiggum_bootstrap" => tool_bootstrap(arguments),
-        _ => Err(WiggumError::Validation(format!("Unknown tool: {tool_name}"))),
+        _ => Err(WiggumError::Validation(format!(
+            "Unknown tool: {tool_name}"
+        ))),
     }
 }
 
-fn maybe_block_input_guardrail(id: Value, tool_name: &str, arguments: &Value) -> Option<JsonRpcResponse> {
+fn maybe_block_input_guardrail(
+    id: Value,
+    tool_name: &str,
+    arguments: &Value,
+) -> Option<JsonRpcResponse> {
     let pattern = detect_input_guardrail_hit(arguments)?;
     if !is_mutating_tool(tool_name) {
         return None;
@@ -1059,10 +1063,12 @@ mod tests {
         let detail = evaluate_session_guardrail("wiggum_generate_plan");
 
         assert!(detail.is_some());
-        assert!(detail
-            .as_deref()
-            .unwrap_or_default()
-            .contains("read_to_write_flow_anomaly"));
+        assert!(
+            detail
+                .as_deref()
+                .unwrap_or_default()
+                .contains("read_to_write_flow_anomaly")
+        );
     }
 
     #[test]
@@ -1075,9 +1081,11 @@ mod tests {
         }
 
         assert!(alert.is_some());
-        assert!(alert
-            .as_deref()
-            .unwrap_or_default()
-            .contains("read_volume_anomaly"));
+        assert!(
+            alert
+                .as_deref()
+                .unwrap_or_default()
+                .contains("read_volume_anomaly")
+        );
     }
 }
