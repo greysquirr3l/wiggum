@@ -1097,7 +1097,8 @@ mod tests {
     #[test]
     fn error_output_is_redacted_before_returning() {
         // Simulate a tool error message that inadvertently contains a bearer token.
-        let error_text = "Error: upstream call failed with header Authorization: Bearer supersecrettoken123";
+        let error_text =
+            "Error: upstream call failed with header Authorization: Bearer supersecrettoken123";
 
         let (redacted, count) = redact_output_content(error_text);
 
