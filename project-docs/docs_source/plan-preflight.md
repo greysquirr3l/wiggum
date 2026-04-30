@@ -58,12 +58,16 @@ rules = [
 
 ### `complete` strategy
 
+> _Inspired by Gary Tam's (Y Combinator) execution standard for AI-assisted development: every task must be a finished deliverable, not a partial checkpoint._
+
 Use `strategy = "complete"` when you want each task treated as a finished deliverable instead of a partial checkpoint. Generated prompts will require:
 
 - Root-cause fix (not workaround) when in scope
 - Tests for behavior changes, including edge/failure path coverage
 - Documentation updates in the same task
 - Full preflight pass before task completion
+
+The completion contract is baked into the orchestrator prompt, each task file, and AGENTS.md so every participant in the loop sees the same standard.
 
 ## Evaluator configuration
 

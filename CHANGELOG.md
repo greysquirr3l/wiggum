@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Added
+
+- `Strategy::Complete` — a new execution strategy that treats every task as a finished deliverable: root-cause fix (no workarounds), tests including failure-path coverage, documentation updates in the same task, and a full preflight pass. The strategy contract is baked into the generated orchestrator prompt, each task file, and AGENTS.md.
+  - _Inspired by Gary Tam's (Y Combinator) "complete it right, end-to-end" execution standard for AI-assisted development._
+- `[style] avoid_god_files` guidance is now injected into individual task files (not just the orchestrator prompt) as a **File Structure** section, reminding subagents to keep module scope narrow on every task.
+- MCP `tools/call` execution now runs a baseline security guardrail pipeline on every invocation:
+  - Input prompt-injection blocking for mutating tools
+  - Output redaction of emails, SSN, bearer tokens, and `secret=` patterns
+  - Hard-block on private key markers in output
+  - Session anomaly monitoring (high read volume; read-to-write pivot)
+  - `WIGGUM_MCP_GUARDRAIL_STRICT=true` enables fail-closed mode for anomalies
+
+### Dependencies
+
+- Added `regex = "1"` for MCP guardrail pattern matching
+
 ## [0.8.0] - 2026-04-22
 
 ### Added

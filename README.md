@@ -101,10 +101,14 @@ See [`reference/example-plan.toml`](reference/example-plan.toml) for a fully ann
 
 Execution strategies supported in `[orchestrator].strategy`:
 
-- `standard` — goal → implement → test → preflight
-- `tdd` — red → green → refactor → preflight
-- `gsd` — must-haves checklist → implement → verify
-- `complete` — root-fix end-to-end, include tests (with failure paths), update docs, then preflight
+| Strategy | Workflow |
+|----------|----------|
+| `standard` | goal → implement → test → preflight |
+| `tdd` | red → green → refactor → preflight |
+| `gsd` | must-haves checklist → implement → verify |
+| `complete` | root-fix end-to-end → tests (including failure paths) → docs update → preflight |
+
+The `complete` strategy is inspired by Gary Tam's (Y Combinator) execution standard: every task must be a finished deliverable, not a partial checkpoint. Root causes are fixed, not worked around. Tests cover edge and failure cases. Documentation lands in the same task.
 
 ### Gates (human-in-the-loop stops)
 
