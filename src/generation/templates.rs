@@ -494,6 +494,14 @@ const TASK_TEMPLATE: &str = r#"# T{{ number_padded }} — {{ title }}
    Include: file paths, type signatures, key design decisions, code snippets where helpful. -->
 {% endif %}
 
+## Tests
+
+{% if test_hints %}{% for hint in test_hints %}- {{ hint }}
+{% endfor %}{% else %}<!-- TODO: Add test requirements here.
+   Include: what to test, edge cases, test file locations. -->
+{% endif %}
+{% endif %}
+
 {% if avoid_god_files %}
 ## File Structure (Anti-Godfile)
 
@@ -502,14 +510,6 @@ const TASK_TEMPLATE: &str = r#"# T{{ number_padded }} — {{ title }}
 - Do not expand `utils`, `helpers`, or `common` into multi-purpose dumping grounds.
 - If a file is already overloaded, extract cohesive pieces before adding new behavior.
 {% if architecture == "hexagonal" %}- In hexagonal code, introduce or refine the port trait first, then move implementation into adapters/domain boundaries as needed.{% endif %}
-{% endif %}
-
-## Tests
-
-{% if test_hints %}{% for hint in test_hints %}- {{ hint }}
-{% endfor %}{% else %}<!-- TODO: Add test requirements here.
-   Include: what to test, edge cases, test file locations. -->
-{% endif %}
 {% endif %}
 
 ## Housekeeping: TODO / FIXME Sweep

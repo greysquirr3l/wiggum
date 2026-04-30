@@ -106,7 +106,7 @@ static REDACT_EMAIL_RE: LazyLock<Option<Regex>> =
 static REDACT_SSN_RE: LazyLock<Option<Regex>> =
     LazyLock::new(|| Regex::new(r"\b\d{3}-\d{2}-\d{4}\b").ok());
 static REDACT_BEARER_RE: LazyLock<Option<Regex>> =
-    LazyLock::new(|| Regex::new(r"(?i)\bbearer\s+[a-z0-9._\-+/=]{12,}\b").ok());
+    LazyLock::new(|| Regex::new(r"(?i)\bbearer\s+[a-z0-9._\-+/=]{12,}").ok());
 static REDACT_SECRET_ASSIGNMENT_RE: LazyLock<Option<Regex>> = LazyLock::new(|| {
     Regex::new(
         r#"(?i)\b(api[_-]?key|token|secret|password)\s*[:=]\s*["']?[a-z0-9._\-/+=]{8,}["']?"#,
@@ -170,7 +170,23 @@ fn strict_guardrail_mode_enabled() -> bool {
 
 fn evaluate_session_guardrail(tool_name: &str) -> Option<String> {
     let mut detail = None;
-    let mut state = SESSION_GUARDRAIL_STATE.lock().ok()?;
+    let mut state = match SESSION_GUARDRAIL_STATE.lock() {
+        Ok(s) => s,
+        Err(poisoned) => {
+            warn!(
+                target: "wiggum::mcp::security",
+                event = "session_guardrail_state_lock_failed",
+                strict_mode = strict_guardrail_mode_enabled(),
+                "MCP guardrail event"
+            );
+            if strict_guardrail_mode_enabled() {
+                return Some(
+                    "session_guardrail_state_unavailable reason=poisoned".to_string(),
+                );
+            }
+            poisoned.into_inner()
+        }
+    };
 
     if is_mutating_tool(tool_name) {
         state.mutating_calls = state.mutating_calls.saturating_add(1);
