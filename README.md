@@ -110,6 +110,13 @@ Execution strategies supported in `[orchestrator].strategy`:
 
 The `complete` strategy is inspired by Gary Tam's (Y Combinator) execution standard: every task must be a finished deliverable, not a partial checkpoint. Root causes are fixed, not worked around. Tests cover edge and failure cases. Documentation lands in the same task.
 
+Use `--dry-run` to preview the generated orchestrator prompt for any strategy before committing:
+
+```bash
+# See exactly what the complete strategy generates
+wiggum generate plan.toml --dry-run
+```
+
 ### Gates (human-in-the-loop stops)
 
 Add a `gate` to any task to require human confirmation before the orchestrator proceeds:

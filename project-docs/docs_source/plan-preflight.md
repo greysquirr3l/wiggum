@@ -69,6 +69,15 @@ Use `strategy = "complete"` when you want each task treated as a finished delive
 
 The completion contract is baked into the orchestrator prompt, each task file, and AGENTS.md so every participant in the loop sees the same standard.
 
+Use `--dry-run` to preview the generated output before running:
+
+```bash
+# Preview what each strategy generates without writing any files
+wiggum generate plan.toml --dry-run
+```
+
+Change `strategy` in `[orchestrator]`, run `--dry-run`, and compare. The orchestrator prompt is the primary artifact that changes between strategies.
+
 ## Evaluator configuration
 
 The optional `[evaluator]` section enables an independent QA agent that scores each task after the subagent marks it complete. When present, `.vscode/evaluator.prompt.md` is generated alongside the orchestrator prompt.
