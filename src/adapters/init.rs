@@ -147,7 +147,7 @@ fn prompt_orchestrator(language: Language) -> Result<(String, Vec<String>)> {
 }
 
 fn prompt_strategy() -> Result<Strategy> {
-    let strategies = ["standard", "tdd", "gsd"];
+    let strategies = ["standard", "tdd", "gsd", "complete"];
     let idx = Select::new()
         .with_prompt("Prompt strategy")
         .items(strategies)
@@ -157,6 +157,7 @@ fn prompt_strategy() -> Result<Strategy> {
     Ok(match strategies.get(idx) {
         Some(&"tdd") => Strategy::Tdd,
         Some(&"gsd") => Strategy::Gsd,
+        Some(&"complete") => Strategy::Complete,
         _ => Strategy::Standard,
     })
 }

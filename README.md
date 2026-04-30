@@ -99,6 +99,24 @@ wiggum watch
 
 See [`reference/example-plan.toml`](reference/example-plan.toml) for a fully annotated plan covering all supported fields — project metadata, preflight commands, orchestrator persona and rules, multiple phases with dependency wiring, and per-task hints, test hints, must-haves, and gates.
 
+Execution strategies supported in `[orchestrator].strategy`:
+
+| Strategy | Workflow |
+|----------|----------|
+| `standard` | goal → implement → test → preflight |
+| `tdd` | red → green → refactor → preflight |
+| `gsd` | must-haves checklist → implement → verify |
+| `complete` | root-fix end-to-end → tests (including failure paths) → docs update → preflight |
+
+The `complete` strategy is inspired by Gary Tam's (Y Combinator) execution standard: every task must be a finished deliverable, not a partial checkpoint. Root causes are fixed, not worked around. Tests cover edge and failure cases. Documentation lands in the same task.
+
+Use `--dry-run` to preview the generated orchestrator prompt for any strategy before committing:
+
+```bash
+# See exactly what the complete strategy generates
+wiggum generate plan.toml --dry-run
+```
+
 ### Gates (human-in-the-loop stops)
 
 Add a `gate` to any task to require human confirmation before the orchestrator proceeds:

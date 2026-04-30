@@ -172,6 +172,16 @@ mod tests {
     }
 
     #[test]
+    fn render_complete_strategy() {
+        let mut plan = sample_plan();
+        plan.orchestrator.strategy = Strategy::Complete;
+        let output = render(&plan).unwrap();
+        assert!(output.contains("Complete"));
+        assert!(output.contains("root fix"));
+        assert!(output.contains("tests and docs"));
+    }
+
+    #[test]
     fn render_go_language() {
         let mut plan = sample_plan();
         plan.project.language = Language::Go;
