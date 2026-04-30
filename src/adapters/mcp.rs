@@ -301,10 +301,15 @@ fn redact_output_content(text: &str) -> (String, usize) {
     (redacted, redaction_count)
 }
 
+fn contains_ascii_case_insensitive(text: &str, pattern: &str) -> bool {
+    text.to_ascii_lowercase()
+        .contains(&pattern.to_ascii_lowercase())
+}
+
 fn contains_blocked_output(text: &str) -> Option<&'static str> {
     OUTPUT_BLOCK_PATTERNS
         .iter()
-        .find(|pattern| text.contains(**pattern))
+        .find(|pattern| contains_ascii_case_insensitive(text, pattern))
         .copied()
 }
 
@@ -420,6 +425,33 @@ fn normalize_success_output(id: Value, tool_name: &str, text: &str) -> JsonRpcRe
         )
     } else {
         tool_result_response(id, redacted_text, None)
+    }
+}
+
+fn normalize_error_output(id: Value, tool_name: &str, error_text: &str) -> JsonRpcResponse {
+    let (redacted_text, redaction_count) = redact_output_content(error_text);
+    if redaction_count > 0 {
+        security_event(
+            tool_name,
+            "output_redacted_from_error",
+            &format!("redactions={redaction_count}"),
+        );
+    }
+
+    if let Some(pattern) = contains_blocked_output(&redacted_text) {
+        security_event(
+            tool_name,
+            "output_guardrail_blocked_from_error",
+            &format!("matched pattern: {pattern}"),
+        );
+        tool_result_response(
+            id,
+            "Error: blocked by MCP output guardrail (error message contained sensitive marker)"
+                .to_string(),
+            Some(true),
+        )
+    } else {
+        tool_result_response(id, redacted_text, Some(true))
     }
 }
 
@@ -711,7 +743,7 @@ fn handle_tool_call(id: Value, params: &Value) -> JsonRpcResponse {
 
     match result {
         Ok(text) => normalize_success_output(id, tool_name, &text),
-        Err(e) => tool_result_response(id, format!("Error: {e}"), Some(true)),
+        Err(e) => normalize_error_output(id, tool_name, &format!("Error: {e}")),
     }
 }
 
@@ -1050,6 +1082,30 @@ mod tests {
         let blocked = contains_blocked_output(leaked);
 
         assert_eq!(blocked, Some("-----BEGIN PRIVATE KEY-----"));
+    }
+
+    #[test]
+    fn output_guardrail_hard_block_is_case_insensitive() {
+        // Pattern is stored lowercase; env vars commonly appear in UPPER_CASE.
+        let leaked = "export AWS_SECRET_ACCESS_KEY=AKIAIOSFODNN7EXAMPLE";
+
+        let blocked = contains_blocked_output(leaked);
+
+        assert_eq!(blocked, Some("aws_secret_access_key"));
+    }
+
+    #[test]
+    fn error_output_is_redacted_before_returning() {
+        // Simulate a tool error message that inadvertently contains a bearer token.
+        let error_text = "Error: upstream call failed with header Authorization: Bearer supersecrettoken123";
+
+        let (redacted, count) = redact_output_content(error_text);
+
+        assert!(
+            redacted.contains("Bearer [REDACTED_TOKEN]"),
+            "bearer token must be redacted in error messages"
+        );
+        assert!(count >= 1);
     }
 
     #[test]
