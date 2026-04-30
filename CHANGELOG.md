@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-04-30
+
 ### Added
 
 - `Strategy::Complete` — a new execution strategy that treats every task as a finished deliverable: root-cause fix (no workarounds), tests including failure-path coverage, documentation updates in the same task, and a full preflight pass. The strategy contract is baked into the generated orchestrator prompt, each task file, and AGENTS.md.
