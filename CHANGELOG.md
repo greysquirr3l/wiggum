@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-05-02
+
+### Security
+
+- Updated transitive dependency `rand` from 0.8.5 to 0.8.6, resolving [RUSTSEC-2026-0097](https://rustsec.org/advisories/RUSTSEC-2026-0097) (unsound behavior with custom loggers via `rand::rng()`)
+
 ## [0.9.0] - 2026-04-30
 
 ### Added
