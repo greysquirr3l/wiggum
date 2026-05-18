@@ -530,6 +530,12 @@ const fn verdict_for(score: u8) -> &'static str {
     }
 }
 
+/// Public wrapper around the internal `verdict_for` helper.
+#[must_use]
+pub const fn verdict_for_score(score: u8) -> &'static str {
+    verdict_for(score)
+}
+
 const fn pct_label(pct: usize) -> &'static str {
     if pct >= 75 {
         "majority"
@@ -552,6 +558,107 @@ fn collect_suggestions(dim: &DimensionScore, out: &mut Vec<Suggestion>) {
             message: format!("[{}] {}", dim.name, finding),
         });
     }
+}
+
+// ─── Formatting helpers ───────────────────────────────────────────────────────
+
+/// Format a [`PlanScore`] as a human-readable terminal report.
+#[must_use]
+pub fn format_score_report(score: &PlanScore) -> String {
+    use std::fmt::Write as _;
+    let mut out = String::with_capacity(1024);
+
+    let health_icon = if score.is_healthy() { "✓" } else { "✗" };
+    let _ = writeln!(
+        out,
+        "Plan Quality Report  {health_icon} Overall: {}/10 ({})\n",
+        score.overall,
+        verdict_for(score.overall)
+    );
+    let _ = writeln!(out, "Dimensions:");
+    for dim in &score.dimensions {
+        let _ = writeln!(
+            out,
+            "  {:<22} {:>2}/10  {}",
+            dim.name, dim.score, dim.verdict
+        );
+        for f in &dim.findings {
+            let _ = writeln!(out, "    · {f}");
+        }
+    }
+
+    if !score.suggestions.is_empty() {
+        let _ = writeln!(out, "\nSuggestions ({}):", score.suggestions.len());
+        for s in &score.suggestions {
+            let _ = writeln!(out, "  [{}] {}", s.severity, s.message);
+        }
+    }
+
+    let _ = writeln!(
+        out,
+        "\nEstimated tokens: ~{}",
+        format_thousands(score.estimated_tokens)
+    );
+    out
+}
+
+/// Format a [`PlanScore`] as a JSON string (no extra dependencies required).
+#[must_use]
+pub fn format_score_json(score: &PlanScore) -> String {
+    use std::fmt::Write as _;
+    let mut out = String::with_capacity(512);
+    let _ = write!(
+        out,
+        r#"{{"overall":{overall},"healthy":{healthy},"estimated_tokens":{tokens},"dimensions":["#,
+        overall = score.overall,
+        healthy = score.is_healthy(),
+        tokens = score.estimated_tokens,
+    );
+    for (i, dim) in score.dimensions.iter().enumerate() {
+        if i > 0 {
+            out.push(',');
+        }
+        let findings_json: String = dim
+            .findings
+            .iter()
+            .map(|f| format!("{f:?}"))
+            .collect::<Vec<_>>()
+            .join(",");
+        let _ = write!(
+            out,
+            r#"{{"name":{name:?},"score":{score},"verdict":{verdict:?},"findings":[{findings}]}}"#,
+            name = dim.name,
+            score = dim.score,
+            verdict = dim.verdict,
+            findings = findings_json,
+        );
+    }
+    out.push_str(r#"],"suggestions":["#);
+    for (i, s) in score.suggestions.iter().enumerate() {
+        if i > 0 {
+            out.push(',');
+        }
+        let _ = write!(
+            out,
+            r#"{{"severity":{sev:?},"message":{msg:?}}}"#,
+            sev = s.severity.to_string(),
+            msg = s.message,
+        );
+    }
+    out.push_str("]}");
+    out
+}
+
+fn format_thousands(n: usize) -> String {
+    let s = n.to_string();
+    let mut out = String::with_capacity(s.len() + s.len() / 3);
+    for (i, c) in s.chars().rev().enumerate() {
+        if i > 0 && i % 3 == 0 {
+            out.push(',');
+        }
+        out.push(c);
+    }
+    out.chars().rev().collect()
 }
 
 // ─── Tests ────────────────────────────────────────────────────────────────────

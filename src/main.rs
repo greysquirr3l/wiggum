@@ -9,6 +9,7 @@ use wiggum::adapters::fs::FsAdapter;
 use wiggum::adapters::mcp;
 use wiggum::adapters::vcs;
 use wiggum::adapters::{bootstrap, diff, init, resume, retro, split, templates};
+use wiggum::domain::check;
 use wiggum::domain::dag::{parallel_groups, validate_dag};
 use wiggum::domain::lint;
 use wiggum::domain::plan::Plan;
@@ -78,7 +79,11 @@ fn main() {
             progress,
             project_dir,
         } => cmd_report(&progress, project_dir.as_deref()),
-        Command::Watch { progress, poll_ms } => cmd_watch(&progress, poll_ms),
+        Command::Watch {
+            progress,
+            poll_ms,
+            stall_secs,
+        } => cmd_watch(&progress, poll_ms, stall_secs),
         Command::Bootstrap {
             path,
             output,
@@ -96,6 +101,7 @@ fn main() {
             dry_run,
         } => cmd_resume(&progress, &plan, task.as_deref(), dry_run),
         Command::Diff { old, new } => cmd_diff(&old, &new),
+        Command::Check { plan, json } => cmd_check(&plan, json),
         Command::Retro {
             progress,
             apply,
@@ -326,8 +332,8 @@ fn cmd_report(progress_path: &Path, project_dir: Option<&Path>) -> wiggum::error
     Ok(())
 }
 
-fn cmd_watch(progress_path: &Path, poll_ms: u64) -> wiggum::error::Result<()> {
-    wiggum::adapters::watch::run_watch(progress_path, poll_ms)
+fn cmd_watch(progress_path: &Path, poll_ms: u64, stall_secs: u64) -> wiggum::error::Result<()> {
+    wiggum::adapters::watch::run_watch(progress_path, poll_ms, stall_secs)
 }
 
 fn cmd_bootstrap(
@@ -416,6 +422,25 @@ fn cmd_resume(
 fn cmd_diff(old_path: &Path, new_path: &Path) -> wiggum::error::Result<()> {
     let changes = diff::diff_plans(old_path, new_path)?;
     println!("{}", diff::format_diff(&changes));
+    Ok(())
+}
+
+fn cmd_check(plan_path: &Path, json: bool) -> wiggum::error::Result<()> {
+    let fs = FsAdapter;
+    let toml_content = fs.read_plan(plan_path)?;
+    let plan = Plan::from_toml(&toml_content)?;
+    let resolved = plan.resolve_tasks()?;
+    let score = check::score_plan(&plan, &resolved);
+
+    if json {
+        println!("{}", check::format_score_json(&score));
+    } else {
+        println!("{}", check::format_score_report(&score));
+    }
+
+    if !score.is_healthy() {
+        std::process::exit(1);
+    }
     Ok(())
 }
 

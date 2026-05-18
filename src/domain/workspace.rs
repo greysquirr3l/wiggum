@@ -201,6 +201,59 @@ pub fn skeleton_toml(workspace_name: &str, plan_dirs: &[(&str, &str)]) -> String
     lines.join("\n")
 }
 
+/// Generate a skeleton `plan.toml` string for a new project.
+///
+/// The caller supplies the project name, a description, the primary language,
+/// and an ordered list of task slugs. Goals and hints are left as placeholders.
+#[must_use]
+pub fn skeleton_plan_toml(
+    project_name: &str,
+    description: &str,
+    language: &str,
+    task_slugs: &[String],
+) -> String {
+    let mut lines = vec![
+        "[project]".to_string(),
+        format!("name = \"{project_name}\""),
+        format!("description = \"{description}\""),
+        format!("language = \"{language}\""),
+        format!("path = \"./{project_name}\""),
+        String::new(),
+        "[orchestrator]".to_string(),
+        "persona = \"You are an expert software engineer. Follow all instructions carefully.\""
+            .to_string(),
+        "strategy = \"sequential\"".to_string(),
+        String::new(),
+        "[[phases]]".to_string(),
+        "name = \"Phase 1 — Foundation\"".to_string(),
+        "order = 1".to_string(),
+        String::new(),
+    ];
+
+    for (i, slug) in task_slugs.iter().enumerate() {
+        let title = slug
+            .split('-')
+            .map(|w| {
+                let mut c = w.chars();
+                c.next().map_or_else(String::new, |f| {
+                    f.to_uppercase().collect::<String>() + c.as_str()
+                })
+            })
+            .collect::<Vec<_>>()
+            .join(" ");
+        let num = i + 1;
+        lines.push("[[tasks]]".to_string());
+        lines.push(format!("slug = \"{slug}\""));
+        lines.push(format!("title = \"T{num:02} — {title}\""));
+        lines.push("phase = \"Phase 1 — Foundation\"".to_string());
+        lines.push("goal = \"TODO: describe what this task should accomplish\"".to_string());
+        lines.push("hints = []".to_string());
+        lines.push(String::new());
+    }
+
+    lines.join("\n")
+}
+
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 #[cfg(test)]

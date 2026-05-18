@@ -77,7 +77,13 @@ fn format_elapsed(elapsed: std::time::Duration) -> String {
 
 /// Render the watch display to a string (testable, no I/O).
 #[must_use]
-pub fn render_display(content: &str, elapsed: std::time::Duration) -> String {
+#[expect(clippy::too_many_lines)]
+pub fn render_display<S: std::hash::BuildHasher>(
+    content: &str,
+    elapsed: std::time::Duration,
+    stall_times: &HashMap<String, std::time::Duration, S>,
+    stall_threshold: std::time::Duration,
+) -> String {
     let summary = parse_progress(content);
     let mut out = String::with_capacity(1024);
 
@@ -188,18 +194,44 @@ pub fn render_display(content: &str, elapsed: std::time::Duration) -> String {
         let _ = writeln!(out, "  {DIM}Learnings: {}{RESET}", summary.learnings_count);
     }
 
+    // Stall warnings
+    if !stall_threshold.is_zero() {
+        for task in summary
+            .tasks
+            .iter()
+            .filter(|t| t.status == TaskStatus::InProgress)
+        {
+            if let Some(&stalled) = stall_times.get(&task.id)
+                && stalled >= stall_threshold
+            {
+                let _ = writeln!(
+                    out,
+                    "  {YELLOW}⚠ HEALTH:{RESET} {} has been in-progress for {} — may be stalled",
+                    task.id,
+                    format_elapsed(stalled),
+                );
+            }
+        }
+    }
+
     out
 }
 
 /// Run the watch loop, polling the progress file and re-rendering on change.
 ///
+/// `stall_secs` controls after how many seconds an in-progress task is flagged
+/// as potentially stalled. Pass `0` to disable stall warnings.
+///
 /// # Errors
 ///
 /// Returns an error if the progress file cannot be read initially.
-pub fn run_watch(progress_path: &Path, poll_ms: u64) -> crate::error::Result<()> {
+pub fn run_watch(progress_path: &Path, poll_ms: u64, stall_secs: u64) -> crate::error::Result<()> {
     let start = Instant::now();
     let mut last_content = String::new();
     let mut stdout = io::stdout();
+    // task_id → wall-clock instant when it first appeared as in-progress
+    let mut in_progress_since: HashMap<String, Instant> = HashMap::new();
+    let stall_threshold = std::time::Duration::from_secs(stall_secs);
 
     // Verify file exists before entering loop
     if !progress_path.exists() {
@@ -218,7 +250,32 @@ pub fn run_watch(progress_path: &Path, poll_ms: u64) -> crate::error::Result<()>
         // Only re-render if the file changed
         if content != last_content {
             last_content.clone_from(&content);
-            let display = render_display(&content, start.elapsed());
+
+            // Update stall tracker: record when each task first goes in-progress
+            let summary = parse_progress(&content);
+            let now = Instant::now();
+            for task in summary
+                .tasks
+                .iter()
+                .filter(|t| t.status == TaskStatus::InProgress)
+            {
+                in_progress_since.entry(task.id.clone()).or_insert(now);
+            }
+            // Remove tasks that are no longer in-progress
+            in_progress_since.retain(|id, _| {
+                summary
+                    .tasks
+                    .iter()
+                    .any(|t| &t.id == id && t.status == TaskStatus::InProgress)
+            });
+
+            // Build stall duration map
+            let stall_times: HashMap<String, std::time::Duration> = in_progress_since
+                .iter()
+                .map(|(id, since)| (id.clone(), since.elapsed()))
+                .collect();
+
+            let display = render_display(&content, start.elapsed(), &stall_times, stall_threshold);
             write!(stdout, "{CLEAR_SCREEN}{display}").ok();
             stdout.flush().ok();
         }
@@ -228,8 +285,13 @@ pub fn run_watch(progress_path: &Path, poll_ms: u64) -> crate::error::Result<()>
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
+
+    fn no_stall() -> (HashMap<String, std::time::Duration>, std::time::Duration) {
+        (HashMap::new(), std::time::Duration::ZERO)
+    }
 
     const SAMPLE: &str = r"# my-project — Implementation Progress
 
@@ -320,40 +382,46 @@ mod tests {
 
     #[test]
     fn render_contains_project_name() {
-        let output = render_display(SAMPLE, std::time::Duration::from_mins(1));
+        let (st, thresh) = no_stall();
+        let output = render_display(SAMPLE, std::time::Duration::from_mins(1), &st, thresh);
         assert!(output.contains("my-project"));
     }
 
     #[test]
     fn render_shows_phases() {
-        let output = render_display(SAMPLE, std::time::Duration::from_secs(0));
+        let (st, thresh) = no_stall();
+        let output = render_display(SAMPLE, std::time::Duration::from_secs(0), &st, thresh);
         assert!(output.contains("Scaffold"));
         assert!(output.contains("Core"));
     }
 
     #[test]
     fn render_shows_current_task() {
-        let output = render_display(SAMPLE, std::time::Duration::from_secs(0));
+        let (st, thresh) = no_stall();
+        let output = render_display(SAMPLE, std::time::Duration::from_secs(0), &st, thresh);
         assert!(output.contains("T03"));
         assert!(output.contains("Auth Service"));
     }
 
     #[test]
     fn render_shows_completion() {
-        let output = render_display(SAMPLE, std::time::Duration::from_secs(0));
+        let (st, thresh) = no_stall();
+        let output = render_display(SAMPLE, std::time::Duration::from_secs(0), &st, thresh);
         assert!(output.contains("2/5"));
         assert!(output.contains("40%"));
     }
 
     #[test]
     fn render_shows_blocked_count() {
-        let output = render_display(SAMPLE, std::time::Duration::from_secs(0));
+        let (st, thresh) = no_stall();
+        let output = render_display(SAMPLE, std::time::Duration::from_secs(0), &st, thresh);
         assert!(output.contains("Blocked: 1"));
     }
 
     #[test]
     fn render_shows_learnings() {
-        let output = render_display(SAMPLE, std::time::Duration::from_secs(0));
+        let (st, thresh) = no_stall();
+        let output = render_display(SAMPLE, std::time::Duration::from_secs(0), &st, thresh);
         assert!(output.contains("Learnings: 2"));
     }
 
@@ -373,7 +441,8 @@ mod tests {
 
 _No learnings yet._
 ";
-        let output = render_display(content, std::time::Duration::from_secs(100));
+        let (st, thresh) = no_stall();
+        let output = render_display(content, std::time::Duration::from_secs(100), &st, thresh);
         assert!(output.contains("All tasks completed!"));
         assert!(output.contains("1/1"));
         assert!(output.contains("100%"));

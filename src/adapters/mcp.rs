@@ -350,6 +350,8 @@ fn run_tool(tool_name: &str, arguments: &Value) -> Result<String> {
         "wiggum_report" => tool_report(arguments),
         "wiggum_generate_agents_md" => tool_generate_agents_md(arguments),
         "wiggum_bootstrap" => tool_bootstrap(arguments),
+        "wiggum_check_plan" => tool_check_plan(arguments),
+        "wiggum_draft_plan" => tool_draft_plan(arguments),
         _ => Err(WiggumError::Validation(format!(
             "Unknown tool: {tool_name}"
         ))),
@@ -721,6 +723,44 @@ fn extended_tool_definitions() -> Vec<ToolDefinition> {
                 "required": ["project_path"]
             }),
         },
+        ToolDefinition {
+            name: "wiggum_check_plan".to_string(),
+            description: "Score the quality of a plan TOML on five dimensions: granularity, \
+                dependency health, coverage, richness, and token budget. \
+                Returns an overall score (0-10) and actionable suggestions."
+                .to_string(),
+            input_schema: plan_path_schema(),
+        },
+        ToolDefinition {
+            name: "wiggum_draft_plan".to_string(),
+            description: "Generate a skeleton plan.toml from a natural-language description. \
+                The calling agent fills in the task details; this tool provides the correctly-structured scaffold."
+                .to_string(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "project_name": {
+                        "type": "string",
+                        "description": "Machine-friendly project slug (e.g. my-api-service)"
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "Natural language description of the project and its goals"
+                    },
+                    "language": {
+                        "type": "string",
+                        "description": "Primary language (e.g. rust, typescript, go)",
+                        "default": "rust"
+                    },
+                    "task_slugs": {
+                        "type": "array",
+                        "items": { "type": "string" },
+                        "description": "Optional ordered list of task slugs to scaffold (if omitted, generic placeholders are used)"
+                    }
+                },
+                "required": ["project_name", "description"]
+            }),
+        },
     ]
 }
 
@@ -1025,6 +1065,100 @@ fn tool_bootstrap(args: &Value) -> Result<String> {
 }
 
 // ─── Response helpers ───────────────────────────────────────────────
+
+fn tool_check_plan(args: &Value) -> Result<String> {
+    let plan_path = args
+        .get("plan_path")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| WiggumError::Validation("plan_path is required".to_string()))?;
+
+    let fs = FsAdapter;
+    let toml_content = fs.read_plan(&PathBuf::from(plan_path))?;
+    let plan = Plan::from_toml(&toml_content)?;
+    let resolved = plan.resolve_tasks()?;
+    let score = crate::domain::check::score_plan(&plan, &resolved);
+
+    let health_label = if score.is_healthy() {
+        "healthy"
+    } else {
+        "needs work"
+    };
+    let mut lines = vec![format!(
+        "Plan quality: {}/10 ({}) — {health_label}",
+        score.overall,
+        crate::domain::check::verdict_for_score(score.overall),
+    )];
+    lines.push(String::new());
+    for dim in &score.dimensions {
+        lines.push(format!(
+            "  {:<22} {}/10  {}",
+            dim.name, dim.score, dim.verdict
+        ));
+        for f in &dim.findings {
+            lines.push(format!("    · {f}"));
+        }
+    }
+    if !score.suggestions.is_empty() {
+        lines.push(String::new());
+        lines.push(format!("Suggestions ({}):", score.suggestions.len()));
+        for s in &score.suggestions {
+            lines.push(format!("  [{}] {}", s.severity, s.message));
+        }
+    }
+    lines.push(format!("\nEstimated tokens: ~{}", score.estimated_tokens));
+    Ok(lines.join("\n"))
+}
+
+fn tool_draft_plan(args: &Value) -> Result<String> {
+    let project_name = args
+        .get("project_name")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| WiggumError::Validation("project_name is required".to_string()))?;
+
+    let description = args
+        .get("description")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| WiggumError::Validation("description is required".to_string()))?;
+
+    let language = args
+        .get("language")
+        .and_then(|v| v.as_str())
+        .unwrap_or("rust");
+
+    let default_slugs = [
+        "scaffold",
+        "domain-model",
+        "core-logic",
+        "api-layer",
+        "persistence",
+        "integration",
+        "security-hardening",
+        "documentation",
+    ];
+    let task_slugs: Vec<String> = args
+        .get("task_slugs")
+        .and_then(|v| v.as_array())
+        .map_or_else(
+            || default_slugs.iter().map(|s| (*s).to_string()).collect(),
+            |arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str())
+                    .map(String::from)
+                    .collect()
+            },
+        );
+
+    let plan_toml = crate::domain::workspace::skeleton_plan_toml(
+        project_name,
+        description,
+        language,
+        &task_slugs,
+    );
+
+    Ok(format!(
+        "# wiggum skeleton plan — fill in goals, hints, and evaluation_criteria before running `wiggum generate`\n\n{plan_toml}"
+    ))
+}
 
 fn success_response(id: Value, result: Value) -> JsonRpcResponse {
     JsonRpcResponse {
