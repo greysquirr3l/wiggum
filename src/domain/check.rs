@@ -415,6 +415,13 @@ fn score_richness(tasks: &[ResolvedTask]) -> DimensionScore {
             placeholders.len(),
             placeholders.join(", ")
         ));
+        // All tasks are placeholders — plan is not ready to generate
+        if placeholders.len() == total {
+            penalty = penalty.saturating_add(3);
+            findings.push(
+                "All tasks have placeholder goals — plan is not ready to generate".to_string(),
+            );
+        }
     }
 
     score_from_penalty("Richness", penalty, findings)
