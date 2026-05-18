@@ -247,8 +247,8 @@ pub fn run_watch(progress_path: &Path, poll_ms: u64, stall_secs: u64) -> crate::
     loop {
         let content = std::fs::read_to_string(progress_path).unwrap_or_default();
 
-        // Only re-render if the file changed
-        if content != last_content {
+        let content_changed = content != last_content;
+        if content_changed {
             last_content.clone_from(&content);
 
             // Update stall tracker: record when each task first goes in-progress
@@ -268,14 +268,23 @@ pub fn run_watch(progress_path: &Path, poll_ms: u64, stall_secs: u64) -> crate::
                     .iter()
                     .any(|t| &t.id == id && t.status == TaskStatus::InProgress)
             });
+        }
 
-            // Build stall duration map
+        // Re-render on content change OR on every poll cycle when tasks are
+        // being tracked: a stalled task stops updating the file, so without
+        // this the stall warning would never surface.
+        if content_changed || !in_progress_since.is_empty() {
             let stall_times: HashMap<String, std::time::Duration> = in_progress_since
                 .iter()
                 .map(|(id, since)| (id.clone(), since.elapsed()))
                 .collect();
 
-            let display = render_display(&content, start.elapsed(), &stall_times, stall_threshold);
+            let display = render_display(
+                &last_content,
+                start.elapsed(),
+                &stall_times,
+                stall_threshold,
+            );
             write!(stdout, "{CLEAR_SCREEN}{display}").ok();
             stdout.flush().ok();
         }

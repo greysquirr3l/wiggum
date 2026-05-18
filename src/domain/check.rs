@@ -608,7 +608,14 @@ pub fn format_score_report(score: &PlanScore) -> String {
     out
 }
 
-/// Format a [`PlanScore`] as a JSON string (no extra dependencies required).
+/// Serialize `s` as a JSON string literal using RFC 8259-compliant escaping.
+///
+/// Delegates to `serde_json` to avoid the `\u{XX}` Rust-Debug pitfall.
+fn json_str(s: &str) -> String {
+    serde_json::to_string(s).unwrap_or_else(|_| r#""""#.to_string())
+}
+
+/// Format a [`PlanScore`] as a JSON string.
 #[must_use]
 pub fn format_score_json(score: &PlanScore) -> String {
     use std::fmt::Write as _;
@@ -627,15 +634,15 @@ pub fn format_score_json(score: &PlanScore) -> String {
         let findings_json: String = dim
             .findings
             .iter()
-            .map(|f| format!("{f:?}"))
+            .map(|f| json_str(f))
             .collect::<Vec<_>>()
             .join(",");
         let _ = write!(
             out,
-            r#"{{"name":{name:?},"score":{score},"verdict":{verdict:?},"findings":[{findings}]}}"#,
-            name = dim.name,
+            r#"{{"name":{name},"score":{score},"verdict":{verdict},"findings":[{findings}]}}"#,
+            name = json_str(dim.name),
             score = dim.score,
-            verdict = dim.verdict,
+            verdict = json_str(dim.verdict),
             findings = findings_json,
         );
     }
@@ -646,9 +653,9 @@ pub fn format_score_json(score: &PlanScore) -> String {
         }
         let _ = write!(
             out,
-            r#"{{"severity":{sev:?},"message":{msg:?}}}"#,
-            sev = s.severity.to_string(),
-            msg = s.message,
+            r#"{{"severity":{sev},"message":{msg}}}"#,
+            sev = json_str(&s.severity.to_string()),
+            msg = json_str(&s.message),
         );
     }
     out.push_str("]}");

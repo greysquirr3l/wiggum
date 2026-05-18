@@ -217,7 +217,10 @@ pub fn skeleton_plan_toml(
         format!("name = \"{}\"", toml_escape(project_name)),
         format!("description = \"{}\"", toml_escape(description)),
         format!("language = \"{}\"", toml_escape(language)),
-        format!("path = \"./{}\"", toml_escape(project_name)),
+        format!(
+            "path = \"./{}\"",
+            toml_escape(&sanitize_path_component(project_name))
+        ),
         String::new(),
         "[orchestrator]".to_string(),
         "persona = \"You are an expert software engineer. Follow all instructions carefully.\""
@@ -254,6 +257,17 @@ pub fn skeleton_plan_toml(
     lines.join("\n")
 }
 
+/// Strip characters that would make a bare path component unsafe.
+///
+/// Only alphanumerics, hyphens, underscores, and dots are kept, preventing
+/// path-separator injection (`/`, `\`, `..`) via user-supplied project names
+/// when the value is embedded in the `path` field of a skeleton plan.
+fn sanitize_path_component(s: &str) -> String {
+    s.chars()
+        .filter(|c| c.is_alphanumeric() || matches!(c, '-' | '_' | '.'))
+        .collect()
+}
+
 /// Escape a string for inclusion in a TOML basic string literal (double-quoted).
 ///
 /// Escapes `\` and `"` per the TOML spec, and renders ASCII control characters
@@ -265,10 +279,7 @@ fn toml_escape(s: &str) -> String {
             '\\' => out.push_str("\\\\"),
             '"' => out.push_str("\\\""),
             '\x00'..='\x1F' | '\x7F' => {
-                let _ = std::fmt::Write::write_fmt(
-                    &mut out,
-                    format_args!("\\u{:04X}", ch as u32),
-                );
+                let _ = std::fmt::Write::write_fmt(&mut out, format_args!("\\u{:04X}", ch as u32));
             }
             _ => out.push(ch),
         }
