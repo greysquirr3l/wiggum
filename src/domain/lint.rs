@@ -361,7 +361,7 @@ mod tests {
     use super::*;
     use crate::domain::plan::{
         IntegrationConfig, Language, Orchestrator, Phase, Plan, Preflight, Project, SecurityConfig,
-        Strategy, StyleConfig, TaskDef,
+        Strategy, StyleConfig, TaskDef, TaskKind,
     };
 
     fn make_plan(tasks: Vec<TaskDef>, architecture: Option<String>) -> (Plan, Vec<ResolvedTask>) {
@@ -378,6 +378,7 @@ mod tests {
                 persona: "test".to_string(),
                 strategy: Strategy::default(),
                 rules: Vec::new(),
+                ..Default::default()
             },
             evaluator: None,
             security: SecurityConfig::default(),
@@ -405,6 +406,7 @@ mod tests {
                 evaluation_criteria: t.evaluation_criteria,
                 phase_name: "Phase 1".to_string(),
                 phase_order: 1,
+                kind: t.kind,
             })
             .collect();
         (plan, resolved)
@@ -421,6 +423,7 @@ mod tests {
             must_haves: Vec::new(),
             gate: None,
             evaluation_criteria: Vec::new(),
+            kind: TaskKind::default(),
         }
     }
 
@@ -467,6 +470,7 @@ mod tests {
                     must_haves: Vec::new(),
                     gate: None,
                     evaluation_criteria: Vec::new(),
+                    kind: TaskKind::default(),
                 }
             })
             .collect();
@@ -488,6 +492,7 @@ mod tests {
                 must_haves: Vec::new(),
                 gate: None,
                 evaluation_criteria: Vec::new(),
+                kind: TaskKind::default(),
             },
             TaskDef {
                 slug: "domain".to_string(),
@@ -499,6 +504,7 @@ mod tests {
                 must_haves: Vec::new(),
                 gate: None,
                 evaluation_criteria: Vec::new(),
+                kind: TaskKind::default(),
             },
         ];
         let (plan, resolved) = make_plan(tasks, Some("hexagonal".to_string()));

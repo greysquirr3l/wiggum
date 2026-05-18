@@ -98,7 +98,7 @@ mod tests {
     use super::*;
     use crate::domain::plan::{
         IntegrationConfig, Language, Orchestrator, Phase, Preflight, Project, ResolvedTask,
-        SecurityConfig, StyleConfig, TaskDef,
+        SecurityConfig, StyleConfig, TaskDef, TaskKind,
     };
 
     fn make_plan_and_tasks() -> (Plan, Vec<ResolvedTask>) {
@@ -129,6 +129,7 @@ mod tests {
                     must_haves: vec![],
                     gate: None,
                     evaluation_criteria: vec!["README.md exists".to_string()],
+                    kind: TaskKind::default(),
                 }],
             }],
         };
@@ -145,6 +146,7 @@ mod tests {
             evaluation_criteria: vec!["README.md exists".to_string()],
             phase_name: "Foundation".to_string(),
             phase_order: 1,
+            kind: TaskKind::default(),
         }];
         (plan, tasks)
     }

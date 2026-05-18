@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 
 use crate::adapters::fs::FsAdapter;
-use crate::domain::plan::{Plan, TaskDef};
+use crate::domain::plan::{Plan, TaskDef, TaskKind};
 use crate::error::{Result, WiggumError};
 use crate::ports::PlanReader;
 
@@ -51,6 +51,7 @@ impl From<TaskTemplate> for TaskDef {
             must_haves: tmpl.must_haves,
             gate: None,
             evaluation_criteria: tmpl.evaluation_criteria,
+            kind: TaskKind::default(),
         }
     }
 }

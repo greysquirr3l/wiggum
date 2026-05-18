@@ -31,6 +31,8 @@ pub fn render_with(tera: &Tera, plan: &Plan, tasks: &[ResolvedTask]) -> Result<S
     ctx.insert("rules", &plan.orchestrator.rules);
     ctx.insert("architecture", &plan.project.architecture);
     ctx.insert("strategy", &plan.orchestrator.strategy.to_string());
+    ctx.insert("max_retries", &plan.orchestrator.max_retries);
+    ctx.insert("on_failure", &plan.orchestrator.on_failure.to_string());
     ctx.insert("has_evaluator", &plan.evaluator.is_some());
 
     // Security rules from the language profile, always injected.

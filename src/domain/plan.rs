@@ -88,6 +88,30 @@ impl Default for EvaluatorConfig {
     }
 }
 
+/// What the orchestrator should do when a task exhausts its retry budget.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum FailureAction {
+    /// Emit a GATE banner and stop — human must restart to proceed.
+    #[default]
+    Pause,
+    /// Mark the task `[!]` (blocked) and continue to the next available task.
+    Skip,
+    /// Emit a structured failure block into PROGRESS.md with diagnosis summary,
+    /// then continue to the next available task.
+    Escalate,
+}
+
+impl std::fmt::Display for FailureAction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Pause => write!(f, "pause"),
+            Self::Skip => write!(f, "skip"),
+            Self::Escalate => write!(f, "escalate"),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Orchestrator {
     #[serde(default = "default_persona")]
@@ -96,6 +120,13 @@ pub struct Orchestrator {
     pub strategy: Strategy,
     #[serde(default)]
     pub rules: Vec<String>,
+    /// Maximum number of preflight-fail/retry cycles before the orchestrator
+    /// applies `on_failure`. Defaults to `2`.
+    #[serde(default = "default_max_retries")]
+    pub max_retries: u32,
+    /// Action taken when a task exhausts `max_retries`. Defaults to `pause`.
+    #[serde(default)]
+    pub on_failure: FailureAction,
 }
 
 /// Prompt strategy mode controlling task and orchestrator template styles.
@@ -118,6 +149,47 @@ pub struct Phase {
     pub name: String,
     pub order: u32,
     pub tasks: Vec<TaskDef>,
+}
+
+/// Task archetype — selects a template variant with role-appropriate
+/// sections and exit criteria pre-populated for that kind of work.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum TaskKind {
+    /// New functionality: emphasises implementation + tests.
+    #[default]
+    Feature,
+    /// Code quality change: emphasises behavioural equivalence before/after.
+    Refactor,
+    /// CI, config, tooling, infrastructure-as-code work.
+    Infrastructure,
+    /// Exploratory / spike: produces a document or recommendation, not code.
+    Research,
+    /// Security or quality audit: produces findings, not new behaviour.
+    Audit,
+}
+
+impl std::fmt::Display for TaskKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Feature => write!(f, "feature"),
+            Self::Refactor => write!(f, "refactor"),
+            Self::Infrastructure => write!(f, "infrastructure"),
+            Self::Research => write!(f, "research"),
+            Self::Audit => write!(f, "audit"),
+        }
+    }
+}
+
+impl TaskKind {
+    /// All supported task kinds.
+    pub const ALL: &[Self] = &[
+        Self::Feature,
+        Self::Refactor,
+        Self::Infrastructure,
+        Self::Research,
+        Self::Audit,
+    ];
 }
 
 /// A task definition as written in the plan TOML.
@@ -145,6 +217,10 @@ pub struct TaskDef {
     /// must pass before the task can be marked complete.
     #[serde(default)]
     pub evaluation_criteria: Vec<String>,
+    /// Task archetype — influences template variant and exit criteria.
+    /// Defaults to `feature` when omitted.
+    #[serde(default)]
+    pub kind: TaskKind,
 }
 
 /// A resolved task with its assigned number (T01, T02, ...).
@@ -164,6 +240,8 @@ pub struct ResolvedTask {
     pub evaluation_criteria: Vec<String>,
     pub phase_name: String,
     pub phase_order: u32,
+    /// Task archetype, propagated from `TaskDef`.
+    pub kind: TaskKind,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -230,12 +308,18 @@ fn default_persona() -> String {
     "You are a senior software engineer".to_string()
 }
 
+const fn default_max_retries() -> u32 {
+    2
+}
+
 impl Default for Orchestrator {
     fn default() -> Self {
         Self {
             persona: default_persona(),
             strategy: Strategy::default(),
             rules: Vec::new(),
+            max_retries: default_max_retries(),
+            on_failure: FailureAction::default(),
         }
     }
 }
@@ -386,6 +470,7 @@ impl Plan {
                     evaluation_criteria: task.evaluation_criteria.clone(),
                     phase_name: phase.name.clone(),
                     phase_order: phase.order,
+                    kind: task.kind,
                 });
                 number += 1;
             }
@@ -594,6 +679,7 @@ fn security_hardening_task(
         ],
         phase_name,
         phase_order,
+        kind: TaskKind::Audit,
     }
 }
 
@@ -647,6 +733,7 @@ fn integration_wiring_task(
         ],
         phase_name,
         phase_order,
+        kind: TaskKind::Audit,
     }
 }
 
@@ -706,6 +793,7 @@ fn stub_cleanup_task(
         ],
         phase_name,
         phase_order,
+        kind: TaskKind::Audit,
     }
 }
 
