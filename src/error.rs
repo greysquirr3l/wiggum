@@ -20,6 +20,9 @@ pub enum WiggumError {
     #[error("duplicate task slug: {0}")]
     DuplicateSlug(String),
 
+    #[error("plan quality score is too low (overall={score}/10, need \u{2265}7)")]
+    PlanUnhealthy { score: u8 },
+
     #[error("template error: {0}")]
     Template(String),
 

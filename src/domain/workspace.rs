@@ -214,10 +214,10 @@ pub fn skeleton_plan_toml(
 ) -> String {
     let mut lines = vec![
         "[project]".to_string(),
-        format!("name = \"{project_name}\""),
-        format!("description = \"{description}\""),
-        format!("language = \"{language}\""),
-        format!("path = \"./{project_name}\""),
+        format!("name = \"{}\"", toml_escape(project_name)),
+        format!("description = \"{}\"", toml_escape(description)),
+        format!("language = \"{}\"", toml_escape(language)),
+        format!("path = \"./{}\"", toml_escape(project_name)),
         String::new(),
         "[orchestrator]".to_string(),
         "persona = \"You are an expert software engineer. Follow all instructions carefully.\""
@@ -243,8 +243,8 @@ pub fn skeleton_plan_toml(
             .join(" ");
         let num = i + 1;
         lines.push("[[tasks]]".to_string());
-        lines.push(format!("slug = \"{slug}\""));
-        lines.push(format!("title = \"T{num:02} — {title}\""));
+        lines.push(format!("slug = \"{}\"", toml_escape(slug)));
+        lines.push(format!("title = \"T{num:02} — {}\"", toml_escape(&title)));
         lines.push("phase = \"Phase 1 — Foundation\"".to_string());
         lines.push("goal = \"TODO: describe what this task should accomplish\"".to_string());
         lines.push("hints = []".to_string());
@@ -252,6 +252,28 @@ pub fn skeleton_plan_toml(
     }
 
     lines.join("\n")
+}
+
+/// Escape a string for inclusion in a TOML basic string literal (double-quoted).
+///
+/// Escapes `\` and `"` per the TOML spec, and renders ASCII control characters
+/// as `\uXXXX` sequences so the output always round-trips through a TOML parser.
+fn toml_escape(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for ch in s.chars() {
+        match ch {
+            '\\' => out.push_str("\\\\"),
+            '"' => out.push_str("\\\""),
+            '\x00'..='\x1F' | '\x7F' => {
+                let _ = std::fmt::Write::write_fmt(
+                    &mut out,
+                    format_args!("\\u{:04X}", ch as u32),
+                );
+            }
+            _ => out.push(ch),
+        }
+    }
+    out
 }
 
 // ─── Tests ────────────────────────────────────────────────────────────────────

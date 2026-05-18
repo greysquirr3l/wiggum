@@ -6,7 +6,7 @@
 
 use std::collections::HashSet;
 
-use crate::domain::plan::{Plan, ResolvedTask};
+use crate::domain::plan::{Plan, ResolvedTask, TaskKind};
 use crate::generation::tokens::estimate_tokens;
 
 // ─── Public surface ───────────────────────────────────────────────────────────
@@ -204,9 +204,15 @@ fn score_dependency_health(tasks: &[ResolvedTask]) -> DimensionScore {
         .collect();
 
     // Exclude the case of a single-task plan — that's not an orphan problem.
+    // Also exclude Audit tasks: they naturally stand alone (findings, not code).
+    let audit_slugs: HashSet<&str> = tasks
+        .iter()
+        .filter(|t| t.kind == TaskKind::Audit)
+        .map(|t| t.slug.as_str())
+        .collect();
     let meaningful_orphans: Vec<&&str> = orphans
         .iter()
-        .filter(|s| all_slugs.len() > 1 && *s != &"security-hardening")
+        .filter(|s| all_slugs.len() > 1 && !audit_slugs.contains(*s))
         .collect();
 
     if meaningful_orphans.len() > 1 {
