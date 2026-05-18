@@ -183,6 +183,31 @@ When **all** tasks T01–T{{ task_count_padded }} show `[x]` in PROGRESS.md, out
 ✅ All {{ project_name }} implementation tasks complete.
 ```
 
+## Failure handling
+
+If a task fails verification (preflight fails or evaluator returns FAIL):
+
+{% if max_retries > 0 %}- Retry the task up to **{{ max_retries }}** time(s) before applying the failure action below.
+  - On each retry: reset the task to `[ ]`, spawn a fresh subagent with full failure context prepended.
+  - Record the retry count in the Notes column of PROGRESS.md.
+{% else %}- No retries are configured (`max_retries = 0`). Apply the failure action immediately on first failure.
+{% endif %}
+When retries are exhausted, apply the configured **failure action** (`{{ on_failure }}`):
+
+{% if on_failure == "pause" %}- **Pause**: Stop the implementation loop. Write the full failure context to PROGRESS.md and emit:
+  ```
+  ⛔ Task T{NN} failed after {{ max_retries }} retries. Human intervention required.
+  ```
+  Do not proceed to any further tasks. Wait for the human to restart the orchestrator.
+{% elif on_failure == "skip" %}- **Skip**: Mark the task `[!]` with the failure reason and proceed to the next available task.
+  Append a skipped-tasks summary to the bottom of PROGRESS.md before continuing.
+{% elif on_failure == "escalate" %}- **Escalate**: Stop the loop and output a full escalation report:
+  - Which task failed and the retry history
+  - All failure evidence from the last verification run
+  - Suggested fix based on the evaluation output
+  Wait for human confirmation before resuming.
+{% endif %}
+
 ## You MUST have access to the `#tool:agent/runSubagent` tool
 
 If this tool is not available, fail immediately with:
@@ -502,6 +527,49 @@ const TASK_TEMPLATE: &str = r#"# T{{ number_padded }} — {{ title }}
 {% endif %}
 {% endif %}
 
+{% if kind == "research" %}
+## Task kind: Research
+
+This task produces a **written artifact** (document, recommendation, or decision record) — not shipped code.
+
+Research task rules:
+- A document must exist at a well-defined path with findings, conclusions, and a clear recommendation
+- Validate findings against at least two independent sources before concluding
+- Link the output from the project README or append to an ADR file
+- **Do not merge or ship implementation code as part of this task.** The deliverable is the document.
+{% elif kind == "refactor" %}
+## Task kind: Refactor
+
+This task reorganises existing code **without changing observable behaviour**.
+
+Refactor rules (non-negotiable):
+- Run the full test suite before starting to establish a green baseline
+- All tests must pass after the refactor — no regressions
+- Public APIs must remain source-compatible unless the task explicitly specifies a breaking change
+- No new features may be introduced here; scope is limited to restructuring
+- Commit type must be `refactor(…):`
+{% elif kind == "infrastructure" %}
+## Task kind: Infrastructure
+
+This task creates or modifies CI/CD pipelines, deployment configs, container files, or build tooling.
+
+Infrastructure rules:
+- Config changes must be idempotent — safe to re-apply without side effects
+- Lint workflow/config files (`actionlint`, `yamllint`, or equivalent) if tooling is available
+- Verify the change in a branch or dry-run mode before finalising
+- Document the deploy/run procedure in a README, RUNBOOK, or inline comment
+{% elif kind == "audit" %}
+## Task kind: Audit
+
+This task performs a security, dependency, or quality audit and produces a **findings document**.
+
+Audit rules:
+- Run the audit tool(s) listed in the task goal
+- Document every finding: severity, location, and recommended fix — do not silently suppress warnings
+- For security audits: cross-reference findings against the OWASP Top 10 checklist
+- Produce a findings document at a well-defined path before marking this task complete
+- The deliverable is the findings document, not a code feature
+{% endif %}
 {% if avoid_god_files %}
 ## File Structure (Anti-Godfile)
 

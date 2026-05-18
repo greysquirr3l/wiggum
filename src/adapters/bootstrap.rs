@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use crate::domain::plan::{
-    Language, Orchestrator, Phase, Plan, Preflight, Project, Strategy, TaskDef,
+    Language, Orchestrator, Phase, Plan, Preflight, Project, Strategy, TaskDef, TaskKind,
 };
 use crate::error::{Result, WiggumError};
 
@@ -131,6 +131,7 @@ pub fn build_plan_from_scan(scan: &ScanResult, project_path: &Path) -> Plan {
             persona,
             strategy: Strategy::default(),
             rules: scan.rules.clone(),
+            ..Default::default()
         },
         evaluator: None,
         security: crate::domain::plan::SecurityConfig::default(),
@@ -149,6 +150,7 @@ pub fn build_plan_from_scan(scan: &ScanResult, project_path: &Path) -> Plan {
                 must_haves: vec![],
                 gate: None,
                 evaluation_criteria: vec![],
+                kind: TaskKind::default(),
             }],
         }],
     };

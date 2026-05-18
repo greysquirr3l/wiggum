@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use dialoguer::{Confirm, Input, MultiSelect, Select};
 
 use crate::domain::plan::{
-    Language, Orchestrator, Phase, Plan, Preflight, Project, Strategy, TaskDef,
+    Language, Orchestrator, Phase, Plan, Preflight, Project, Strategy, TaskDef, TaskKind,
 };
 use crate::error::{Result, WiggumError};
 
@@ -37,6 +37,7 @@ pub fn run_init(output_plan: Option<&Path>) -> Result<(Plan, PathBuf)> {
             persona,
             strategy,
             rules,
+            ..Default::default()
         },
         evaluator: None,
         security: crate::domain::plan::SecurityConfig::default(),
@@ -237,6 +238,7 @@ fn prompt_tasks_for_phase(phase_name: &str, existing_phases: &[Phase]) -> Result
             must_haves: Vec::new(),
             gate: None,
             evaluation_criteria: Vec::new(),
+            kind: TaskKind::default(),
         });
 
         task_num += 1;

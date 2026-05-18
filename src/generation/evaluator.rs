@@ -71,7 +71,7 @@ mod tests {
     use super::*;
     use crate::domain::plan::{
         EvaluatorConfig, IntegrationConfig, Language, Orchestrator, Phase, Plan, Preflight,
-        Project, ResolvedTask, SecurityConfig, StyleConfig, TaskDef,
+        Project, ResolvedTask, SecurityConfig, StyleConfig, TaskDef, TaskKind,
     };
 
     fn make_plan(with_evaluator: bool) -> Plan {
@@ -111,6 +111,7 @@ mod tests {
                     must_haves: vec![],
                     gate: None,
                     evaluation_criteria: vec![],
+                    kind: TaskKind::default(),
                 }],
             }],
         }
@@ -130,6 +131,7 @@ mod tests {
             evaluation_criteria: vec![],
             phase_name: "Foundation".to_string(),
             phase_order: 1,
+            kind: TaskKind::default(),
         }]
     }
 

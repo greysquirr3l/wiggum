@@ -140,7 +140,7 @@ fn find_cycle_description(
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
-    use crate::domain::plan::ResolvedTask;
+    use crate::domain::plan::{ResolvedTask, TaskKind};
 
     fn make_task(number: u32, slug: &str, depends_on: &[&str]) -> ResolvedTask {
         ResolvedTask {
@@ -156,6 +156,7 @@ mod tests {
             evaluation_criteria: vec![],
             phase_name: "Phase 1".to_string(),
             phase_order: 1,
+            kind: TaskKind::default(),
         }
     }
 

@@ -256,7 +256,7 @@ pub fn format_diff(changes: &[Change]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-
+    use crate::domain::plan::TaskKind;
     #[test]
     fn task_diff_empty_when_identical() {
         let task = ResolvedTask {
@@ -272,6 +272,7 @@ mod tests {
             evaluation_criteria: vec![],
             phase_name: "Phase 1".into(),
             phase_order: 1,
+            kind: TaskKind::default(),
         };
         let diff = diff_task(&task, &task);
         assert!(diff.is_empty());

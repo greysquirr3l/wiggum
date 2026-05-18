@@ -42,7 +42,7 @@ mod tests {
     use super::*;
     use crate::domain::plan::{
         IntegrationConfig, Language, Orchestrator, Phase, Plan, Preflight, Project, SecurityConfig,
-        Strategy, StyleConfig, TaskDef,
+        Strategy, StyleConfig, TaskDef, TaskKind,
     };
 
     fn sample_plan() -> Plan {
@@ -67,6 +67,7 @@ mod tests {
                     "No unwrap() in production code".to_string(),
                     "All public functions need # Errors docs".to_string(),
                 ],
+                ..Default::default()
             },
             evaluator: None,
             security: SecurityConfig::default(),
@@ -85,6 +86,7 @@ mod tests {
                     must_haves: vec![],
                     gate: None,
                     evaluation_criteria: vec![],
+                    kind: TaskKind::default(),
                 }],
             }],
         }

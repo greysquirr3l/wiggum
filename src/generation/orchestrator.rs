@@ -31,6 +31,8 @@ pub fn render_with(tera: &Tera, plan: &Plan, tasks: &[ResolvedTask]) -> Result<S
     ctx.insert("rules", &plan.orchestrator.rules);
     ctx.insert("architecture", &plan.project.architecture);
     ctx.insert("strategy", &plan.orchestrator.strategy.to_string());
+    ctx.insert("max_retries", &plan.orchestrator.max_retries);
+    ctx.insert("on_failure", &plan.orchestrator.on_failure.to_string());
     ctx.insert("has_evaluator", &plan.evaluator.is_some());
 
     // Security rules from the language profile, always injected.
@@ -49,4 +51,61 @@ pub fn render_with(tera: &Tera, plan: &Plan, tasks: &[ResolvedTask]) -> Result<S
 
     tera.render("orchestrator.md", &ctx)
         .map_err(|e| WiggumError::Template(e.to_string()))
+}
+
+// ─── Tests ────────────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use super::*;
+    use crate::domain::plan::{FailureAction, Plan};
+
+    const MINIMAL_PLAN: &str = r#"
+[project]
+name = "test"
+path = "./test"
+description = "test"
+language = "rust"
+
+[[phases]]
+name = "Phase 1"
+order = 1
+
+[[phases.tasks]]
+slug = "t01-init"
+title = "T01 — Init"
+phase = "Phase 1"
+goal = "Set up the project."
+"#;
+
+    /// The orchestrator template branches on the *string* value of `on_failure`.
+    /// Pin those values here so a future Display change breaks tests, not users.
+    #[test]
+    fn failure_action_display_values_match_template_branches() {
+        assert_eq!(FailureAction::Pause.to_string(), "pause");
+        assert_eq!(FailureAction::Skip.to_string(), "skip");
+        assert_eq!(FailureAction::Escalate.to_string(), "escalate");
+    }
+
+    #[test]
+    fn each_failure_action_renders_its_template_section() {
+        let base = Plan::from_toml(MINIMAL_PLAN).unwrap();
+
+        let cases = [
+            (FailureAction::Pause, "**Pause**"),
+            (FailureAction::Skip, "**Skip**"),
+            (FailureAction::Escalate, "**Escalate**"),
+        ];
+        for (action, expected_marker) in cases {
+            let mut plan = base.clone();
+            plan.orchestrator.on_failure = action;
+            plan.orchestrator.max_retries = 1;
+            let rendered = render(&plan, &[]).unwrap();
+            assert!(
+                rendered.contains(expected_marker),
+                "Expected '{expected_marker}' section for {action:?}, got:\n{rendered}",
+            );
+        }
+    }
 }
