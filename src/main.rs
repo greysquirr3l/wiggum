@@ -439,7 +439,9 @@ fn cmd_check(plan_path: &Path, json: bool) -> wiggum::error::Result<()> {
     }
 
     if !score.is_healthy() {
-        return Err(WiggumError::PlanUnhealthy { score: score.overall });
+        return Err(WiggumError::PlanUnhealthy {
+            score: score.overall,
+        });
     }
     Ok(())
 }
