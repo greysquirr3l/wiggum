@@ -6,6 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-05-19
+
+### Added
+
+- Task archetypes: `kind` field on task definitions (`Feature`, `Refactor`, `Infrastructure`, `Research`, `Audit`), defaults to `Feature`; kind is persisted through generation and injected into task file templates
+- Plan quality scoring: `wiggum check <plan.toml>` scores plans across five weighted dimensions — granularity (25%), dependency health (20%), coverage (25%), richness (20%), token budget (10%); exits 1 if overall score < 7.0; `--json` flag for machine-readable output
+- `wiggum_check_plan` MCP tool exposes quality scoring to orchestrators
+- Retry budget and recovery: `max_retries` (default 2) and `on_failure` (`Pause / Skip / Escalate`, default `Pause`) on `[orchestrator]`; both injected into the generated orchestrator prompt
+- Mid-loop health diagnostics: `wiggum watch` gains `--stall-secs` (default 1800 s / 30 min); stalled tasks surface as `⚠ HEALTH:` lines in the live display
+- `wiggum_draft_plan` MCP tool: generates a skeleton `plan.toml` from a natural-language description (`project_name`, `description`, `language`, optional `task_slugs`); read-only, no disk writes
+- Multi-plan workspace support: `Workspace` and `ResolvedWorkspace` types with topological sort via `petgraph`; detects duplicate slugs, unknown plan dependencies, and dependency cycles
+- `wiggum diff <old.toml> <new.toml>` CLI command: compares two plan files and emits a structured change set
+
+### Dependencies
+
+- Updated `tokio` 1.52.1 → 1.52.3
+- Updated `assert_cmd` (dev) 2.2.1 → 2.2.2
+
 ## [0.9.1] - 2026-05-02
 
 ### Security
@@ -242,7 +260,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - VCS-aware reporting with git timeline
 - mdBook documentation site
 
-[Unreleased]: https://github.com/greysquirr3l/wiggum/compare/v0.7.2...HEAD
+[Unreleased]: https://github.com/greysquirr3l/wiggum/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/greysquirr3l/wiggum/compare/v0.9.1...v0.10.0
+[0.9.1]: https://github.com/greysquirr3l/wiggum/compare/v0.9.0...v0.9.1
+[0.9.0]: https://github.com/greysquirr3l/wiggum/compare/v0.8.0...v0.9.0
+[0.8.0]: https://github.com/greysquirr3l/wiggum/compare/v0.7.2...v0.8.0
 [0.7.2]: https://github.com/greysquirr3l/wiggum/compare/v0.7.1...v0.7.2
 [0.7.1]: https://github.com/greysquirr3l/wiggum/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/greysquirr3l/wiggum/compare/v0.6.2...v0.7.0

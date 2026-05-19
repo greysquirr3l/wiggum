@@ -1,6 +1,6 @@
 [package]
 name = "wiggum"
-version = "0.9.1"
+version = "0.10.0"
 edition = "2024"
 rust-version = "1.95.0"
 description = "AI orchestration scaffold generator for the Ralph Wiggum loop"
@@ -61,7 +61,7 @@ tera = "1"
 petgraph = "0.8"
 
 # Async runtime (MCP server)
-tokio = { version = "1.52.1", features = ["full"] }
+tokio = { version = "1.52.3", features = ["full"] }
 
 # Error handling
 thiserror = "2"
@@ -73,5 +73,5 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 
 [dev-dependencies]
 tempfile = "3"
-assert_cmd = "2"
+assert_cmd = "2.2.2"
 predicates = "3"
