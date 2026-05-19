@@ -37,6 +37,8 @@ This enables agents to generate plans and task scaffolds directly within a codin
 | `wiggum_generate_plan` | Generate full scaffold from a plan TOML file path |
 | `wiggum_validate_plan` | Validate a plan TOML file (dependency DAG check, missing fields) |
 | `wiggum_lint_plan` | Run quality lint rules against a plan TOML file |
+| `wiggum_check_plan` | Score plan quality on five dimensions (granularity, dependency health, coverage, richness, token budget); returns overall score 0–10 and actionable suggestions |
+| `wiggum_draft_plan` | Generate a skeleton `plan.toml` from a natural-language description; takes `project_name`, `description`, `language`, and optional `task_slugs` |
 | `wiggum_read_progress` | Parse PROGRESS.md and return structured status |
 | `wiggum_update_progress` | Update a task's status in PROGRESS.md |
 | `wiggum_list_templates` | List available language/architecture templates |

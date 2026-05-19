@@ -29,6 +29,38 @@ wiggum generate <plan> [OPTIONS]
 | `--estimate-tokens` | Show estimated token counts for generated artifacts |
 | `--skip-agents-md` | Skip `AGENTS.md` generation |
 
+## `wiggum check`
+
+Score the quality of a plan file before generating. Unlike `validate --lint`, which checks structural correctness, `check` scores the *substance* of a plan on five dimensions and produces concrete improvement suggestions.
+
+```bash
+wiggum check <plan> [--json]
+```
+
+| Option | Description |
+|--------|-------------|
+| `<plan>` | Path to the plan TOML file |
+| `--json` | Output results as JSON instead of human-readable text |
+
+The five scoring dimensions are:
+
+| Dimension | What it measures |
+|-----------|------------------|
+| **Granularity** | Whether tasks are sized for a single agent session (not too broad or too narrow) |
+| **Dependency health** | DAG fan-out, orphan detection, and over-coupling |
+| **Coverage** | Balance of task kinds across the plan |
+| **Richness** | Presence of hints, must-haves, evaluation criteria |
+| **Token budget** | Estimated prompt size across all generated artifacts |
+
+Each dimension scores 0–10. The overall score is a weighted composite. Plans scoring **≥ 7** are considered healthy; `wiggum check` exits with a non-zero status if the plan is below this threshold.
+
+Run `check` before `generate` to catch low-quality plans early:
+
+```bash
+wiggum check plan.toml
+wiggum check plan.toml --json
+```
+
 ## `wiggum validate`
 
 Validate a plan file without generating artifacts.
@@ -111,3 +143,6 @@ wiggum watch [OPTIONS]
 |--------|-------------|
 | `--progress` | Path to `PROGRESS.md` (default: `PROGRESS.md`) |
 | `--poll-ms` | Poll interval in milliseconds (default: `1000`) |
+| `--stall-secs` | Seconds before an in-progress task triggers a stall warning (default: `1800`; set to `0` to disable) |
+
+When `--stall-secs` is non-zero, the watch display emits a `⚠ HEALTH` warning next to any task that has remained `[~]` in-progress for longer than the threshold. The warning continues to refresh on every poll cycle until the task transitions to a terminal state.

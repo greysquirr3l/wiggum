@@ -54,7 +54,25 @@ rules = [
 |-------|----------|---------|-------------|
 | `persona` | No | `"You are a senior software engineer"` | The subagent persona baked into every task prompt |
 | `strategy` | No | `standard` | Execution strategy: `standard` (goal → implement → test → preflight), `tdd` (red → green → refactor → preflight), `gsd` (must-haves checklist → implement → verify), `complete` (root-fix end-to-end → tests including failure paths → docs update → preflight) |
+| `max_retries` | No | `2` | Maximum number of preflight-fail/retry cycles before `on_failure` is applied |
+| `on_failure` | No | `pause` | Action taken when a task exhausts `max_retries`: `pause`, `skip`, or `escalate` |
 | `rules` | No | | Project-specific rules included in each subagent prompt. Appended after the automatic security rules from the language profile. |
+
+### Failure actions
+
+When a task exhausts its `max_retries` budget, the orchestrator applies `on_failure`:
+
+| Value | Behaviour |
+|-------|-----------|
+| `pause` | Emit a `GATE` banner and stop — a human must restart to proceed. **Default.** |
+| `skip` | Mark the task `[!]` (blocked) and continue to the next available task |
+| `escalate` | Emit a structured failure block with a diagnosis summary into `PROGRESS.md`, then continue |
+
+```toml
+[orchestrator]
+max_retries = 3
+on_failure  = "escalate"
+```
 
 ### `complete` strategy
 

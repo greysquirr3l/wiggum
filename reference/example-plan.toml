@@ -35,8 +35,10 @@ lint  = "cargo clippy --workspace -- -D warnings"
 # Controls the persona and rules baked into every generated subagent prompt.
 
 [orchestrator]
-persona  = "You are a senior Rust engineer specialising in async HTTP services and hexagonal architecture."
-strategy = "standard"   # standard | tdd | gsd | complete
+persona     = "You are a senior Rust engineer specialising in async HTTP services and hexagonal architecture."
+strategy    = "standard"   # standard | tdd | gsd | complete
+max_retries = 2             # retry a failed task up to N times before applying on_failure
+on_failure  = "pause"       # pause | skip | escalate — action when retries are exhausted
 rules = [
     "Rust edition 2024, stable toolchain only — no nightly features.",
     "Keep the domain module free of I/O dependencies (no tokio, no reqwest, no sqlx).",
@@ -66,6 +68,7 @@ order = 1
 
 [[phases.tasks]]
 slug      = "workspace-scaffold"
+kind      = "infrastructure"   # creates CI pipelines and build tooling, not a feature
 title     = "Cargo workspace, CI pipeline, and repo hygiene"
 goal      = "Bootstrap the project with a compilable stub workspace, GitHub Actions CI, and linting config."
 depends_on = []
