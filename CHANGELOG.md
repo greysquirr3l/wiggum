@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-05-19
+
+### Changed
+
+- Updated `actions/checkout` from v4 to v5 across all CI workflows
+
+### Dependencies
+
+- Updated `winnow` 1.0.2 → 1.0.3
+- Updated `cc` 1.2.61 → 1.2.62
+- Updated `wasip2` 1.0.2 → 1.0.3
+
 ## [0.10.0] - 2026-05-19
 
 ### Added
@@ -260,7 +272,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - VCS-aware reporting with git timeline
 - mdBook documentation site
 
-[Unreleased]: https://github.com/greysquirr3l/wiggum/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/greysquirr3l/wiggum/compare/v0.10.1...HEAD
+[0.10.1]: https://github.com/greysquirr3l/wiggum/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/greysquirr3l/wiggum/compare/v0.9.1...v0.10.0
 [0.9.1]: https://github.com/greysquirr3l/wiggum/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/greysquirr3l/wiggum/compare/v0.8.0...v0.9.0
