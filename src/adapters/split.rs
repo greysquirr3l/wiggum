@@ -287,6 +287,7 @@ fn build_split_tasks(original: &TaskDef, split: &SplitPlan) -> Vec<TaskDef> {
                 } else {
                     vec![]
                 },
+                kind: original.kind,
             }
         })
         .collect()
@@ -376,7 +377,7 @@ mod tests {
     use super::*;
     use crate::domain::plan::{
         IntegrationConfig, Language, Orchestrator, Phase, Plan, Preflight, Project, SecurityConfig,
-        Strategy, StyleConfig, TaskDef,
+        Strategy, StyleConfig, TaskDef, TaskKind,
     };
 
     #[test]
@@ -399,6 +400,7 @@ mod tests {
                 persona: "test".to_string(),
                 strategy: Strategy::default(),
                 rules: Vec::new(),
+                ..Default::default()
             },
             evaluator: None,
             security: SecurityConfig::default(),
@@ -427,6 +429,7 @@ mod tests {
             must_haves: Vec::new(),
             gate: None,
             evaluation_criteria: Vec::new(),
+            kind: TaskKind::default(),
         }
     }
 

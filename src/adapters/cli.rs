@@ -90,6 +90,10 @@ pub enum Command {
         /// Poll interval in milliseconds
         #[arg(long, default_value = "1000")]
         poll_ms: u64,
+
+        /// Seconds before an in-progress task triggers a stall warning (0 = disabled)
+        #[arg(long, default_value = "1800")]
+        stall_secs: u64,
     },
 
     /// Bootstrap a plan from an existing project directory
@@ -187,6 +191,16 @@ pub enum Command {
         /// Update prices from the latest source
         #[arg(long)]
         update: bool,
+    },
+
+    /// Score the quality of a plan file before generating
+    Check {
+        /// Path to the plan TOML file
+        plan: PathBuf,
+
+        /// Output results as JSON
+        #[arg(long)]
+        json: bool,
     },
 
     /// Show version information
