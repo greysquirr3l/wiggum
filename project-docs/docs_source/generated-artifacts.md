@@ -74,6 +74,25 @@ Suppress with `[security] skip_hardening_task = true` in your plan, or by includ
 
 Only generated when `[evaluator]` is configured in the plan. Defines a skeptical QA agent that re-runs preflight independently, scores each exit criterion, and updates `features.json` with verified results. Prevents false completions caused by the orchestrator trusting the subagent's self-report.
 
+## Planner prompt — `.vscode/planner.prompt.md`
+
+An agent-mode prompt for the planning phase, generated alongside the orchestrator prompt.
+The planner subagent assists with breaking down new work items, estimating complexity,
+and suggesting task decompositions — without touching the implementation.
+
+## Background auditor prompt — `.vscode/background-auditor.prompt.md`
+
+A continuously running QA companion that watches for regressions while the orchestrator
+advances through tasks. Unlike the evaluator (which scores individual tasks), the auditor
+monitors cross-cutting concerns such as security rule drift, architectural boundary violations,
+and accumulating technical debt across completed tasks.
+
+## Claude hooks configuration — `.claude/settings.json`
+
+A Claude Code `settings.json` file pre-configured with `PreToolUse` hooks that enforce
+wiggum's preflight checks before any file-modifying tool call. This stops subagents from
+bypassing the build/test/lint gates by skipping the preflight command.
+
 ## Agents manifest — `AGENTS.md`
 
 Defines agent roles and capabilities. Can be skipped with `--skip-agents-md`.

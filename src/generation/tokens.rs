@@ -110,6 +110,9 @@ mod tests {
             agents_md: None,
             features_json: String::new(),
             evaluator_prompt: None,
+            planner_prompt: String::new(),
+            background_auditor_prompt: String::new(),
+            hooks_json: String::new(),
         };
         let estimates = estimate_all(&artifacts);
         assert_eq!(estimates.len(), 5);
@@ -130,6 +133,9 @@ mod tests {
             agents_md: None,
             features_json: String::new(),
             evaluator_prompt: None,
+            planner_prompt: String::new(),
+            background_auditor_prompt: String::new(),
+            hooks_json: String::new(),
         };
         let report = format_report(&artifacts);
         assert!(report.contains("Token estimates"));

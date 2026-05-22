@@ -17,6 +17,8 @@ static TEMPLATES: LazyLock<Tera> = LazyLock::new(|| {
         ("plan_doc.md", PLAN_DOC_TEMPLATE),
         ("agents.md", AGENTS_MD_TEMPLATE),
         ("evaluator.md", EVALUATOR_TEMPLATE),
+        ("planner.md", PLANNER_TEMPLATE),
+        ("background_auditor.md", BACKGROUND_AUDITOR_TEMPLATE),
     ];
 
     for (name, content) in templates {
@@ -53,6 +55,8 @@ pub fn get_tera_with_overrides(project_path: &Path) -> Result<Tera> {
         "plan_doc.md",
         "agents.md",
         "evaluator.md",
+        "planner.md",
+        "background_auditor.md",
     ];
     for name in template_names {
         let user_file = override_dir.join(name);
@@ -215,6 +219,29 @@ If this tool is not available, fail immediately with:
 ```
 ⛔ runSubagent tool is not available. Switch to Agent mode in VS Code Copilot and retry.
 ```
+{% if parallel_groups | length > 1 %}
+## Parallel execution groups
+
+Tasks in the same group have no intra-group dependencies and may be dispatched
+to concurrent subagents. Run groups sequentially; within each group, launch all
+tasks simultaneously using separate `runSubagent` calls.
+
+{% for group in parallel_groups %}Group {{ loop.index }} ({{ group | length }} task(s)): {% for slug in group %}{{ slug }}{% if not loop.last %}, {% endif %}{% endfor %}
+
+{% endfor %}
+> If your environment supports only sequential execution, fall back to running
+> each group in dependency order.
+{% endif %}
+
+## Session-boundary protocol
+
+When a context window ends mid-task (compaction or interrupt), before surrendering:
+1. Write a `## Session handoff` section at the bottom of PROGRESS.md with:
+   - The current task slug and status (`[~]`)
+   - Files modified so far
+   - Next concrete action needed
+2. Do **not** mark the task `[x]` until all exit criteria are verified.
+3. On resume, read `## Session handoff` and the task file before writing any code.
 
 </ORCHESTRATOR_INSTRUCTIONS>
 
@@ -333,6 +360,11 @@ Complete the real fix in one pass. No workaround when the root fix is in scope.
 5. **Sprint contract** — Before writing any code, state explicitly:
    - What you will build (files, functions, types)
    - How you will verify each exit criterion listed in the task file
+{% if contract_review %}
+5a. **Contract review** — Paste the sprint contract to the evaluator agent and wait for
+    its approval. Do not start implementation until the evaluator confirms the contract
+    matches the task goal and exit criteria. Address any objections before proceeding.
+{% endif %}
 6. Implement the task completely — create all files, write all code, add all tests specified.
 7. Run the preflight check from the task file:
    ```bash
@@ -709,6 +741,16 @@ const AGENTS_MD_TEMPLATE: &str = r#"# AGENTS.md
 - Every new public function needs at least one test
 - Fix all test failures before marking a task complete
 
+## Claude hooks
+
+A `.claude/settings.json` is generated alongside these files. It registers a
+`PreCompact` hook that blocks context compression while any task is in the `[~]`
+(in-progress) state, preventing the loss of mid-task context.
+
+- Do **not** delete or edit `.claude/settings.json` manually
+- The hook exit-code controls: `0` = safe to compact, `1` = blocked
+- If you need to override, close the `[~]` task first (mark it `[!]` or `[x]`)
+
 ## Commit conventions
 
 - Use conventional commits: `feat:`, `fix:`, `refactor:`, `test:`, `docs:`
@@ -735,8 +777,20 @@ description: QA Evaluator — independently verifies task completion for {{ proj
 - Tasks: `{{ project_path }}/tasks/`
 - Progress: `{{ project_path }}/PROGRESS.md`
 - Features registry: `{{ project_path }}/features.json`
+{% if contract_review %}
+## Contract review (pre-implementation gate)
 
-## When the orchestrator spawns you
+Before the implementation subagent writes any code, review its sprint contract:
+
+1. Does the proposed approach satisfy every exit criterion in the task file?
+2. Are all stated files/types/functions sufficient to cover the goal?
+3. Are there implicit requirements the contract omits?
+
+Respond with **APPROVED** or a numbered list of objections. The subagent must address
+all objections and resubmit before starting implementation.
+{% endif %}
+
+## When the orchestrator spawns you for evaluation
 
 The orchestrator will tell you which task (e.g. T01) to evaluate.
 
@@ -762,12 +816,46 @@ The orchestrator will tell you which task (e.g. T01) to evaluate.
 4. Check all "Exit Criteria" in the task file. If "Evaluation Criteria" are present, check each one.
 5. Look up the task entry in `features.json` and verify against its `criteria` list.
 
-## Scoring
+## Evidence requirements
 
+For **every** criterion in your table you MUST provide concrete evidence:
+
+- **Build/tests/lint**: paste the last 10 lines of terminal output (including the exit code)
+- **Implementation quality**: quote specific lines of code, not "looks correct"
+- **Goal satisfaction**: trace the code path that delivers the stated outcome
+- **Acceptance criteria**: for each criterion in the task file, state the exact check you ran
+
+Assertions without evidence are automatically invalid. A criterion without evidence = FAIL.
+
+## Hollow-pass detection
+
+Reject an implementation if it shows any of these patterns:
+
+- Functions that `todo!()` / `unimplemented!()` / return stub values
+- Tests that pass only because they assert nothing meaningful (e.g. `assert!(true)`)
+- Code that compiles with `#[allow(...)]` suppressions added to silence errors
+- Features that are "complete" but not reachable from any caller
+- Documentation updates without corresponding code changes
+
+Flag any of these as `HOLLOW` in your results table and mark that criterion FAIL.
+
+## Scoring
+{% if criteria %}
+This project uses a **weighted rubric**. Score each criterion from 0–10, then compute:
+
+**Weighted score = Σ (criterion_score × weight / 100)**
+
+| Criterion | Weight | Description |
+|---|---|---|
+{% for c in criteria %}| {{ c.name }} | {{ c.weight }}% | {{ c.description }} |
+{% endfor %}
+The weighted score is your final score (0–10). Apply the pass threshold below.
+{% else %}
 After checking all criteria:
 
 1. Count passing criteria vs. total criteria.
 2. Assign a score **0–10** (0 = nothing works, 10 = all pass).
+{% endif %}
 3. Score ≥ {{ pass_threshold }}: **PASS**
 4. Score < {{ pass_threshold }}: **FAIL**
 {% if hard_fail %}
@@ -781,20 +869,20 @@ After checking all criteria:
 
 ### Results
 
-| Criterion | Result | Evidence |
-|---|---|---|
-| Build succeeds | PASS/FAIL | <output or error> |
-| All tests pass | PASS/FAIL | <test count or failure> |
-| Linter clean | PASS/FAIL | <warnings/errors or "clean"> |
-| Implementation matches goal | PASS/FAIL | <brief justification> |
-| <task-specific criterion> | PASS/FAIL | <evidence> |
-
-### Score: N/10
+| Criterion | Weight | Result | Evidence |
+|---|---|---|---|
+| Build succeeds | — | PASS/FAIL | <last 10 lines of build output> |
+| All tests pass | — | PASS/FAIL | <test count or failure message> |
+| Linter clean | — | PASS/FAIL | <warnings/errors or "clean"> |
+| Implementation matches goal | — | PASS/FAIL | <specific code path traced> |
+{% if criteria %}{% for c in criteria %}| {{ c.name }} | {{ c.weight }}% | PASS/FAIL | <evidence> |
+{% endfor %}{% endif %}
+### Score: N/10 {% if criteria %}(weighted){% endif %}
 
 ### Verdict: PASS / FAIL
 
 ### Required fixes (if FAIL)
-- <specific fix needed>
+- <specific fix with file + line reference>
 ```
 
 ## After evaluation
@@ -810,7 +898,133 @@ After checking all criteria:
 
 ---
 
-**Pass threshold for this project: {{ pass_threshold }}/10**
+**Pass threshold for this project: {{ pass_threshold }}/10**{% if evaluator_mode == "advisor" %}
+
+> ℹ️ **Advisor mode** — evaluation findings are reported but do not block the orchestrator.
+{% endif %}
+
+_Generated by [wiggum](https://github.com/greysquirr3l/wiggum)._
+"#;
+
+const PLANNER_TEMPLATE: &str = r"---
+agent: agent
+description: Planner — decomposes goals into wiggum tasks for {{ project_name }}
+---
+
+You are a meticulous technical planner. Your job is to take a stated goal and
+decompose it into well-scoped, dependency-ordered tasks suitable for a wiggum plan.
+
+## Project context
+
+- Project: `{{ project_name }}`
+- Path: `{{ project_path }}`
+- Language: `{{ language }}`
+{% if architecture %}- Architecture: `{{ architecture }}`
+{% endif %}
+- Preflight build: `{{ preflight_build }}`
+- Preflight test: `{{ preflight_test }}`
+- Preflight lint: `{{ preflight_lint }}`
+
+## Your output
+
+Produce a TOML `[[phases.tasks]]` block for each task. Follow these rules:
+
+1. **One concern per task.** A task should be completable in ≤ 4 hours.
+2. **Explicit dependencies.** Set `depends_on` for every prerequisite slug.
+3. **Hints are mandatory.** Every task must have ≥ 2 `hints` entries with concrete guidance.
+4. **Test hints.** Every feature/refactor task needs ≥ 1 `test_hints` entry.
+5. **Evaluation criteria.** Every task needs ≥ 2 `evaluation_criteria` entries.
+6. **Phase ordering.** Group related tasks under a named phase with a sequential `order`.
+7. **No orphan tasks.** If a task has no dependencies, it belongs in Phase 1.
+
+## Task kind taxonomy
+
+| kind | Use for |
+|---|---|
+| `feature` | New functionality |
+| `refactor` | Behaviour-preserving code quality changes |
+| `infrastructure` | CI, config, tooling, IaC |
+| `research` | Exploratory spikes — output is a document |
+| `audit` | Security or quality review — output is findings |
+
+## Validation checklist
+
+Before responding, verify:
+
+- [ ] All `depends_on` values reference existing slugs in your output
+- [ ] No two tasks share the same slug
+- [ ] Weights in any `[evaluator.criteria]` blocks sum to 100
+- [ ] Phases are numbered sequentially starting at 1
+
+_Generated by [wiggum](https://github.com/greysquirr3l/wiggum)._
+";
+
+const BACKGROUND_AUDITOR_TEMPLATE: &str = r#"---
+agent: agent
+description: Background Auditor — continuously monitors implementation quality for {{ project_name }}
+---
+
+You are a background quality auditor. You run after each task completes and look for
+systemic issues that individual evaluators might miss: accumulating technical debt,
+cross-task inconsistencies, and patterns that indicate implementation drift.
+
+## Project context
+
+- Project: `{{ project_name }}`
+- Path: `{{ project_path }}`
+- Tasks: `{{ project_path }}/tasks/`
+- Progress: `{{ project_path }}/PROGRESS.md`
+- Features: `{{ project_path }}/features.json`
+
+## When you run
+
+The orchestrator spawns you after every task is marked `[x]`. You receive the
+task slug that just completed.
+
+## Your checklist
+
+For each audit run, check:
+
+1. **Wiring** — Is the newly implemented code actually reachable from the application
+   entry point? Trace the call graph from `main` or the primary export.
+2. **Stub creep** — Are there any `todo!()`, `unimplemented!()`, `TODO`, or `FIXME`
+   comments introduced by this task?
+3. **Test coverage regression** — Did this task delete or weaken any existing tests?
+4. **Dependency surface** — Did this task add a new external dependency? If so,
+   is it justified and pinned?
+5. **Cross-task consistency** — Does the naming/API introduced here match patterns
+   established in earlier tasks? Flag divergences.
+6. **Security surface** — Did this task add user input handling, file I/O, or
+   network calls without explicit validation?
+
+## Output format
+
+```
+## Audit: T{NN} — {title}  ({timestamp})
+
+### Findings
+
+| Check | Status | Detail |
+|---|---|---|
+| Wiring | OK/WARN | <call path or "not reachable from main"> |
+| Stub creep | OK/WARN | <file:line or "none"> |
+| Test regression | OK/WARN | <summary> |
+| New dependency | OK/WARN | <name@version or "none"> |
+| API consistency | OK/WARN | <divergence or "consistent"> |
+| Security surface | OK/WARN | <new input/IO/net or "none"> |
+
+### Recommendations
+- <actionable item with file + line>
+```
+
+If all checks pass, append a one-line `✓ T{NN} audit clean` entry to PROGRESS.md
+under the task's section. If any WARN items exist, append a `⚠ Audit findings` block.
+
+## Escalation
+
+If you detect a blocker (e.g. dead code that can never be reached, or a security
+injection point with no validation), set the task status to `[!]` in PROGRESS.md
+and report to the orchestrator immediately.
 
 _Generated by [wiggum](https://github.com/greysquirr3l/wiggum)._
 "#;

@@ -42,7 +42,7 @@ wiggum check <plan> [--json]
 | `<plan>` | Path to the plan TOML file |
 | `--json` | Output results as JSON instead of human-readable text |
 
-The five scoring dimensions are:
+The six scoring dimensions are:
 
 | Dimension | What it measures |
 |-----------|------------------|
@@ -51,6 +51,7 @@ The five scoring dimensions are:
 | **Coverage** | Balance of task kinds across the plan |
 | **Richness** | Presence of hints, must-haves, evaluation criteria |
 | **Token budget** | Estimated prompt size across all generated artifacts |
+| **Harness complexity** | Whether the evaluator harness matches plan scale — penalises over-engineered harnesses on tiny plans and rewards high criteria coverage |
 
 Each dimension scores 0–10. The overall score is a weighted composite. Plans scoring **≥ 7** are considered healthy; `wiggum check` exits with a non-zero status if the plan is below this threshold.
 
@@ -117,6 +118,81 @@ Output format:
 ```text
 wiggum <version> (<sha|unknown>)
 ```
+
+## `wiggum retro`
+
+Analyse a completed `PROGRESS.md` and emit retrospective improvement suggestions.
+
+```bash
+wiggum retro [OPTIONS]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--progress` | Path to `PROGRESS.md` (default: `PROGRESS.md`) |
+| `--plan` | Path to the plan TOML (used to correlate task slugs) |
+| `--save` | Save the retrospective as a reusable pattern in `~/.wiggum/patterns/` |
+
+## `wiggum replan`
+
+Re-generate a single task file after a failure. Reads the current plan and any failure
+evidence recorded in `PROGRESS.md`, then re-renders the task's `.md` file with augmented hints.
+
+```bash
+wiggum replan <plan> --task <slug> [--dry-run]
+```
+
+| Option | Description |
+|--------|-------------|
+| `<plan>` | Path to the plan TOML file |
+| `--task`, `-t` | Slug of the task to re-generate (required) |
+| `--dry-run` | Print the new content to stdout instead of writing to disk |
+
+Failure evidence is extracted from lines in `PROGRESS.md` that are tagged `[~]` or contain
+"required fix". Extracted lines are prepended as `[Previous failure]` hints in the regenerated
+task file so the subagent has full context for the retry.
+
+## `wiggum patterns`
+
+Manage the local pattern store (`~/.wiggum/patterns/`). Patterns are reusable TOML files derived
+from retrospectives that can be applied as hint augmentations to future plans.
+
+```bash
+wiggum patterns <action> [OPTIONS]
+```
+
+### `list`
+
+List all saved patterns.
+
+```bash
+wiggum patterns list
+```
+
+### `save`
+
+Save a pattern from a PROGRESS.md file (or an existing retro output).
+
+```bash
+wiggum patterns save --from <progress-path> --plan <plan-path>
+```
+
+| Option | Description |
+|--------|-------------|
+| `--from` | Path to the source `PROGRESS.md` |
+| `--plan` | Path to the plan TOML (provides language metadata) |
+
+### `apply`
+
+Apply matching patterns as additional hints to a plan file. Patterns are matched by language.
+
+```bash
+wiggum patterns apply --plan <plan-path>
+```
+
+| Option | Description |
+|--------|-------------|
+| `--plan` | Path to the plan TOML to augment |
 
 ## `wiggum report`
 

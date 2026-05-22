@@ -1,9 +1,12 @@
 pub mod agents_md;
+pub mod background_auditor;
 pub mod clean;
 pub mod evaluator;
 pub mod features;
+pub mod hooks;
 pub mod orchestrator;
 pub mod plan_doc;
+pub mod planner;
 pub mod progress;
 pub mod task;
 pub(crate) mod templates;
@@ -28,6 +31,12 @@ pub struct GeneratedArtifacts {
     /// QA evaluator agent prompt (`.vscode/evaluator.prompt.md`).
     /// Present only when the plan includes an `[evaluator]` section.
     pub evaluator_prompt: Option<String>,
+    /// Task-decomposition planner agent prompt (`.vscode/planner.prompt.md`).
+    pub planner_prompt: String,
+    /// Continuous quality background auditor prompt (`.vscode/background-auditor.prompt.md`).
+    pub background_auditor_prompt: String,
+    /// Claude hooks configuration (`.claude/settings.json`).
+    pub hooks_json: String,
 }
 
 /// Generate all artifacts from a plan (pure — returns strings, no I/O).
@@ -53,6 +62,9 @@ pub fn generate_all(plan: &Plan) -> Result<GeneratedArtifacts> {
     let agents_md = Some(agents_md::render(plan)?);
     let features_json = features::render(plan, &resolved)?;
     let evaluator_prompt = evaluator::render(plan, &resolved)?;
+    let planner_prompt = planner::render(plan)?;
+    let background_auditor_prompt = background_auditor::render(plan)?;
+    let hooks_json = hooks::render().to_string();
 
     Ok(GeneratedArtifacts {
         progress,
@@ -62,6 +74,9 @@ pub fn generate_all(plan: &Plan) -> Result<GeneratedArtifacts> {
         agents_md,
         features_json,
         evaluator_prompt,
+        planner_prompt,
+        background_auditor_prompt,
+        hooks_json,
     })
 }
 
@@ -91,6 +106,9 @@ pub fn generate_all_with_overrides(plan: &Plan, project_path: &Path) -> Result<G
     let agents_md = Some(agents_md::render_with(&tera, plan)?);
     let features_json = features::render(plan, &resolved)?;
     let evaluator_prompt = evaluator::render_with(&tera, plan, &resolved)?;
+    let planner_prompt = planner::render_with(&tera, plan)?;
+    let background_auditor_prompt = background_auditor::render_with(&tera, plan)?;
+    let hooks_json = hooks::render().to_string();
 
     Ok(GeneratedArtifacts {
         progress,
@@ -100,6 +118,9 @@ pub fn generate_all_with_overrides(plan: &Plan, project_path: &Path) -> Result<G
         agents_md,
         features_json,
         evaluator_prompt,
+        planner_prompt,
+        background_auditor_prompt,
+        hooks_json,
     })
 }
 
@@ -152,6 +173,23 @@ pub fn write_artifacts(
     if let Some(evaluator_prompt) = &artifacts.evaluator_prompt {
         writer.write_file(&vscode_dir.join("evaluator.prompt.md"), evaluator_prompt)?;
     }
+
+    // Write planner prompt
+    writer.write_file(
+        &vscode_dir.join("planner.prompt.md"),
+        &artifacts.planner_prompt,
+    )?;
+
+    // Write background auditor prompt
+    writer.write_file(
+        &vscode_dir.join("background-auditor.prompt.md"),
+        &artifacts.background_auditor_prompt,
+    )?;
+
+    // Write Claude hooks configuration
+    let claude_dir = project_path.join(".claude");
+    writer.ensure_dir(&claude_dir)?;
+    writer.write_file(&claude_dir.join("settings.json"), &artifacts.hooks_json)?;
 
     Ok(())
 }

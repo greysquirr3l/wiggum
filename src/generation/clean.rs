@@ -12,6 +12,10 @@ const GENERATED_FILES: &[&str] = &[
     "IMPLEMENTATION_PLAN.md",
     "AGENTS.md",
     ".vscode/orchestrator.prompt.md",
+    ".vscode/evaluator.prompt.md",
+    ".vscode/planner.prompt.md",
+    ".vscode/background-auditor.prompt.md",
+    ".claude/settings.json",
 ];
 
 /// Collect all wiggum-generated paths that exist on disk.
@@ -84,6 +88,14 @@ pub fn remove_artifacts(plan: &Plan, project_path: &Path) -> Result<Vec<PathBuf>
         fs::remove_dir(&vscode_dir)?;
         info!("Removed empty directory: {}", vscode_dir.display());
         removed.push(vscode_dir);
+    }
+
+    // Clean up .claude/ if empty after removing settings.json
+    let claude_dir = project_path.join(".claude");
+    if claude_dir.is_dir() && is_dir_empty(&claude_dir) {
+        fs::remove_dir(&claude_dir)?;
+        info!("Removed empty directory: {}", claude_dir.display());
+        removed.push(claude_dir);
     }
 
     Ok(removed)

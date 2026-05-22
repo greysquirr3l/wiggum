@@ -1,6 +1,9 @@
 use tera::{Context, Tera};
 
-use crate::domain::plan::{Plan, ResolvedTask};
+use crate::domain::{
+    dag,
+    plan::{Plan, ResolvedTask},
+};
 use crate::error::{Result, WiggumError};
 use crate::generation::templates::get_tera;
 
@@ -48,6 +51,16 @@ pub fn render_with(tera: &Tera, plan: &Plan, tasks: &[ResolvedTask]) -> Result<S
 
     // File-structure guidance, conditionally injected.
     ctx.insert("avoid_god_files", &plan.style.avoid_god_files);
+
+    // Parallel execution groups for concurrent subagent dispatch.
+    let groups = dag::parallel_groups(tasks)?;
+    let groups_value =
+        serde_json::to_value(&groups).unwrap_or(serde_json::Value::Array(Vec::new()));
+    ctx.insert("parallel_groups", &groups_value);
+
+    // Contract review gate (requires evaluator).
+    let contract_review = plan.evaluator.as_ref().is_some_and(|e| e.contract_review);
+    ctx.insert("contract_review", &contract_review);
 
     tera.render("orchestrator.md", &ctx)
         .map_err(|e| WiggumError::Template(e.to_string()))
