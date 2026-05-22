@@ -1,0 +1,4 @@
+# Track only the plan source — ignore all generated artifacts
+*
+!.gitignore
+!plan.toml
