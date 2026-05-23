@@ -74,6 +74,7 @@ pub fn score_plan(plan: &Plan, resolved: &[ResolvedTask]) -> PlanScore {
     let coverage = score_coverage(plan, resolved);
     let richness = score_richness(resolved);
     let token_dim = score_token_budget(resolved);
+    let harness = score_harness_complexity(plan, resolved);
 
     let estimated_tokens = estimated_total_tokens(resolved);
 
@@ -83,23 +84,30 @@ pub fn score_plan(plan: &Plan, resolved: &[ResolvedTask]) -> PlanScore {
     collect_suggestions(&coverage, &mut suggestions);
     collect_suggestions(&richness, &mut suggestions);
     collect_suggestions(&token_dim, &mut suggestions);
+    collect_suggestions(&harness, &mut suggestions);
 
-    // Overall: weighted average (granularity 25%, dep 20%, coverage 25%, richness 20%, tokens 10%)
-    // NOTE: sequential `a * w + b * w + …` is intentional — mul_add changes FP rounding order and
-    // shifts score boundaries relied on by `is_healthy` / tests. Suppress the lint instead.
+    // Overall: weighted average (granularity 22%, dep 18%, coverage 22%, richness 23%, tokens 10%, harness 5%)
     #[expect(
         clippy::suboptimal_flops,
         reason = "sequential form preserves score boundary semantics relied on by tests"
     )]
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-    let overall = (f64::from(granularity.score) * 0.25
-        + f64::from(dependency.score) * 0.20
-        + f64::from(coverage.score) * 0.25
-        + f64::from(richness.score) * 0.20
-        + f64::from(token_dim.score) * 0.10)
+    let overall = (f64::from(granularity.score) * 0.22
+        + f64::from(dependency.score) * 0.18
+        + f64::from(coverage.score) * 0.22
+        + f64::from(richness.score) * 0.23
+        + f64::from(token_dim.score) * 0.10
+        + f64::from(harness.score) * 0.05)
         .round() as u8;
 
-    let dimensions = vec![granularity, dependency, coverage, richness, token_dim];
+    let dimensions = vec![
+        granularity,
+        dependency,
+        coverage,
+        richness,
+        token_dim,
+        harness,
+    ];
 
     PlanScore {
         dimensions,
@@ -496,6 +504,66 @@ fn estimated_total_tokens(tasks: &[ResolvedTask]) -> usize {
                     .sum::<usize>()
         })
         .sum()
+}
+
+// ─── Dimension: Harness complexity ───────────────────────────────────────────
+
+/// Scores whether the evaluation harness is proportionate to plan complexity.
+///
+/// - Penalises plans with an evaluator but ≤2 tasks (over-engineered harness).
+/// - Penalises plans with >3 phases but no evaluator (under-invested harness).
+/// - Rewards plans where ≥50% of tasks have `evaluation_criteria` and a non-default
+///   evaluator strategy is configured.
+fn score_harness_complexity(plan: &Plan, tasks: &[ResolvedTask]) -> DimensionScore {
+    let mut findings = Vec::new();
+    let mut penalty = 0i8;
+
+    let task_count = tasks.len();
+    let phase_count = plan.phases.len();
+    let has_evaluator = plan.evaluator.is_some();
+
+    // Penalise: evaluator configured but plan is tiny (≤2 tasks)
+    if has_evaluator && task_count <= 2 {
+        penalty += 2;
+        findings.push(format!(
+            "Evaluator configured but plan has only {task_count} task(s) — harness is over-engineered for a micro-plan"
+        ));
+    }
+
+    // Penalise: large plan (>3 phases) with no evaluator
+    if !has_evaluator && phase_count > 3 {
+        penalty += 1;
+        findings.push(format!(
+            "Plan has {phase_count} phases but no [evaluator] section — multi-phase plans benefit from automated QA"
+        ));
+    }
+
+    // Reward: ≥50% tasks have evaluation_criteria AND non-default evaluator mode
+    if task_count > 0 {
+        let tasks_with_criteria = tasks
+            .iter()
+            .filter(|t| !t.evaluation_criteria.is_empty())
+            .count();
+        let pct = (tasks_with_criteria * 100)
+            .checked_div(task_count)
+            .unwrap_or(0);
+        if pct >= 50 {
+            // Negative penalty = bonus; floor at 0 via saturating conversion
+            penalty -= 1;
+            findings.push(format!(
+                "{tasks_with_criteria}/{task_count} tasks ({pct}%) have evaluation_criteria — good harness investment"
+            ));
+        } else if pct < 25 && has_evaluator {
+            penalty += 1;
+            findings.push(format!(
+                "Evaluator is configured but only {tasks_with_criteria}/{task_count} tasks ({pct}%) have evaluation_criteria"
+            ));
+        }
+    }
+
+    // Convert signed penalty to score (10 base, clamped to [0, 10])
+    let clamped_penalty = penalty.clamp(0_i8, 10_i8).cast_unsigned();
+    score_from_penalty("Harness complexity", clamped_penalty, findings)
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

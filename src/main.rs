@@ -4,11 +4,11 @@ use std::process;
 use clap::Parser;
 use tracing::{error, info};
 
-use wiggum::adapters::cli::{Cli, Command, TemplatesCmd};
+use wiggum::adapters::cli::{Cli, Command, PatternsAction, TemplatesCmd};
 use wiggum::adapters::fs::FsAdapter;
 use wiggum::adapters::mcp;
 use wiggum::adapters::vcs;
-use wiggum::adapters::{bootstrap, diff, init, resume, retro, split, templates};
+use wiggum::adapters::{bootstrap, diff, init, patterns, replan, resume, retro, split, templates};
 use wiggum::domain::check;
 use wiggum::domain::dag::{parallel_groups, validate_dag};
 use wiggum::domain::lint;
@@ -106,7 +106,8 @@ fn main() {
             progress,
             apply,
             plan,
-        } => cmd_retro(&progress, apply, &plan),
+            save,
+        } => cmd_retro(&progress, apply, &plan, save),
         Command::Split { plan, task, into } => cmd_split(&plan, &task, into),
         Command::Templates(sub) => cmd_templates(sub),
         Command::Prices { update } => cmd_prices(update),
@@ -115,6 +116,12 @@ fn main() {
             println!("wiggum {} ({git_sha})", env!("CARGO_PKG_VERSION"));
             Ok(())
         }
+        Command::Replan {
+            plan,
+            task,
+            dry_run,
+        } => replan::run_replan(&plan, &task, dry_run),
+        Command::Patterns { action } => cmd_patterns(action),
     };
 
     if let Err(e) = result {
@@ -203,6 +210,10 @@ fn cmd_generate(
     if artifacts.evaluator_prompt.is_some() {
         println!("   🔎 .vscode/evaluator.prompt.md");
     }
+    println!("   🗂  .vscode/planner.prompt.md");
+    println!("   🔍 .vscode/background-auditor.prompt.md");
+    println!("   🪝 .claude/settings.json");
+
     println!();
     println!("Next steps:");
     println!("  1. Review and enrich the task files in tasks/");
@@ -254,14 +265,29 @@ fn print_dry_run(
             eval.len() as f64 / 1024.0
         );
     }
+    println!(
+        "  .vscode/planner.prompt.md       ({:.1} KB)",
+        artifacts.planner_prompt.len() as f64 / 1024.0
+    );
+    println!(
+        "  .vscode/background-auditor.prompt.md  ({:.1} KB)",
+        artifacts.background_auditor_prompt.len() as f64 / 1024.0
+    );
+    println!(
+        "  .claude/settings.json           ({:.1} KB)",
+        artifacts.hooks_json.len() as f64 / 1024.0
+    );
     let total_size = artifacts.progress.len()
         + artifacts.plan_doc.len()
         + artifacts.orchestrator.len()
         + artifacts.tasks.iter().map(|(_, c)| c.len()).sum::<usize>()
         + artifacts.agents_md.as_ref().map_or(0, String::len)
         + artifacts.features_json.len()
-        + artifacts.evaluator_prompt.as_ref().map_or(0, String::len);
-    let total_files = 4
+        + artifacts.evaluator_prompt.as_ref().map_or(0, String::len)
+        + artifacts.planner_prompt.len()
+        + artifacts.background_auditor_prompt.len()
+        + artifacts.hooks_json.len();
+    let total_files = 7
         + artifacts.tasks.len()
         + usize::from(artifacts.agents_md.is_some())
         + usize::from(artifacts.evaluator_prompt.is_some());
@@ -446,15 +472,71 @@ fn cmd_check(plan_path: &Path, json: bool) -> wiggum::error::Result<()> {
     Ok(())
 }
 
-fn cmd_retro(progress_path: &Path, _apply: bool, _plan_path: &Path) -> wiggum::error::Result<()> {
+fn cmd_retro(
+    progress_path: &Path,
+    _apply: bool,
+    plan_path: &Path,
+    save: bool,
+) -> wiggum::error::Result<()> {
     let summary = retro::analyze_progress(progress_path)?;
     println!("{}", retro::format_retro(&summary));
 
-    // TODO: Implement --apply flag to patch plan.toml
-    // if apply && !summary.suggestions.is_empty() {
-    //     println!("\nSave suggestions to plan-retro.toml? [Y/n]:");
-    // }
+    if save {
+        let fs = FsAdapter;
+        let toml_content = fs.read_plan(plan_path)?;
+        let plan = Plan::from_toml(&toml_content)?;
+        let patterns_dir = patterns::default_patterns_dir().ok_or_else(|| {
+            WiggumError::Validation("Cannot determine home directory".to_string())
+        })?;
+        let path = patterns::save_from_retro(&summary, &plan, &patterns_dir)?;
+        println!("\n✅ Pattern saved to {}", path.display());
+    }
 
+    Ok(())
+}
+
+fn cmd_patterns(action: PatternsAction) -> wiggum::error::Result<()> {
+    let patterns_dir = patterns::default_patterns_dir()
+        .ok_or_else(|| WiggumError::Validation("Cannot determine home directory".to_string()))?;
+
+    match action {
+        PatternsAction::List => {
+            let list = patterns::list(&patterns_dir)?;
+            if list.is_empty() {
+                println!("No patterns saved yet. Run `wiggum retro --save` to capture learnings.");
+            } else {
+                println!("Saved patterns ({}):\n", list.len());
+                for p in &list {
+                    println!(
+                        "  {} [{}] — {} suggestions ({})",
+                        p.id,
+                        p.language,
+                        p.suggestions.len(),
+                        p.source
+                    );
+                }
+            }
+        }
+        PatternsAction::Save { from, plan } => {
+            let fs = FsAdapter;
+            let toml_content = fs.read_plan(&plan)?;
+            let plan_obj = Plan::from_toml(&toml_content)?;
+            let path = patterns::save_from_progress(&from, &plan_obj, &patterns_dir)?;
+            println!("✅ Pattern saved to {}", path.display());
+        }
+        PatternsAction::Apply { plan } => {
+            let hints = patterns::apply(&plan, &patterns_dir)?;
+            if hints.is_empty() {
+                println!("No matching patterns found for this project's language.");
+            } else {
+                println!("Suggested hints from saved patterns:\n");
+                for hint in &hints {
+                    println!("  • {hint}");
+                }
+                println!("\nAdd these to your task hints to benefit from past learnings.");
+            }
+        }
+    }
     Ok(())
 }
 

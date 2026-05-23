@@ -7,7 +7,7 @@
 
 use tera::{Context, Tera};
 
-use crate::domain::plan::{EvaluatorConfig, Plan, ResolvedTask};
+use crate::domain::plan::{EvalMode, EvaluatorConfig, Plan, ResolvedTask};
 use crate::error::{Result, WiggumError};
 use crate::generation::templates::get_tera;
 
@@ -61,6 +61,16 @@ fn render_evaluator(
     ctx.insert("preflight_test", &plan.preflight.test);
     ctx.insert("preflight_lint", &plan.preflight.lint);
     ctx.insert("task_count_padded", &format!("{:02}", tasks.len()));
+
+    let criteria_value =
+        serde_json::to_value(&evaluator.criteria).unwrap_or(serde_json::Value::Array(Vec::new()));
+    ctx.insert("criteria", &criteria_value);
+    ctx.insert("contract_review", &evaluator.contract_review);
+    let mode_str = match evaluator.mode {
+        EvalMode::Blocking => "blocking",
+        EvalMode::Advisor => "advisor",
+    };
+    ctx.insert("evaluator_mode", mode_str);
 
     tera.render("evaluator.md", &ctx)
         .map_err(|e| WiggumError::Template(e.to_string()))

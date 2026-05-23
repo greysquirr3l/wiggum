@@ -5,4 +5,7 @@
 !.gitignore
 !book.toml
 !docs_source/
+
+# Track plan subfolders (generated artifacts inside each are controlled by their own .gitignore)
+!wiggum-3.0/
 !docs_source/**

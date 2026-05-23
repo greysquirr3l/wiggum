@@ -59,6 +59,25 @@ persona        = "You are a skeptical QA engineer who verifies every claim again
 pass_threshold = 7        # minimum score (0–10) for a criterion to pass
 hard_fail      = true     # abort the loop on any failed criterion
 test_tool      = "cargo test --workspace"   # defaults to preflight.test if omitted
+mode           = "blocking"  # blocking (default) | advisor — blocking gates task progression
+contract_review = true       # run a contract-review phase before dispatching the subagent
+
+# Weighted criteria — when provided, weights must sum to 100.
+# The evaluator scores each criterion independently; hard_fail fires if any score < pass_threshold.
+[[evaluator.criteria]]
+name        = "tests-pass"
+weight      = 40
+description = "All unit and integration tests pass with zero failures."
+
+[[evaluator.criteria]]
+name        = "no-security-regressions"
+weight      = 30
+description = "HMAC secrets never appear in log output at any level; cargo audit reports no vulnerabilities."
+
+[[evaluator.criteria]]
+name        = "architectural-boundaries"
+weight      = 30
+description = "The domain module has no I/O dependencies (no tokio, no reqwest, no sqlx imports)."
 
 # ─── Phase 1: Workspace Scaffold ──────────────────────────────────────────────
 

@@ -47,6 +47,29 @@ pub struct Preflight {
     pub audit: Option<String>,
 }
 
+/// A single weighted evaluation criterion for the QA evaluator.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EvalCriterion {
+    /// Short name identifying the criterion (e.g. "tests-pass").
+    pub name: String,
+    /// Relative weight in the 0–100 range. All weights in the `criteria` vec
+    /// must sum to 100 when the vec is non-empty.
+    pub weight: u8,
+    /// Human-readable description of what must be true for this criterion to pass.
+    pub description: String,
+}
+
+/// Whether the evaluator operates as a hard gate or a non-blocking advisor.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum EvalMode {
+    /// Evaluator verdict blocks the orchestrator from proceeding (default).
+    #[default]
+    Blocking,
+    /// Evaluator runs and reports findings but does not block task progression.
+    Advisor,
+}
+
 /// Configuration for the evaluator/QA agent generated alongside the subagent.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EvaluatorConfig {
@@ -64,6 +87,38 @@ pub struct EvaluatorConfig {
     /// (e.g. `"cargo test --workspace"`). Falls back to preflight.test when absent.
     #[serde(default)]
     pub test_tool: Option<String>,
+    /// Weighted evaluation criteria. When non-empty, weights must sum to 100.
+    /// When empty, the evaluator uses a flat criterion list derived from the task.
+    #[serde(default)]
+    pub criteria: Vec<EvalCriterion>,
+    /// Whether the evaluator blocks task progression (Blocking) or advises only (Advisor).
+    #[serde(default)]
+    pub mode: EvalMode,
+    /// When true, the orchestrator runs a two-phase contract-review loop before
+    /// dispatching the implementation subagent. See the `contract_review` template section.
+    #[serde(default)]
+    pub contract_review: bool,
+}
+
+impl EvaluatorConfig {
+    /// Validate the evaluator configuration.
+    ///
+    /// # Errors
+    ///
+    /// Returns `WiggumError::Validation` if the criteria weights are non-empty
+    /// but do not sum to exactly 100.
+    pub fn validate(&self) -> crate::error::Result<()> {
+        if self.criteria.is_empty() {
+            return Ok(());
+        }
+        let total: u32 = self.criteria.iter().map(|c| u32::from(c.weight)).sum();
+        if total != 100 {
+            return Err(WiggumError::Validation(format!(
+                "evaluator criteria weights must sum to 100, got {total}"
+            )));
+        }
+        Ok(())
+    }
 }
 
 fn default_evaluator_persona() -> String {
@@ -84,6 +139,9 @@ impl Default for EvaluatorConfig {
             pass_threshold: default_pass_threshold(),
             hard_fail: false,
             test_tool: None,
+            criteria: Vec::new(),
+            mode: EvalMode::Blocking,
+            contract_review: false,
         }
     }
 }
@@ -439,6 +497,9 @@ impl Plan {
     pub fn from_toml(input: &str) -> Result<Self> {
         let mut plan: Self = toml::from_str(input)?;
         plan.preflight = plan.preflight.with_defaults(plan.project.language);
+        if let Some(evaluator) = &plan.evaluator {
+            evaluator.validate()?;
+        }
         Ok(plan)
     }
 

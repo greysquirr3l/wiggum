@@ -166,6 +166,10 @@ pub enum Command {
         /// Path to the plan TOML file (for --apply)
         #[arg(long, default_value = "plan.toml")]
         plan: PathBuf,
+
+        /// Save extracted patterns to the global patterns store (~/.wiggum/patterns/)
+        #[arg(long)]
+        save: bool,
     },
 
     /// Split an oversized task into multiple smaller tasks
@@ -205,6 +209,26 @@ pub enum Command {
 
     /// Show version information
     Version,
+
+    /// Re-render a single task file after a failure, injecting failure evidence as hints
+    Replan {
+        /// Path to the plan TOML file
+        plan: PathBuf,
+
+        /// Slug of the task to re-render
+        #[arg(short, long)]
+        task: String,
+
+        /// Preview output without writing files
+        #[arg(long)]
+        dry_run: bool,
+    },
+
+    /// Manage reusable plan patterns from past retrospectives
+    Patterns {
+        #[command(subcommand)]
+        action: PatternsAction,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -231,5 +255,27 @@ pub enum TemplatesCmd {
         /// Template name (defaults to task slug)
         #[arg(long)]
         name: Option<String>,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+pub enum PatternsAction {
+    /// List saved patterns
+    List,
+
+    /// Save patterns from PROGRESS.md into the global store
+    Save {
+        /// Path to PROGRESS.md
+        from: PathBuf,
+
+        /// Path to the plan TOML file (for language detection)
+        #[arg(long, default_value = "plan.toml")]
+        plan: PathBuf,
+    },
+
+    /// Apply matching patterns to a plan (shows suggested hints)
+    Apply {
+        /// Path to the plan TOML file
+        plan: PathBuf,
     },
 }

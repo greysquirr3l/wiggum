@@ -5,6 +5,8 @@ pub mod diff;
 pub mod fs;
 pub mod init;
 pub mod mcp;
+pub mod patterns;
+pub mod replan;
 pub mod resume;
 pub mod retro;
 pub mod split;

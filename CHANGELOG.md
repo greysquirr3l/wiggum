@@ -6,6 +6,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-05-22
+
+### Added
+
+- **Evaluator harness** (`EvalCriterion`, `EvalMode`, `EvaluatorConfig` extensions): tasks can now declare named evaluation criteria with weights; `EvalMode` distinguishes `Blocking` (gate) from `Advisor` (informational); `contract_review` flag enables a pre-implementation contract-review phase before subagent dispatch
+- **Planner prompt** — `.vscode/planner.prompt.md` generated alongside the orchestrator prompt; guides the planning subagent through decomposition, complexity estimation, and task sizing
+- **Background auditor prompt** — `.vscode/background-auditor.prompt.md`; a continuously running QA companion that monitors cross-cutting concerns (security drift, architectural boundaries, accumulating debt) across completed tasks
+- **Claude hooks configuration** — `.claude/settings.json` generated with a `PreCompact` hook that blocks context compression while any `[~]` in-progress marker exists in `PROGRESS.md`
+- **`wiggum replan`** — re-generates a single task file after failure; extracts failure evidence from `PROGRESS.md` and injects it as `[Previous failure]` hints into the re-rendered task
+- **`wiggum patterns`** — local pattern store (`~/.wiggum/patterns/`); `list`, `save` (from `PROGRESS.md`), and `apply` (augments plan hints by language) subcommands
+- **`wiggum retro --save`** — new flag saves the retrospective summary as a reusable pattern in the local store
+- **Harness complexity** scoring dimension (5% weight) added to `wiggum check`; penalises over-engineered evaluators on small plans and rewards high eval-criteria coverage — check now scores across **six** dimensions
+- Orchestrator template extended with retry budget, stall detection, and contract-review guidance
+- `AGENTS.md` template extended with Claude pre-tool-use hook instructions
+
+### Changed
+
+- `wiggum check` scoring weights rebalanced for the new six-dimension model: granularity 22%, dependency 18%, coverage 22%, richness 23%, token 10%, harness 5%
+
 ## [0.10.1] - 2026-05-19
 
 ### Changed
