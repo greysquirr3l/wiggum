@@ -216,7 +216,7 @@ pub enum Command {
         plan: PathBuf,
 
         /// Slug of the task to re-render
-        #[arg(long)]
+        #[arg(short, long)]
         task: String,
 
         /// Preview output without writing files

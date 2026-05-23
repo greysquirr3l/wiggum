@@ -86,7 +86,7 @@ pub fn score_plan(plan: &Plan, resolved: &[ResolvedTask]) -> PlanScore {
     collect_suggestions(&token_dim, &mut suggestions);
     collect_suggestions(&harness, &mut suggestions);
 
-    // Overall: weighted average (granularity 22%, dep 18%, coverage 22%, richness 18%, tokens 10%, harness 10%)
+    // Overall: weighted average (granularity 22%, dep 18%, coverage 22%, richness 23%, tokens 10%, harness 5%)
     #[expect(
         clippy::suboptimal_flops,
         reason = "sequential form preserves score boundary semantics relied on by tests"

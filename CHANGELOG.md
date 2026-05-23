@@ -10,10 +10,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Added
 
-- **Evaluator harness** (`EvalCriterion`, `EvalMode`, `EvaluatorConfig` extensions): tasks can now declare named evaluation criteria with weights; `EvalMode` distinguishes `Blocking` (gate) from `Advisor` (informational); `contract_review` flag enables post-task contract diff checks
+- **Evaluator harness** (`EvalCriterion`, `EvalMode`, `EvaluatorConfig` extensions): tasks can now declare named evaluation criteria with weights; `EvalMode` distinguishes `Blocking` (gate) from `Advisor` (informational); `contract_review` flag enables a pre-implementation contract-review phase before subagent dispatch
 - **Planner prompt** — `.vscode/planner.prompt.md` generated alongside the orchestrator prompt; guides the planning subagent through decomposition, complexity estimation, and task sizing
 - **Background auditor prompt** — `.vscode/background-auditor.prompt.md`; a continuously running QA companion that monitors cross-cutting concerns (security drift, architectural boundaries, accumulating debt) across completed tasks
-- **Claude hooks configuration** — `.claude/settings.json` generated with `PreToolUse` hooks that enforce wiggum preflight checks before any file-modifying tool call
+- **Claude hooks configuration** — `.claude/settings.json` generated with a `PreCompact` hook that blocks context compression while any `[~]` in-progress marker exists in `PROGRESS.md`
 - **`wiggum replan`** — re-generates a single task file after failure; extracts failure evidence from `PROGRESS.md` and injects it as `[Previous failure]` hints into the re-rendered task
 - **`wiggum patterns`** — local pattern store (`~/.wiggum/patterns/`); `list`, `save` (from `PROGRESS.md`), and `apply` (augments plan hints by language) subcommands
 - **`wiggum retro --save`** — new flag saves the retrospective summary as a reusable pattern in the local store

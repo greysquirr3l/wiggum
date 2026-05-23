@@ -89,9 +89,10 @@ and accumulating technical debt across completed tasks.
 
 ## Claude hooks configuration — `.claude/settings.json`
 
-A Claude Code `settings.json` file pre-configured with `PreToolUse` hooks that enforce
-wiggum's preflight checks before any file-modifying tool call. This stops subagents from
-bypassing the build/test/lint gates by skipping the preflight command.
+A Claude Code `settings.json` file pre-configured with a `PreCompact` hook that blocks
+context compression while any in-progress task marker (`[~]`) exists in `PROGRESS.md`.
+This prevents Claude from compacting away active working state mid-task, preserving the
+full task context until the task is marked complete.
 
 ## Agents manifest — `AGENTS.md`
 
