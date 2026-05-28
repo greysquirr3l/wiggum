@@ -1,6 +1,6 @@
 # Introduction
 
-**Wiggum** is a CLI tool and MCP server that generates structured task files for autonomous AI coding loops. It codifies the **Ralph Wiggum loop** pattern — an orchestrator agent that drives subagents through a dependency-ordered task list until an entire project is implemented, hands-off.
+**Wiggum** is a CLI tool and MCP server that generates structured task files for autonomous AI coding workflows. It codifies a dependency-aware orchestration pattern — an orchestrator agent that drives subagents through a dependency-ordered task list until an entire project is implemented, hands-off.
 
 ## What it does
 

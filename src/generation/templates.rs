@@ -127,7 +127,7 @@ _No state summary yet._
 
 const ORCHESTRATOR_TEMPLATE: &str = r#"---
 agent: agent
-description: Orchestrator for the Ralph Wiggum loop — drives subagents to implement all {{ project_name }} tasks
+description: Orchestrator for dependency-aware implementation loops — drives subagents to implement all {{ project_name }} tasks
 ---
 {% if orchestrator_model %}
 > **Recommended model:** `{{ orchestrator_model }}` — select this in the VS Code Copilot

@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Changed
+
+- Refreshed package and docs descriptions to describe Wiggum as an agentic implementation scaffold for dependency-aware AI coding workflows (replacing Ralph Wiggum loop phrasing in top-level metadata and primary docs).
+
 ## [0.12.0] - 2026-05-28
 
 ### Added

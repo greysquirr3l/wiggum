@@ -5,7 +5,7 @@ use clap::{Parser, Subcommand};
 #[derive(Debug, Parser)]
 #[command(
     name = "wiggum",
-    about = "AI orchestration scaffold generator for the Ralph Wiggum loop"
+    about = "Agentic implementation scaffold generator for dependency-aware AI coding workflows"
 )]
 pub struct Cli {
     #[command(subcommand)]

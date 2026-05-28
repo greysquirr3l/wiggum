@@ -1,6 +1,6 @@
 [book]
 title = "Wiggum Documentation"
-description = "AI orchestration scaffold generator for the Ralph Wiggum loop"
+description = "Agentic implementation scaffold generator for dependency-aware AI coding workflows"
 authors = ["greysquirr3l"]
 language = "en"
 src = "docs_source"

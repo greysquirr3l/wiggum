@@ -36,7 +36,7 @@ A high-level architecture document derived from your plan's project description 
 
 ## Orchestrator prompt — `.vscode/orchestrator.prompt.md`
 
-The agent-mode prompt that drives the Ralph Wiggum loop. It tells the orchestrator how to read progress, spawn subagents, verify their output independently, and update the tracker. Includes a sprint contract step, a codebase state handoff step, and a guard against premature completion.
+The agent-mode prompt that drives the implementation loop. It tells the orchestrator how to read progress, spawn subagents, verify their output independently, and update the tracker. Includes a sprint contract step, a codebase state handoff step, and a guard against premature completion.
 
 ## Feature registry — `features.json`
 

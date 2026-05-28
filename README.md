@@ -1,6 +1,6 @@
 # Wiggum
 
-AI orchestration scaffold generator for the Ralph Wiggum loop.
+Agentic implementation scaffold generator for dependency-aware AI coding workflows.
 
 Wiggum generates structured task files, progress trackers, and orchestrator prompts from a TOML plan definition — enabling autonomous AI coding loops where an orchestrator agent drives subagents through dependency-ordered tasks until a project is fully implemented.
 
