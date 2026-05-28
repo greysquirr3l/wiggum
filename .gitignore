@@ -15,6 +15,7 @@ Cargo.lock
 .Trashes
 
 # IDEs and editors
+.vscode/
 .vscode/*.log
 *.swp
 *.swo
