@@ -39,6 +39,15 @@ persona     = "You are a senior Rust engineer specialising in async HTTP service
 strategy    = "standard"   # standard | tdd | gsd | complete
 max_retries = 2             # retry a failed task up to N times before applying on_failure
 on_failure  = "pause"       # pause | skip | escalate — action when retries are exhausted
+# Optional model pinning. Wiggum can't enforce the model from a prompt file, but it
+# will render `model` as a recommendation header in orchestrator.prompt.md and inject
+# `subagent_model` as the `model:` argument on every `runSubagent` dispatch.
+# Any model registered in the VS Code Copilot Chat picker is valid, including local
+# BYOK backends (Ollama, LM Studio, llama.cpp). Use the exact picker label in the
+# form "Model Name (Vendor)".
+# model          = "claude-opus-4.7"            # recommended for the orchestrator agent itself
+# subagent_model = "claude-sonnet-4.5"          # pinned model for implementation subagents
+# subagent_model = "Qwen 2.5 Coder 32B (Ollama)"  # or a local model — server must be running
 rules = [
     "Rust edition 2024, stable toolchain only — no nightly features.",
     "Keep the domain module free of I/O dependencies (no tokio, no reqwest, no sqlx).",
@@ -61,6 +70,7 @@ hard_fail      = true     # abort the loop on any failed criterion
 test_tool      = "cargo test --workspace"   # defaults to preflight.test if omitted
 mode           = "blocking"  # blocking (default) | advisor — blocking gates task progression
 contract_review = true       # run a contract-review phase before dispatching the subagent
+# model        = "claude-sonnet-4.5"  # optional model pin for the evaluator agent
 
 # Weighted criteria — when provided, weights must sum to 100.
 # The evaluator scores each criterion independently; hard_fail fires if any score < pass_threshold.

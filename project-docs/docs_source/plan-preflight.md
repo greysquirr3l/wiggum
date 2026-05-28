@@ -56,6 +56,8 @@ rules = [
 | `strategy` | No | `standard` | Execution strategy: `standard` (goal → implement → test → preflight), `tdd` (red → green → refactor → preflight), `gsd` (must-haves checklist → implement → verify), `complete` (root-fix end-to-end → tests including failure paths → docs update → preflight) |
 | `max_retries` | No | `2` | Maximum number of preflight-fail/retry cycles before `on_failure` is applied |
 | `on_failure` | No | `pause` | Action taken when a task exhausts `max_retries`: `pause`, `skip`, or `escalate` |
+| `model` | No | — | Recommended model identifier (e.g. `"claude-opus-4.7"`, `"gpt-5"`, `"gemini-2.5-pro"`) for the orchestrator agent itself. Rendered as a header note in `orchestrator.prompt.md`; Wiggum cannot enforce the picker choice from a prompt file. |
+| `subagent_model` | No | — | Model identifier passed as `model:` to every `runSubagent` call the orchestrator dispatches for implementation work. Lets you run the orchestrator on a stronger model (e.g. Opus) while implementation subagents use a cheaper one (e.g. Sonnet or Haiku). |
 | `rules` | No | | Project-specific rules included in each subagent prompt. Appended after the automatic security rules from the language profile. |
 
 ### Failure actions
@@ -73,6 +75,79 @@ When a task exhausts its `max_retries` budget, the orchestrator applies `on_fail
 max_retries = 3
 on_failure  = "escalate"
 ```
+
+### Model selection
+
+By default the orchestrator, every implementation subagent, and the evaluator all
+inherit whatever model is selected in the VS Code Copilot Chat picker at the time
+you run the prompt. Three optional fields let you pin different models for each role
+so you can drive orchestration with a stronger reasoning model while implementation
+runs on something cheaper:
+
+```toml
+[orchestrator]
+model          = "claude-opus-4.7"     # orchestrator agent (recommendation header)
+subagent_model = "claude-sonnet-4.5"   # every runSubagent call for implementation
+
+[evaluator]
+model          = "claude-sonnet-4.5"   # evaluator agent
+```
+
+How each field is applied:
+
+- `[orchestrator] model` — rendered as a **Recommended model** header at the top of
+  `orchestrator.prompt.md`. Wiggum cannot enforce a model from a prompt file, so this
+  is a reminder to set the picker before you start the loop, not a guarantee.
+- `[orchestrator] subagent_model` — injected into the orchestrator's instructions as
+  `model: "<name>"` on every `#tool:agent/runSubagent` call dispatched for
+  implementation work (including each entry in a parallel group).
+- `[evaluator] model` — header note on `evaluator.prompt.md` plus the `model:`
+  argument when the orchestrator dispatches the evaluator as a subagent.
+
+Equivalent ChatGPT or Gemini model identifiers work the same way — the string is
+passed through to `runSubagent` verbatim, so whatever the picker accepts is valid
+(e.g. `"gpt-5"`, `"gpt-5-mini"`, `"gemini-2.5-pro"`, `"gemini-2.5-flash"`).
+
+#### Local / BYOK models
+
+Any model registered in the VS Code Copilot Chat picker is valid — including
+local runtimes and OpenAI-compatible endpoints added through **Manage Models…**
+(Ollama, LM Studio, llama.cpp server, vLLM, Azure OpenAI, etc.). Use the exact
+label the picker shows, in the form `"Model Name (Vendor)"`:
+
+```toml
+[orchestrator]
+model          = "Claude Opus 4.7 (Anthropic)"
+subagent_model = "Qwen 2.5 Coder 32B (Ollama)"
+
+[evaluator]
+model = "GLM 4.6 (LM Studio)"
+```
+
+Practical caveats when pinning a local model as the subagent runner:
+
+- The local server must be running before the orchestrator dispatches a subagent —
+  wiggum does not start it for you.
+- Local models typically have much smaller effective context windows than hosted
+  ones. Keep `subagent_model` for narrow implementation tasks and leave the
+  orchestrator on a hosted model with a large context, or shrink task scope via
+  `wiggum check` and per-task hints before running.
+- `runSubagent` calls the local model through the same VS Code language-model API
+  as hosted providers; tool calling, parallel groups, and the preflight loop work
+  the same way, but availability of advanced features depends on what the local
+  backend implements.
+
+Common pairings:
+
+| Use case | `model` | `subagent_model` | Evaluator `model` |
+|---|---|---|---|
+| Highest quality | `claude-opus-4.7` | `claude-sonnet-4.5` | `claude-sonnet-4.5` |
+| Budget-conscious | `claude-sonnet-4.5` | `claude-haiku-4.5` | `claude-haiku-4.5` |
+| ChatGPT stack | `gpt-5` | `gpt-5-mini` | `gpt-5-mini` |
+| Gemini stack | `gemini-2.5-pro` | `gemini-2.5-flash` | `gemini-2.5-flash` |
+
+All three fields are optional and independent — omit any of them to fall back to
+the picker-selected model.
 
 ### `complete` strategy
 
@@ -116,6 +191,7 @@ test_tool      = "cargo test --workspace"
 | `pass_threshold` | No | `7` | Minimum score (0–10) for a criterion to pass |
 | `hard_fail` | No | `false` | If `true`, abort the loop on any failed criterion |
 | `test_tool` | No | Inherits `preflight.test` | Command the evaluator uses to run the test suite |
+| `model` | No | — | Model identifier for the evaluator agent. Rendered as a header note in `evaluator.prompt.md` and passed as `model:` when the orchestrator dispatches the evaluator via `runSubagent`. |
 
 ## Security configuration
 

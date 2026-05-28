@@ -36,6 +36,12 @@ pub fn render_with(tera: &Tera, plan: &Plan, tasks: &[ResolvedTask]) -> Result<S
     ctx.insert("strategy", &plan.orchestrator.strategy.to_string());
     ctx.insert("max_retries", &plan.orchestrator.max_retries);
     ctx.insert("on_failure", &plan.orchestrator.on_failure.to_string());
+    ctx.insert("orchestrator_model", &plan.orchestrator.model);
+    ctx.insert("subagent_model", &plan.orchestrator.subagent_model);
+    ctx.insert(
+        "evaluator_model",
+        &plan.evaluator.as_ref().and_then(|e| e.model.clone()),
+    );
     ctx.insert("has_evaluator", &plan.evaluator.is_some());
 
     // Security rules from the language profile, always injected.
@@ -120,5 +126,38 @@ goal = "Set up the project."
                 "Expected '{expected_marker}' section for {action:?}, got:\n{rendered}",
             );
         }
+    }
+
+    #[test]
+    fn orchestrator_model_renders_recommended_header_when_set() {
+        let mut plan = Plan::from_toml(MINIMAL_PLAN).unwrap();
+        plan.orchestrator.model = Some("claude-opus-4.7".to_string());
+        let rendered = render(&plan, &[]).unwrap();
+        assert!(rendered.contains("**Recommended model:** `claude-opus-4.7`"));
+    }
+
+    #[test]
+    fn orchestrator_omits_model_header_when_unset() {
+        let plan = Plan::from_toml(MINIMAL_PLAN).unwrap();
+        let rendered = render(&plan, &[]).unwrap();
+        assert!(!rendered.contains("**Recommended model:**"));
+    }
+
+    #[test]
+    fn subagent_model_injects_runsubagent_model_argument() {
+        let mut plan = Plan::from_toml(MINIMAL_PLAN).unwrap();
+        plan.orchestrator.subagent_model = Some("claude-sonnet-4.5".to_string());
+        let rendered = render(&plan, &[]).unwrap();
+        assert!(
+            rendered.contains("pass `model: \"claude-sonnet-4.5\"`"),
+            "expected runSubagent model directive, got:\n{rendered}",
+        );
+    }
+
+    #[test]
+    fn subagent_model_omitted_when_unset() {
+        let plan = Plan::from_toml(MINIMAL_PLAN).unwrap();
+        let rendered = render(&plan, &[]).unwrap();
+        assert!(!rendered.contains("pass `model:"));
     }
 }

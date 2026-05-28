@@ -98,6 +98,12 @@ pub struct EvaluatorConfig {
     /// dispatching the implementation subagent. See the `contract_review` template section.
     #[serde(default)]
     pub contract_review: bool,
+    /// Model identifier for the evaluator agent (e.g. `"claude-sonnet-4.5"`).
+    /// Rendered as a header note in `evaluator.prompt.md` and passed as the
+    /// `model:` argument when the orchestrator dispatches the evaluator as a
+    /// subagent. When unset, the evaluator inherits the dispatcher's model.
+    #[serde(default)]
+    pub model: Option<String>,
 }
 
 impl EvaluatorConfig {
@@ -142,6 +148,7 @@ impl Default for EvaluatorConfig {
             criteria: Vec::new(),
             mode: EvalMode::Blocking,
             contract_review: false,
+            model: None,
         }
     }
 }
@@ -185,6 +192,17 @@ pub struct Orchestrator {
     /// Action taken when a task exhausts `max_retries`. Defaults to `pause`.
     #[serde(default)]
     pub on_failure: FailureAction,
+    /// Recommended model identifier for the orchestrator agent itself
+    /// (e.g. `"claude-opus-4.7"`, `"gpt-5"`, `"gemini-2.5-pro"`). Rendered as
+    /// a header note in `orchestrator.prompt.md` so the human knows which model
+    /// to select in the chat picker before running the prompt.
+    #[serde(default)]
+    pub model: Option<String>,
+    /// Model identifier passed as the `model:` argument to every `runSubagent`
+    /// call the orchestrator dispatches for implementation work. When unset,
+    /// subagents inherit the orchestrator's model.
+    #[serde(default)]
+    pub subagent_model: Option<String>,
 }
 
 /// Prompt strategy mode controlling task and orchestrator template styles.
@@ -378,6 +396,8 @@ impl Default for Orchestrator {
             rules: Vec::new(),
             max_retries: default_max_retries(),
             on_failure: FailureAction::default(),
+            model: None,
+            subagent_model: None,
         }
     }
 }

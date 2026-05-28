@@ -6,6 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-05-28
+
+### Added
+
+- **Model pinning for orchestrator, subagents, and evaluator** — three optional fields let you mix models across the loop without touching the chat picker mid-run:
+  - `[orchestrator] model` — rendered as a recommended-model header at the top of `orchestrator.prompt.md` (e.g. `"claude-opus-4.7"`, `"gpt-5"`, `"gemini-2.5-pro"`)
+  - `[orchestrator] subagent_model` — injected into the orchestrator instructions as `model: "<name>"` on every `runSubagent` dispatch for implementation work
+  - `[evaluator] model` — header note plus `model:` argument when the orchestrator dispatches the evaluator
+  - Common use case: drive orchestration with Opus, implementation with Sonnet, evaluation with Sonnet/Haiku (or the equivalent ChatGPT/Gemini tier)
+  - Local / BYOK models (Ollama, LM Studio, llama.cpp, vLLM, Azure OpenAI) work via the same string field — use the exact picker label, e.g. `"Qwen 2.5 Coder 32B (Ollama)"`
+
+### Dependencies
+
+- Updated `serde_json` 1.0.149 -> 1.0.150
+- Updated `bumpalo` 3.20.2 -> 3.20.3
+- Updated `autocfg` 1.5.0 -> 1.5.1
+
 ## [0.11.0] - 2026-05-22
 
 ### Added

@@ -48,6 +48,7 @@ fn render_evaluator(
     ctx.insert("project_name", &plan.project.name);
     ctx.insert("project_path", &plan.project.path);
     ctx.insert("evaluator_persona", &evaluator.persona);
+    ctx.insert("evaluator_model", &evaluator.model);
     ctx.insert("pass_threshold", &evaluator.pass_threshold);
     ctx.insert("hard_fail", &evaluator.hard_fail);
     ctx.insert(

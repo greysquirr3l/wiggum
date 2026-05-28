@@ -129,7 +129,11 @@ const ORCHESTRATOR_TEMPLATE: &str = r#"---
 agent: agent
 description: Orchestrator for the Ralph Wiggum loop — drives subagents to implement all {{ project_name }} tasks
 ---
-
+{% if orchestrator_model %}
+> **Recommended model:** `{{ orchestrator_model }}` — select this in the VS Code Copilot
+> Chat model picker before running this prompt. Wiggum cannot enforce the model choice
+> from a prompt file; this is a recommendation, not a guarantee.
+{% endif %}
 <PLAN>{{ project_path }}/IMPLEMENTATION_PLAN.md</PLAN>
 
 <TASKS>{{ project_path }}/tasks</TASKS>
@@ -166,7 +170,9 @@ Repeat until all tasks (T01–T{{ task_count_padded }}) in PROGRESS.md are `[x]`
    You will inject this content directly into the subagent dispatch message in step 6.
 6. Start a subagent with the SUBAGENT_PROMPT below, **prepending the extracted
    Accumulated Learnings and Codebase State content at the top of the dispatch message**
-   so the subagent receives it as live context, not a file reference.
+   so the subagent receives it as live context, not a file reference.{% if subagent_model %}
+   When invoking `#tool:agent/runSubagent`, pass `model: "{{ subagent_model }}"` so the
+   implementation subagent runs on the configured model regardless of your own session model.{% endif %}
 7. Wait for the subagent to complete.
 8. **Independently verify** — run the preflight yourself before trusting the subagent's `[x]`:
    ```bash
@@ -174,7 +180,9 @@ Repeat until all tasks (T01–T{{ task_count_padded }}) in PROGRESS.md are `[x]`
    ```
    Do not accept a task as done if preflight fails, regardless of what the subagent reports.{% if has_evaluator %}
 9. **Spawn the evaluator** — start the evaluator agent (`.vscode/evaluator.prompt.md`) with
-   the task context. Wait for it to return a PASS verdict before proceeding.
+   the task context. Wait for it to return a PASS verdict before proceeding.{% if evaluator_model %}
+   When invoking `#tool:agent/runSubagent` for the evaluator, pass
+   `model: "{{ evaluator_model }}"` to pin its model.{% endif %}
    If the evaluator returns FAIL, mark the task `[!]` and capture the evaluator's findings
    in PROGRESS.md for the next subagent iteration.{% endif %}
 10. Read PROGRESS.md again.
@@ -224,7 +232,8 @@ If this tool is not available, fail immediately with:
 
 Tasks in the same group have no intra-group dependencies and may be dispatched
 to concurrent subagents. Run groups sequentially; within each group, launch all
-tasks simultaneously using separate `runSubagent` calls.
+tasks simultaneously using separate `runSubagent` calls.{% if subagent_model %}
+Pass `model: "{{ subagent_model }}"` on every concurrent dispatch.{% endif %}
 
 {% for group in parallel_groups %}Group {{ loop.index }} ({{ group | length }} task(s)): {% for slug in group %}{{ slug }}{% if not loop.last %}, {% endif %}{% endfor %}
 
@@ -765,7 +774,11 @@ const EVALUATOR_TEMPLATE: &str = r#"---
 agent: agent
 description: QA Evaluator — independently verifies task completion for {{ project_name }}
 ---
-
+{% if evaluator_model %}
+> **Recommended model:** `{{ evaluator_model }}` — when the orchestrator dispatches this
+> agent via `runSubagent`, it will pass `model: "{{ evaluator_model }}"`. If you run this
+> prompt directly, select that model in the VS Code Copilot Chat picker first.
+{% endif %}
 {{ evaluator_persona }}
 
 > **Your role is independent verification, not rubber-stamping.**
