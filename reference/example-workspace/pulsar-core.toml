@@ -1,0 +1,136 @@
+# example-workspace/pulsar-core.toml
+#
+# The shared domain library component of the Pulsar workspace.
+# This plan is generated and executed first; pulsar-server depends on it.
+
+# ─── Project ──────────────────────────────────────────────────────────────────
+
+[project]
+name        = "pulsar-core"
+description = """
+pulsar-core is a Rust library crate providing the domain types and storage
+adapter for the Pulsar event streaming platform. Both the HTTP server and
+the CLI depend on this crate.
+
+It exposes: Event<T>, StreamId, Offset value objects, the EventStore port
+trait, and a SQLite-backed EventStore implementation.
+"""
+language     = "rust"
+path         = "/path/to/pulsar/crates/pulsar-core"
+architecture = "hexagonal"
+
+# ─── Preflight ────────────────────────────────────────────────────────────────
+
+[preflight]
+build = "cargo build -p pulsar-core"
+test  = "cargo test -p pulsar-core"
+lint  = "cargo clippy -p pulsar-core -- -D warnings"
+
+# ─── Orchestrator ─────────────────────────────────────────────────────────────
+
+[orchestrator]
+persona     = "You are a senior Rust engineer building a lean, zero-I/O domain library."
+strategy    = "tdd"
+max_retries = 2
+on_failure  = "pause"
+rules = [
+    "Library crate only — no main(), no binary targets.",
+    "The domain module must have zero I/O dependencies (no tokio, no sqlx, no reqwest).",
+    "All public types derive Serialize, Deserialize, Clone, Debug.",
+    "No .unwrap() outside test modules; use ? and thiserror.",
+    "All public items must have at least one unit test.",
+]
+
+# ─── Evaluator ────────────────────────────────────────────────────────────────
+
+[evaluator]
+persona        = "You are a skeptical QA engineer verifying a library contract that other crates depend on."
+pass_threshold = 7
+hard_fail      = true
+
+# ─── Phase 1: Domain Types ────────────────────────────────────────────────────
+
+[[phases]]
+name  = "Domain Types"
+order = 1
+
+[[phases.tasks]]
+slug      = "event-types"
+kind      = "feature"
+title     = "Event<T>, StreamId, Offset, and EventStore port"
+goal      = """
+Define the core domain types and the EventStore port trait in src/domain.rs.
+No I/O imports. No tokio, sqlx, or reqwest anywhere in this module.
+"""
+depends_on = []
+hints = [
+    "Event<T>: id (Uuid), stream_id (StreamId), offset (Offset), payload (T), occurred_at (DateTime<Utc>).",
+    "StreamId: newtype wrapping Uuid. Offset: newtype wrapping u64, starts at 0.",
+    "EventStore port: append(&Event<T>) -> Result<Offset>, read_from(stream_id, from_offset) -> Vec<Event<T>>.",
+    "EventStore must be object-safe — no generic methods on the trait.",
+    "No tokio, sqlx, or reqwest imports in src/domain.rs.",
+]
+test_hints = [
+    "Test: Offset(0).next() == Offset(1).",
+    "Test: StreamId constructed from a known UUID round-trips through to_string().",
+    "Compile-time: no 'use tokio' or 'use sqlx' in src/domain.rs (grep in test).",
+]
+must_haves = [
+    "Event<T> is generic and implements Serialize/Deserialize where T: serde bounds",
+    "EventStore is object-safe (usable as dyn EventStore<T>)",
+    "Zero I/O dependencies in src/domain.rs",
+]
+evaluation_criteria = [
+    "grep -r 'tokio\\|sqlx\\|reqwest' src/domain.rs returns nothing",
+    "All domain type tests pass",
+    "Offset::next() test passes",
+]
+
+# ─── Phase 2: Storage Adapter ─────────────────────────────────────────────────
+
+[[phases]]
+name  = "Storage Adapter"
+order = 2
+
+[[phases.tasks]]
+slug      = "sqlite-event-store"
+kind      = "feature"
+title     = "SQLite EventStore adapter (sqlx 0.8)"
+goal      = """
+Implement the EventStore port in src/adapters/sqlite.rs backed by SQLite using
+sqlx 0.8 async. All SQL must use compile-time query macros. The (stream_id,
+offset) pair must be unique per the DB schema.
+"""
+depends_on = ["event-types"]
+hints = [
+    "sqlx = { features = [\"sqlite\", \"runtime-tokio\", \"macros\"] }.",
+    "Table: events (id TEXT PK, stream_id TEXT, offset INTEGER, payload BLOB, occurred_at TEXT).",
+    "UNIQUE constraint on (stream_id, offset) — duplicate offsets must return Err, not panic.",
+    "append() inserts a new row. read_from() queries WHERE stream_id = ? AND offset >= ? ORDER BY offset.",
+    "Use sqlite::memory: in tests to avoid filesystem artefacts.",
+]
+test_hints = [
+    "Test: append two events to the same stream → offsets 0 and 1.",
+    "Test: read_from(stream, offset=1) returns only the second event.",
+    "Test: duplicate (stream_id, offset) append returns Err (not panic).",
+    "In-memory SQLite used in all adapter tests.",
+]
+must_haves = [
+    "UNIQUE constraint on (stream_id, offset)",
+    "In-memory SQLite in all tests (no filesystem side-effects)",
+    "Compile-time sqlx query macros (query! or query_as!)",
+]
+evaluation_criteria = [
+    "Duplicate append test returns Err",
+    "read_from offset filter test passes",
+    "All tests use in-memory SQLite",
+]
+
+# ─── Security / Integration ───────────────────────────────────────────────────
+
+[security]
+skip_hardening_task = true   # library crate — no HTTP surface
+
+[integration]
+skip_wiring_audit = true     # nothing to wire in a library with no entry point
+skip_stub_audit   = false    # still catch any todo!() stubs

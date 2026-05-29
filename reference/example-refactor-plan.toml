@@ -1,0 +1,336 @@
+# example-refactor-plan.toml — Sandpiper: async stack modernisation
+#
+# This example demonstrates the research → refactor → audit workflow pattern.
+# Use this as a starting point when your goal is improving an existing codebase
+# rather than building new functionality from scratch.
+#
+# Key differences from example-plan.toml:
+#   kind = "research"       — deliverable is a document, not code
+#   kind = "refactor"       — enforces no-regression and source-compat rules
+#   kind = "audit"          — deliverable is a findings document
+#   on_failure = "escalate" — regressions need a full diagnostic report, not a silent pause
+#   max_retries = 1         — refactor failures usually need human review, not blind re-runs
+#
+# Run:
+#   wiggum validate example-refactor-plan.toml
+#   wiggum check   example-refactor-plan.toml
+#   wiggum generate example-refactor-plan.toml --dry-run
+
+# ─── Project ──────────────────────────────────────────────────────────────────
+
+[project]
+name        = "sandpiper"
+description = """
+Sandpiper is a Rust CLI/daemon that periodically polls a list of configured
+HTTP health endpoints and writes status records to a local SQLite database.
+
+The current implementation was built on a sync stack:
+  - ureq 2.x for HTTP
+  - rusqlite 0.31 for storage
+  - clap 3.x for CLI
+
+This plan migrates it to a modern async stack without changing any observable
+behaviour — same CLI flags, same database schema, same test coverage:
+  - reqwest 0.12 + tokio 1.x (async HTTP)
+  - sqlx 0.8 with async SQLite (async storage)
+  - clap 4.x (updated derive API)
+"""
+language     = "rust"
+path         = "/path/to/sandpiper"
+architecture = "flat"          # small daemon — no hexagonal split needed
+
+# ─── Preflight ────────────────────────────────────────────────────────────────
+
+[preflight]
+build = "cargo build --workspace"
+test  = "cargo test --workspace"
+lint  = "cargo clippy --workspace -- -D warnings"
+
+# ─── Orchestrator ─────────────────────────────────────────────────────────────
+
+[orchestrator]
+persona     = "You are a senior Rust engineer with deep experience migrating sync Rust services to async without introducing regressions."
+strategy    = "tdd"
+max_retries = 1             # refactor failures usually need human review, not blind retries
+on_failure  = "escalate"    # produce a full diagnostic report so the human can pinpoint the regression
+rules = [
+    "Rust edition 2024, stable toolchain only.",
+    "All tests that passed before the refactor must still pass after — zero regressions.",
+    "No new features — this plan's scope is limited to the stack migration.",
+    "Public API surface (CLI flags, subcommands, database schema) must remain identical.",
+    "No .unwrap() outside tests; propagate errors with ? and thiserror.",
+    "Run `cargo test --workspace` before starting each task to verify the green baseline.",
+    "Commit type must be `refactor(…):` for migration tasks; `chore(audit):` for audit tasks.",
+]
+
+# ─── Evaluator ────────────────────────────────────────────────────────────────
+
+[evaluator]
+persona        = "You are a Rust engineer specialised in catching regressions and API drift during migrations. You are highly skeptical of 'it compiled' as proof of correctness."
+pass_threshold = 8          # higher bar than usual — regressions are not acceptable
+hard_fail      = true
+test_tool      = "cargo test --workspace"
+mode           = "advisor"   # advisor — evaluator reports findings but does not block progression;
+                             # regression catches are surfaced for human review, not hard-stopped
+contract_review = false      # no contract-review phase; refactors must preserve existing contracts
+
+# Weighted criteria for every task in this refactor plan.
+[[evaluator.criteria]]
+name        = "zero-regressions"
+weight      = 50
+description = "Exact same number of tests pass before and after; cargo test exit code 0."
+
+[[evaluator.criteria]]
+name        = "api-surface-unchanged"
+weight      = 30
+description = "All public CLI flags, subcommands, and database schema columns remain identical."
+
+[[evaluator.criteria]]
+name        = "no-old-deps"
+weight      = 20
+description = "Migrated crates (ureq, rusqlite, clap 3) are absent from Cargo.lock after their respective migration tasks."
+
+# ─── Phase 1: Investigation ───────────────────────────────────────────────────
+
+[[phases]]
+name  = "Investigation"
+order = 1
+
+[[phases.tasks]]
+slug      = "migration-adr"
+kind      = "research"       # deliverable is a document, not code
+title     = "Survey codebase and write ADR-001: async stack migration"
+goal      = """
+Audit the sandpiper codebase. Catalogue every call-site that directly uses
+ureq, rusqlite, or clap 3. Produce docs/adr/ADR-001-async-stack-migration.md
+with: a findings table per library, a migration order recommendation, and a
+risk matrix (high/medium/low disruption per module).
+
+This task produces a written document — no implementation code is merged here.
+"""
+depends_on = []
+hints = [
+    "Grep for 'ureq::' and 'use ureq' to find all HTTP call-sites.",
+    "Grep for 'rusqlite::' and 'Connection::open' to find all storage call-sites.",
+    "List all CLI flags and subcommands from clap 3 derive structs — they must be preserved exactly.",
+    "Risk matrix: for each module, assess disruption level if migrated in isolation.",
+    "Validate findings against the reqwest 0.12 migration guide and sqlx 0.8 changelog before concluding.",
+]
+test_hints = []
+must_haves = [
+    "docs/adr/ADR-001-async-stack-migration.md exists and is non-empty",
+    "ADR contains a risk matrix table",
+    "ADR contains an explicit migration order recommendation",
+]
+evaluation_criteria = [
+    "ADR file exists at docs/adr/ADR-001-async-stack-migration.md",
+    "All three libraries (ureq, rusqlite, clap 3) covered in findings",
+    "Risk matrix covers at least 5 modules",
+]
+
+# ─── Phase 2: Domain Preservation ────────────────────────────────────────────
+
+[[phases]]
+name  = "Domain Preservation"
+order = 2
+
+[[phases.tasks]]
+slug      = "domain-isolation"
+kind      = "refactor"
+title     = "Ensure HealthTarget and CheckResult are I/O-free"
+goal      = """
+Verify that the core domain types (HealthTarget, CheckResult, CheckStatus) live
+in a src/domain.rs with zero I/O dependencies. If they are currently co-located
+with ureq or rusqlite call-sites, extract them. All tests must pass before and
+after the extraction — zero regressions.
+"""
+depends_on = ["migration-adr"]
+hints = [
+    "Run `cargo test` first — record the passing test count as the baseline.",
+    "If domain types are inside an I/O module, move them into src/domain.rs.",
+    "Add a #[cfg(test)] module that asserts no 'ureq' or 'rusqlite' import is present in domain.rs.",
+    "Public field names and types must not change — downstream usage must compile unchanged.",
+]
+test_hints = [
+    "Same number of tests pass before and after this task.",
+    "grep -r 'ureq\\|rusqlite' src/domain.rs returns nothing.",
+]
+must_haves = [
+    "src/domain.rs exists and is free of I/O imports",
+    "No test regressions from the extraction",
+    "All existing domain type unit tests pass unchanged",
+]
+evaluation_criteria = [
+    "cargo test count matches the pre-refactor baseline",
+    "grep -r 'ureq\\|rusqlite' src/domain.rs returns nothing",
+]
+
+# ─── Phase 3: HTTP Client Migration ──────────────────────────────────────────
+
+[[phases]]
+name  = "HTTP Client Migration"
+order = 3
+
+[[phases.tasks]]
+slug      = "http-client-migration"
+kind      = "refactor"
+title     = "Replace ureq 2.x with reqwest 0.12 + tokio"
+goal      = """
+Remove ureq from Cargo.toml. Add reqwest 0.12 (rustls-tls, no native-tls) and
+tokio 1.x. Replace all ureq call-sites with equivalent reqwest + async/await.
+All existing HTTP-related tests must pass unchanged. The binary must remain
+compatible with the same invocation patterns.
+"""
+depends_on = ["domain-isolation"]
+hints = [
+    "Add tokio = { features = [\"rt-multi-thread\", \"macros\"] } and reqwest = { features = [\"rustls-tls\", \"json\"] }.",
+    "Replace ureq::get(...).call()? with reqwest::Client::get(...).send().await?.",
+    "Convert fn check_target(t: &HealthTarget) -> CheckResult into async fn check_target.",
+    "main() must become #[tokio::main] async fn main() after this task.",
+    "Run cargo deny check — remove ureq from any deny.toml allow-list entries if present.",
+]
+test_hints = [
+    "All existing HTTP check tests pass after migration.",
+    "cargo deny check passes — ureq no longer in the dependency tree.",
+]
+must_haves = [
+    "ureq removed from Cargo.toml and Cargo.lock",
+    "reqwest uses rustls-tls, not native-tls",
+    "main() is async (#[tokio::main])",
+]
+evaluation_criteria = [
+    "grep 'ureq' Cargo.toml Cargo.lock returns nothing",
+    "All HTTP-related tests pass",
+    "cargo deny check passes",
+]
+
+# ─── Phase 4: Storage Migration ───────────────────────────────────────────────
+
+[[phases]]
+name  = "Storage Migration"
+order = 4
+
+[[phases.tasks]]
+slug      = "storage-migration"
+kind      = "refactor"
+title     = "Replace rusqlite with sqlx 0.8 (async SQLite)"
+goal      = """
+Remove rusqlite from Cargo.toml. Add sqlx 0.8 with SQLite + runtime-tokio.
+Rewrite the storage layer using sqlx compile-time query macros. The existing
+database schema must be preserved exactly — no column renames, no type changes,
+no schema version bump.
+"""
+depends_on = ["http-client-migration"]
+hints = [
+    "sqlx = { features = [\"sqlite\", \"runtime-tokio\", \"macros\"] }.",
+    "Set DATABASE_URL in .env for compile-time query checking (e.g. sqlite:sandpiper.db).",
+    "Move existing CREATE TABLE statements into migrations/0001_initial.sql.",
+    "Convert fn save_result(conn: &Connection, r: &CheckResult) to async fn save_result(pool: &SqlitePool, r: &CheckResult).",
+    "Use sqlite::memory: in tests — no filesystem side-effects.",
+]
+test_hints = [
+    "Save-then-load round-trip test for CheckResult passes.",
+    "In-memory SQLite used in all storage tests.",
+    "rusqlite does not appear in Cargo.lock.",
+]
+must_haves = [
+    "rusqlite removed from Cargo.toml and Cargo.lock",
+    "Migrations in migrations/ directory",
+    "All SQL uses sqlx compile-time query macros (query! or query_as!)",
+    "Schema unchanged — same table names and column definitions",
+]
+evaluation_criteria = [
+    "grep 'rusqlite' Cargo.lock returns nothing",
+    "All storage tests pass with in-memory SQLite",
+    "sqlx compile-time macros used (not raw SQL strings)",
+]
+
+# ─── Phase 5: CLI Modernisation ───────────────────────────────────────────────
+
+[[phases]]
+name  = "CLI Modernisation"
+order = 5
+
+[[phases.tasks]]
+slug      = "cli-modernisation"
+kind      = "refactor"
+title     = "Update clap 3 derive to clap 4 API"
+goal      = """
+Update clap from 3.x to 4.x. Migrate the derive API to clap 4 conventions
+(StructOpt is gone; use #[derive(Parser)] directly from clap). All CLI flags
+and subcommands must behave identically — same long names, same short aliases,
+same help text format.
+"""
+depends_on = ["storage-migration"]
+hints = [
+    "clap 4 changed #[clap(long, short)] attribute placement — audit every field.",
+    "StructOpt is no longer a dependency; use #[derive(clap::Parser)] directly.",
+    "Run `sandpiper --help` before and after; diff the output lines to check for drift.",
+    "Use assert_cmd to verify --help output contains expected flag names.",
+]
+test_hints = [
+    "assert_cmd: sandpiper --help output matches a known-good snapshot.",
+    "assert_cmd: sandpiper poll --interval 30 --db ./test.db parses without error.",
+]
+must_haves = [
+    "All CLI flags and subcommands preserved exactly (same long names, same short aliases)",
+    "No StructOpt dependency remaining",
+    "assert_cmd integration tests pass for all known invocations",
+]
+evaluation_criteria = [
+    "grep 'structopt' Cargo.toml returns nothing",
+    "assert_cmd snapshot tests pass for all subcommands",
+    "All tests from prior phases still pass",
+]
+
+# ─── Phase 6: Regression Audit ────────────────────────────────────────────────
+
+[[phases]]
+name  = "Regression Audit"
+order = 6
+
+[[phases.tasks]]
+slug      = "regression-audit"
+kind      = "audit"          # deliverable is a findings document, not a code feature
+title     = "Full regression and migration outcome audit"
+goal      = """
+Run the complete test suite, cargo audit, and cargo deny. Append a Migration
+Outcome section to docs/adr/ADR-001-async-stack-migration.md recording:
+before/after direct dependency counts, total test count and pass rate, any
+advisory findings introduced by new deps, and an explicit sign-off statement.
+
+This task produces a written document appended to the existing ADR — no code
+changes unless a critical advisory fix is required.
+"""
+depends_on = ["cli-modernisation"]
+hints = [
+    "cargo test --workspace — record total test count. Must equal or exceed the pre-migration baseline.",
+    "cargo audit — list any new advisories introduced by reqwest, sqlx, or tokio.",
+    "cargo deny check — confirm no license or supply-chain violations.",
+    "Count direct dependencies in Cargo.toml before and after — expect a net reduction (ureq + rusqlite removed).",
+    "Append to docs/adr/ADR-001-async-stack-migration.md; do not create a new file.",
+]
+test_hints = []
+must_haves = [
+    "All tests pass (zero regressions vs. pre-migration baseline)",
+    "cargo audit exits 0 or any advisories are documented with rationale",
+    "cargo deny check exits 0",
+    "ADR outcome section appended with sign-off",
+]
+evaluation_criteria = [
+    "cargo test exits 0 — test count matches or exceeds pre-migration baseline",
+    "cargo audit exits 0",
+    "cargo deny check exits 0",
+    "docs/adr/ADR-001-async-stack-migration.md contains a 'Migration Outcome' section",
+]
+
+# ─── Security ─────────────────────────────────────────────────────────────────
+
+[security]
+skip_hardening_task = true   # scope is limited to the migration — no new attack surface added
+
+# ─── Integration ──────────────────────────────────────────────────────────────
+
+[integration]
+skip_wiring_audit = false    # verify nothing got accidentally unwired during the migration
+skip_stub_audit   = false    # catch any todo!() stubs left in place

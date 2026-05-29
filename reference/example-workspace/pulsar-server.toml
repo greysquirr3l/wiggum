@@ -1,0 +1,143 @@
+# example-workspace/pulsar-server.toml
+#
+# The HTTP server component of the Pulsar workspace.
+# Depends on pulsar-core (declared in workspace.toml) — this plan starts only
+# after the pulsar-core plan is complete.
+
+# ─── Project ──────────────────────────────────────────────────────────────────
+
+[project]
+name        = "pulsar-server"
+description = """
+pulsar-server is an Axum HTTP server that exposes the Pulsar event store over
+a REST API. It depends on pulsar-core for all domain types and the EventStore
+port — no domain logic lives here.
+
+Endpoints:
+  POST /streams/:id/events           — append an event to a stream
+  GET  /streams/:id/events?from=<n>  — read events from a stream starting at offset n
+"""
+language     = "rust"
+path         = "/path/to/pulsar/crates/pulsar-server"
+architecture = "hexagonal"
+
+# ─── Preflight ────────────────────────────────────────────────────────────────
+
+[preflight]
+build = "cargo build -p pulsar-server"
+test  = "cargo test -p pulsar-server"
+lint  = "cargo clippy -p pulsar-server -- -D warnings"
+
+# ─── Orchestrator ─────────────────────────────────────────────────────────────
+
+[orchestrator]
+persona     = "You are a senior Rust engineer building an async HTTP service on top of the pulsar-core library."
+strategy    = "tdd"
+max_retries = 2
+on_failure  = "pause"
+rules = [
+    "Do not re-implement anything from pulsar-core — import and use it.",
+    "All domain logic belongs in pulsar-core; only routing, extractors, and app state live here.",
+    "All endpoints return structured JSON error bodies.",
+    "No secrets or PII in log output at any log level.",
+    "No .unwrap() outside test modules.",
+]
+
+# ─── Evaluator ────────────────────────────────────────────────────────────────
+
+[evaluator]
+persona        = "You are a skeptical QA engineer verifying an HTTP API contract."
+pass_threshold = 7
+hard_fail      = true
+
+# ─── Phase 1: HTTP API ────────────────────────────────────────────────────────
+
+[[phases]]
+name  = "HTTP API"
+order = 1
+
+[[phases.tasks]]
+slug      = "axum-router"
+kind      = "feature"
+title     = "Axum router — POST /streams/:id/events and GET /streams/:id/events"
+goal      = """
+Stand up an Axum HTTP server with two endpoints. App state holds an
+Arc<dyn EventStore<serde_json::Value> + Send + Sync> injected at startup.
+No domain logic in the router — all work delegated to the EventStore port.
+"""
+depends_on = []
+hints = [
+    "POST /streams/:id/events — body: { payload: serde_json::Value }. Returns 201 Created { offset: u64 }.",
+    "GET /streams/:id/events?from=<offset> — offset defaults to 0. Returns 200 OK { events: [...] }.",
+    "Inject EventStore via axum::extract::State(Arc<...>).",
+    "Return 422 Unprocessable Entity for invalid request bodies; 500 for store errors.",
+    "Structured JSON error body on all non-2xx responses: { error: string, code: string }.",
+]
+test_hints = [
+    "Integration: POST /streams/x/events with a valid body → 201 with offset in response.",
+    "Integration: GET /streams/x/events?from=0 after one append → 1 event in list.",
+    "Integration: GET /streams/x/events?from=1 after one append → empty list.",
+    "Integration: POST with invalid JSON body → 422.",
+]
+must_haves = [
+    "Both endpoints functional and covered by integration tests",
+    "EventStore injected via State (not hardcoded or thread-local)",
+    "Structured JSON error responses on all error paths",
+    "No domain logic in the router module",
+]
+evaluation_criteria = [
+    "POST → 201 with offset test passes",
+    "GET with from= filter tests pass (populated and empty)",
+    "422 on invalid body test passes",
+    "No direct sqlx or domain type construction in axum handlers",
+]
+
+# ─── Phase 2: Config and Deployment ──────────────────────────────────────────
+
+[[phases]]
+name  = "Config and Deployment"
+order = 2
+
+[[phases.tasks]]
+slug      = "server-config"
+kind      = "infrastructure"   # creates deployment config and build tooling
+title     = "TOML config, server entry point, and Dockerfile"
+goal      = """
+Wire the Axum server to a TOML config file and write the main() entry point.
+Add a minimal multi-stage Dockerfile. Config must support PULSAR_ environment
+variable overrides for all fields.
+"""
+depends_on = ["axum-router"]
+hints = [
+    "Config sections: [server] { host, port } and [database] { url }.",
+    "Use figment for layered config (TOML file → PULSAR_-prefixed env vars).",
+    "#[tokio::main] async fn main() — load config, run migrations, bind the Axum listener.",
+    "Dockerfile: FROM rust:1.85-slim AS builder. Multi-stage — final image FROM debian:bookworm-slim.",
+    "EXPOSE 3000 in Dockerfile. ENTRYPOINT [\"./pulsar-server\"].",
+    "Config must be validated at startup — exit with a clear error message if invalid.",
+]
+test_hints = [
+    "assert_cmd: pulsar-server --help exits 0.",
+    "Test: PULSAR_SERVER_PORT env var overrides the TOML value.",
+    "Docker build --no-cache completes without errors (CI step).",
+]
+must_haves = [
+    "PULSAR_ env var prefix overrides all TOML config fields",
+    "Dockerfile present and builds successfully",
+    "Config validated at startup with clear error messages",
+    "Migrations applied automatically at startup",
+]
+evaluation_criteria = [
+    "PULSAR_SERVER_PORT env override test passes",
+    "Dockerfile exists and docker build exits 0",
+    "Invalid config causes a non-zero exit with a human-readable message",
+]
+
+# ─── Security / Integration ───────────────────────────────────────────────────
+
+[security]
+skip_hardening_task = false   # HTTP surface — inject security hardening task
+
+[integration]
+skip_wiring_audit = false     # verify EventStore is properly wired through app state
+skip_stub_audit   = false     # catch any todo!() stubs

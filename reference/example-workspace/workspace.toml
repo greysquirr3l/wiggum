@@ -1,0 +1,36 @@
+# example-workspace/workspace.toml — multi-plan workspace example
+#
+# A workspace.toml lets you orchestrate multiple interdependent plan.toml files
+# as a unit. Use it when a project spans several independent components — a
+# shared library, an API service, a background worker — that must be developed
+# in dependency order but each need their own plan.
+#
+# This example: "Pulsar" — an event streaming platform with two components:
+#   pulsar-core    — the shared domain library (no HTTP, no server)
+#   pulsar-server  — the Axum HTTP server that depends on pulsar-core
+#
+# The dependency ordering means pulsar-server cannot start until pulsar-core
+# is complete. Within each plan, tasks proceed independently in their own order.
+#
+# Usage:
+#   wiggum validate example-workspace/pulsar-core.toml
+#   wiggum validate example-workspace/pulsar-server.toml
+#   wiggum generate example-workspace/pulsar-core.toml  --output output/pulsar-core
+#   wiggum generate example-workspace/pulsar-server.toml --output output/pulsar-server
+#
+# The workspace.toml itself is consumed by tools (e.g. wiggum_draft_plan MCP
+# tool) and CI scripts that need to know the plan execution order.
+
+[workspace]
+name        = "pulsar-platform"
+description = "Pulsar event streaming platform — core library and HTTP server, orchestrated as one workspace."
+
+[[plans]]
+name = "pulsar-core"
+path = "pulsar-core.toml"
+# No depends_on — this plan starts immediately
+
+[[plans]]
+name = "pulsar-server"
+path = "pulsar-server.toml"
+depends_on = ["pulsar-core"]   # server plan cannot start until core plan is complete

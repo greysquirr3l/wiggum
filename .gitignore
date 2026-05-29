@@ -50,7 +50,14 @@ tasks/
 
 # Development reference docs (not shipped)
 docs/dev/
-reference/
+reference/*
 !reference/example-plan.toml
+!reference/example-progress.md
+!reference/example-refactor-plan.toml
+!reference/orchestrator.prompt.md.example
+!reference/example-tasks/
+!reference/example-tasks/**
+!reference/example-workspace/
+!reference/example-workspace/**
 
 ai_assisted_development-security.md
