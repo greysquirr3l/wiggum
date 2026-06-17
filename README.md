@@ -263,22 +263,26 @@ Install git hooks to ensure code quality and catch issues before CI:
 This installs three hooks:
 
 **pre-commit** (runs on every commit):
+
 - Format code with `cargo fmt`
 - Detect secrets with `gitleaks`
 - Check vulnerabilities with `cargo audit`
 
 **commit-msg** (validates commit messages):
+
 - Enforce conventional commits format (`feat:`, `fix:`, `docs:`, etc.)
 - Check subject line length (max 72 chars)
 - Ensure proper formatting
 
 **pre-push** (runs before push to remote):
+
 - Run all tests with `cargo test`
 - Run lints with `cargo clippy`
 - Verify release build works
 - Build documentation
 
 To bypass hooks when needed (not recommended):
+
 ```bash
 git commit --no-verify
 git push --no-verify

@@ -340,7 +340,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - VCS-aware reporting with git timeline
 - mdBook documentation site
 
-[Unreleased]: https://github.com/greysquirr3l/wiggum/compare/v0.10.1...HEAD
 [0.10.1]: https://github.com/greysquirr3l/wiggum/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/greysquirr3l/wiggum/compare/v0.9.1...v0.10.0
 [0.9.1]: https://github.com/greysquirr3l/wiggum/compare/v0.9.0...v0.9.1
