@@ -262,16 +262,22 @@ Install the pre-commit hook to automatically format code and run security audits
 
 The hook will:
 - Run `cargo fmt --all` and auto-stage formatting changes
+- Run `gitleaks` to detect secrets and credentials in staged changes
 - Run `cargo audit` to check for security vulnerabilities
 
 To bypass the hook (not recommended), use `git commit --no-verify`.
 
 ### Prerequisites
 
-Install `cargo-audit` for security vulnerability scanning:
+Install security scanning tools:
 
 ```bash
+# Install cargo-audit for dependency vulnerability scanning
 cargo install cargo-audit
+
+# Install gitleaks for secrets detection
+brew install gitleaks  # macOS
+# or see https://github.com/gitleaks/gitleaks#installing for other platforms
 ```
 
 ## Documentation

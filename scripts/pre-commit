@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Pre-commit hook for wiggum
-# Runs cargo fmt and cargo audit before allowing commits
+# Runs cargo fmt, gitleaks, and cargo audit before allowing commits
 
 set -e
 
@@ -16,6 +16,16 @@ git diff --name-only | grep '\.rs$' | while read -r file; do
         git add "$file"
     fi
 done
+
+# Run gitleaks to detect secrets
+echo "→ Running gitleaks..."
+if ! command -v gitleaks &> /dev/null; then
+    echo "⚠️  gitleaks not installed, skipping secrets detection"
+    echo "   Install with: brew install gitleaks (macOS) or see https://github.com/gitleaks/gitleaks#installing"
+else
+    # Scan staged changes for secrets
+    gitleaks protect --staged --verbose
+fi
 
 # Run cargo audit for security vulnerabilities
 echo "→ Running cargo audit..."
