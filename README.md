@@ -254,22 +254,39 @@ avoid_god_files = true
 
 ### Git hooks
 
-Install the pre-commit hook to automatically format code and run security audits:
+Install git hooks to ensure code quality and catch issues before CI:
 
 ```bash
 ./scripts/install-hooks.sh
 ```
 
-The hook will:
-- Run `cargo fmt --all` and auto-stage formatting changes
-- Run `gitleaks` to detect secrets and credentials in staged changes
-- Run `cargo audit` to check for security vulnerabilities
+This installs three hooks:
 
-To bypass the hook (not recommended), use `git commit --no-verify`.
+**pre-commit** (runs on every commit):
+- Format code with `cargo fmt`
+- Detect secrets with `gitleaks`
+- Check vulnerabilities with `cargo audit`
+
+**commit-msg** (validates commit messages):
+- Enforce conventional commits format (`feat:`, `fix:`, `docs:`, etc.)
+- Check subject line length (max 72 chars)
+- Ensure proper formatting
+
+**pre-push** (runs before push to remote):
+- Run all tests with `cargo test`
+- Run lints with `cargo clippy`
+- Verify release build works
+- Build documentation
+
+To bypass hooks when needed (not recommended):
+```bash
+git commit --no-verify
+git push --no-verify
+```
 
 ### Prerequisites
 
-Install security scanning tools:
+Install development and security tools:
 
 ```bash
 # Install cargo-audit for dependency vulnerability scanning

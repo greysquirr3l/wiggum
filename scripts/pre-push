@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Pre-push hook for wiggum
+# Runs tests, lints, and build checks before pushing to remote
+
+set -e
+
+echo "Running pre-push checks..."
+
+# Run tests
+echo "→ Running tests..."
+cargo test --all
+
+# Run clippy with warnings as errors
+echo "→ Running clippy..."
+cargo clippy --all-targets --all-features -- -D warnings
+
+# Ensure release build works
+echo "→ Building release..."
+cargo build --release
+
+# Verify documentation builds
+echo "→ Building documentation..."
+cargo doc --no-deps
+
+echo "✓ Pre-push checks passed"
