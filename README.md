@@ -60,14 +60,45 @@ project/
     ├── T01-{slug}.md
     ├── T02-{slug}.md
     └── ...
-.vscode/
+.vscode/                            # when targets.vscode = true (default)
 ├── orchestrator.prompt.md
-└── evaluator.prompt.md   # only when [evaluator] is configured
+├── planner.prompt.md
+├── background-auditor.prompt.md
+└── evaluator.prompt.md             # only when [evaluator] is configured
+.opencode/agents/                   # when targets.opencode = true
+├── wiggum-orchestrator.md
+├── wiggum-implementer.md
+├── wiggum-planner.md
+├── wiggum-auditor.md
+└── wiggum-evaluator.md             # only when [evaluator] is configured
+.claude/                            # when targets.claude = true
+└── settings.json
 ```
+
+## Targets
+
+Wiggum generates artifacts for one or more AI coding tools at once. The default
+target is **VS Code + GitHub Copilot** for back-compat. To opt in to additional
+targets, add a `[targets]` section to your plan TOML or pass `--target` on the
+CLI:
+
+```toml
+[targets]
+vscode   = true   # default
+opencode = true   # .opencode/agents/wiggum-*.md
+claude   = true   # .claude/settings.json
+```
+
+```bash
+wiggum generate plan.toml --target opencode   # one target
+wiggum generate plan.toml --target all        # all three
+```
+
+See [`docs/targets.md`](https://greysquirr3l.github.io/wiggum/targets.html) for the full reference.
 
 ## Running the loop
 
-After generating artifacts, open your AI coding tool in agent mode and load the generated `orchestrator.prompt.md` as the prompt. The orchestrator will:
+After generating artifacts, open your AI coding tool in agent mode and load the generated orchestrator file as the prompt. The orchestrator will:
 
 1. Read `PROGRESS.md` to find the next incomplete task
 2. Open the corresponding `tasks/T{NN}-{slug}.md` file
@@ -79,15 +110,24 @@ After generating artifacts, open your AI coding tool in agent mode and load the 
 8. Mark the task complete in `PROGRESS.md` and record learnings
 9. Repeat until all tasks are done
 
-In VS Code with Copilot, copy `orchestrator.prompt.md` into your project as a prompt file:
+### In VS Code with Copilot
+
+Copy `orchestrator.prompt.md` into your project as a prompt file:
 
 ```bash
-cp orchestrator.prompt.md .github/orchestrator.prompt.md
+cp .vscode/orchestrator.prompt.md .github/orchestrator.prompt.md
 ```
 
 Then start Copilot in agent mode and send:
 
 > Read `.github/orchestrator.prompt.md` and follow its instructions. Begin by reading `PROGRESS.md` to identify the next incomplete task, then execute it. After each task passes preflight, update `PROGRESS.md` and continue to the next task.
+
+### In opencode
+
+opencode auto-discovers agents from `.opencode/agents/`. Open the project and
+the `wiggum-orchestrator` agent appears in the agent picker. Select it and send:
+
+> Begin by reading `PROGRESS.md` to identify the next incomplete task, then execute it. After each task passes preflight, update `PROGRESS.md` and continue to the next task.
 
 Monitor progress in a separate terminal with:
 

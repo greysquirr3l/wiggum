@@ -46,6 +46,19 @@ evaluation_criteria = [
 
 Four default criteria are added to every task automatically: build succeeds, all tests pass, linter clean, and implementation matches goal.
 
+## Target selection
+
+Wiggum can emit artifacts for one or more AI coding tools at once. Add a `[targets]` section to your plan to control which tools' agent files are generated. See [Targets](./targets.md) for the full reference.
+
+```toml
+[targets]
+vscode   = true   # default when [targets] is absent
+opencode = true   # .opencode/agents/wiggum-*.md
+claude   = false  # .claude/settings.json (PreCompact hook)
+```
+
+When the `[targets]` section is absent, Wiggum defaults to `vscode = true` and the other targets `false` — this matches the pre-`[targets]` behavior exactly. The CLI flag `--target <vscode|opencode|claude|all>` overrides the plan.
+
 ## Sections
 
 - **[Project Configuration](./plan-project.md)** — Project metadata and language settings

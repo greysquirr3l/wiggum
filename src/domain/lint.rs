@@ -384,6 +384,7 @@ mod tests {
             security: SecurityConfig::default(),
             integration: IntegrationConfig::default(),
             style: StyleConfig::default(),
+            targets: crate::domain::plan::TargetConfig::default(),
             phases: vec![Phase {
                 name: "Phase 1".to_string(),
                 order: 1,

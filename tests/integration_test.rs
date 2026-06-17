@@ -9,6 +9,7 @@ use wiggum::adapters::{patterns, replan};
 use wiggum::domain::check::score_plan;
 use wiggum::domain::dag::validate_dag;
 use wiggum::domain::plan::Plan;
+use wiggum::domain::targets::TargetSet;
 use wiggum::generation;
 use wiggum::ports::PlanReader;
 
@@ -66,9 +67,18 @@ fn generate_all_artifacts() {
     assert!(artifacts.progress.contains("Workspace Scaffold"));
     assert!(artifacts.progress.contains("`[ ]`"));
 
-    // Check orchestrator
-    assert!(artifacts.orchestrator.contains("example-project"));
-    assert!(artifacts.orchestrator.contains("runSubagent"));
+    // Check VSCode orchestrator
+    assert!(artifacts.orchestrator_vscode.contains("example-project"));
+    assert!(artifacts.orchestrator_vscode.contains("runSubagent"));
+
+    // Check opencode orchestrator
+    assert!(artifacts.orchestrator_opencode.contains("example-project"));
+    assert!(artifacts.orchestrator_opencode.contains("subagent_type"));
+    assert!(!artifacts.orchestrator_opencode.contains("runSubagent"));
+
+    // Check implementer
+    assert!(artifacts.implementer.contains("mode: subagent"));
+    assert!(!artifacts.implementer.contains("wiggum-implementer"));
 
     // Check plan doc
     assert!(artifacts.plan_doc.contains("example-project"));
@@ -97,18 +107,165 @@ fn write_artifacts_to_disk() {
 
     let artifacts = generation::generate_all(&plan).expect("Generation failed");
     let fs = FsAdapter;
-    generation::write_artifacts(&fs, &project_path, &artifacts).expect("Failed to write artifacts");
+    let targets = TargetSet::vscode_only();
+    generation::write_artifacts(&fs, &project_path, &artifacts, &targets)
+        .expect("Failed to write artifacts");
 
     // Verify files exist
     assert!(project_path.join("PROGRESS.md").exists());
     assert!(project_path.join("IMPLEMENTATION_PLAN.md").exists());
     assert!(project_path.join(".vscode/orchestrator.prompt.md").exists());
+    assert!(!project_path.join(".opencode").exists());
+    assert!(!project_path.join(".claude").exists());
     assert!(
         project_path
             .join("tasks/T01-workspace-scaffold.md")
             .exists()
     );
     assert!(project_path.join("tasks/T05-persistence.md").exists());
+}
+
+#[test]
+fn write_artifacts_opencode_target_writes_opencode_agents() {
+    let mut plan = load_example_plan();
+    let tmp = TempDir::new().expect("Failed to create temp dir");
+    let project_path = tmp.path().to_path_buf();
+    plan.project.path = project_path.to_string_lossy().to_string();
+
+    let artifacts = generation::generate_all(&plan).expect("Generation failed");
+    let fs = FsAdapter;
+    let targets = TargetSet {
+        vscode: false,
+        opencode: true,
+        claude: false,
+    };
+    generation::write_artifacts(&fs, &project_path, &artifacts, &targets)
+        .expect("Failed to write artifacts");
+
+    assert!(project_path.join("PROGRESS.md").exists());
+    assert!(project_path.join("AGENTS.md").exists());
+    assert!(!project_path.join(".vscode").exists());
+    assert!(project_path
+        .join(".opencode/agents/wiggum-orchestrator.md")
+        .exists());
+    assert!(project_path
+        .join(".opencode/agents/wiggum-implementer.md")
+        .exists());
+    assert!(project_path
+        .join(".opencode/agents/wiggum-planner.md")
+        .exists());
+    assert!(project_path
+        .join(".opencode/agents/wiggum-auditor.md")
+        .exists());
+}
+
+#[test]
+fn write_artifacts_claude_target_writes_hooks_only() {
+    let mut plan = load_example_plan();
+    let tmp = TempDir::new().expect("Failed to create temp dir");
+    let project_path = tmp.path().to_path_buf();
+    plan.project.path = project_path.to_string_lossy().to_string();
+
+    let artifacts = generation::generate_all(&plan).expect("Generation failed");
+    let fs = FsAdapter;
+    let targets = TargetSet {
+        vscode: false,
+        opencode: false,
+        claude: true,
+    };
+    generation::write_artifacts(&fs, &project_path, &artifacts, &targets)
+        .expect("Failed to write artifacts");
+
+    assert!(project_path.join(".claude/settings.json").exists());
+    assert!(!project_path.join(".vscode").exists());
+    assert!(!project_path.join(".opencode").exists());
+}
+
+#[test]
+fn write_artifacts_all_targets_writes_everything() {
+    let mut plan = load_example_plan();
+    let tmp = TempDir::new().expect("Failed to create temp dir");
+    let project_path = tmp.path().to_path_buf();
+    plan.project.path = project_path.to_string_lossy().to_string();
+
+    let artifacts = generation::generate_all(&plan).expect("Generation failed");
+    let fs = FsAdapter;
+    generation::write_artifacts(&fs, &project_path, &artifacts, &TargetSet::all())
+        .expect("Failed to write artifacts");
+
+    assert!(project_path.join(".vscode/orchestrator.prompt.md").exists());
+    assert!(project_path
+        .join(".opencode/agents/wiggum-orchestrator.md")
+        .exists());
+    assert!(project_path.join(".claude/settings.json").exists());
+}
+
+#[test]
+fn opencode_orchestrator_does_not_contain_runsubagent() {
+    let plan = load_example_plan();
+    let artifacts = generation::generate_all(&plan).expect("Generation failed");
+    assert!(
+        !artifacts.orchestrator_opencode.contains("runSubagent"),
+        "opencode orchestrator must not contain runSubagent"
+    );
+    assert!(
+        artifacts.orchestrator_opencode.contains("task tool"),
+        "opencode orchestrator should reference the `task` tool"
+    );
+}
+
+#[test]
+fn plan_targets_field_overrides_default() {
+    let toml = r#"
+[project]
+name = "opencode-app"
+description = "Test opencode target from plan"
+language = "rust"
+path = "/tmp/opencode-app"
+
+[targets]
+vscode = false
+opencode = true
+
+[[phases]]
+name = "Phase 1"
+order = 1
+
+[[phases.tasks]]
+slug = "t01"
+title = "T01"
+goal = "Test goal"
+"#;
+    let plan = Plan::from_toml(toml).expect("parse plan");
+    let resolved = plan.targets.resolve();
+    assert!(!resolved.vscode, "vscode should be disabled in plan");
+    assert!(resolved.opencode, "opencode should be enabled in plan");
+}
+
+#[test]
+fn plan_targets_field_empty_resolves_to_vscode_default() {
+    let toml = r#"
+[project]
+name = "default-app"
+description = "Test default targets"
+language = "rust"
+path = "/tmp/default-app"
+
+[[phases]]
+name = "Phase 1"
+order = 1
+
+[[phases.tasks]]
+slug = "t01"
+title = "T01"
+goal = "Test goal"
+"#;
+    let plan = Plan::from_toml(toml).expect("parse plan");
+    let resolved = plan.targets.resolve();
+    // Empty/absent [targets] should yield the back-compat default (vscode only).
+    assert!(resolved.vscode);
+    assert!(!resolved.opencode);
+    assert!(!resolved.claude);
 }
 
 #[test]
@@ -212,11 +369,11 @@ fn generate_all_includes_new_3_0_artifacts() {
         "hooks.json should be generated"
     );
     assert!(
-        !artifacts.planner_prompt.is_empty(),
+        !artifacts.planner_vscode.is_empty(),
         "planner prompt should be generated"
     );
     assert!(
-        !artifacts.background_auditor_prompt.is_empty(),
+        !artifacts.background_auditor_vscode.is_empty(),
         "background auditor prompt should be generated"
     );
     assert!(
@@ -224,7 +381,8 @@ fn generate_all_includes_new_3_0_artifacts() {
         "hooks.json should contain Claude hook structure"
     );
     assert!(
-        artifacts.planner_prompt.contains("planner") || artifacts.planner_prompt.contains("plan"),
+        artifacts.planner_vscode.contains("planner")
+            || artifacts.planner_vscode.contains("plan"),
         "planner prompt should reference planning"
     );
 }

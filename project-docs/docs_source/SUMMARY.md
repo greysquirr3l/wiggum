@@ -21,6 +21,7 @@
 - [The Ralph Wiggum Loop](./ralph-wiggum-loop.md)
 - [Language Profiles](./language-profiles.md)
 - [Generated Artifacts](./generated-artifacts.md)
+- [Targets](./targets.md)
 
 # Development
 

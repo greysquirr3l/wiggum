@@ -14,6 +14,7 @@ use wiggum::domain::dag::{parallel_groups, validate_dag};
 use wiggum::domain::lint;
 use wiggum::domain::plan::Plan;
 use wiggum::domain::pricing::PricingData;
+use wiggum::domain::targets::{Target, TargetSet};
 use wiggum::error::WiggumError;
 use wiggum::generation;
 use wiggum::ports::PlanReader;
@@ -24,12 +25,13 @@ enum VcsWarningMode {
     Skip,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 struct GenerateOptions {
     vcs_warning_mode: VcsWarningMode,
     dry_run: bool,
     estimate_tokens: bool,
     skip_agents_md: bool,
+    target_override: Option<String>,
 }
 
 fn main() {
@@ -53,10 +55,11 @@ fn main() {
             dry_run,
             estimate_tokens,
             skip_agents_md,
+            target,
         } => cmd_generate(
             &plan,
             output.as_deref(),
-            GenerateOptions {
+            &GenerateOptions {
                 vcs_warning_mode: if force {
                     VcsWarningMode::Skip
                 } else {
@@ -65,6 +68,7 @@ fn main() {
                 dry_run,
                 estimate_tokens,
                 skip_agents_md,
+                target_override: target,
             },
         ),
         Command::Validate { plan, lint } => cmd_validate(&plan, lint),
@@ -146,11 +150,19 @@ fn cmd_add_task(plan_path: &Path) -> wiggum::error::Result<()> {
 fn cmd_generate(
     plan_path: &Path,
     output_override: Option<&std::path::Path>,
-    opts: GenerateOptions,
+    opts: &GenerateOptions,
 ) -> wiggum::error::Result<()> {
     let fs = FsAdapter;
     let toml_content = fs.read_plan(plan_path)?;
     let plan = Plan::from_toml(&toml_content)?;
+
+    // Resolve the target set: --target CLI flag wins, else plan field, else default (vscode).
+    let targets = resolve_targets(&plan, opts.target_override.as_deref())?;
+    if targets.is_empty() {
+        return Err(WiggumError::Validation(
+            "no target selected — at least one of vscode/opencode/claude must be enabled".to_string(),
+        ));
+    }
 
     // Validate first
     let resolved = plan.resolve_tasks()?;
@@ -161,6 +173,7 @@ fn cmd_generate(
         resolved.len()
     );
     info!("Execution order: {}", sorted.join(" → "));
+    info!("Targets: {}", describe_targets(targets));
 
     // Generate (with user template overrides if present)
     let project_path =
@@ -186,43 +199,104 @@ fn cmd_generate(
     }
 
     if opts.dry_run {
-        print_dry_run(&artifacts, &project_path, &resolved, opts.estimate_tokens)?;
+        print_dry_run(
+            &artifacts,
+            &project_path,
+            &resolved,
+            targets,
+            opts.estimate_tokens,
+        )?;
         return Ok(());
     }
 
     if opts.estimate_tokens {
         println!();
-        println!("{}", generation::tokens::format_report(&artifacts));
+        println!("{}", generation::tokens::format_report(&artifacts, &targets));
         println!();
     }
 
-    generation::write_artifacts(&fs, &project_path, &artifacts)?;
+    generation::write_artifacts(&fs, &project_path, &artifacts, &targets)?;
 
+    print_success(&artifacts, &project_path, targets);
+
+    Ok(())
+}
+
+/// Resolve the active `TargetSet` from CLI override and the plan.
+fn resolve_targets(plan: &Plan, cli_override: Option<&str>) -> wiggum::error::Result<TargetSet> {
+    if let Some(cli) = cli_override {
+        return TargetSet::from_cli_str(cli)
+            .map_err(|e| WiggumError::Validation(format!("--target: {e}")));
+    }
+    Ok(plan.targets.resolve())
+}
+
+fn describe_targets(targets: TargetSet) -> String {
+    targets
+        .iter()
+        .map(|t| t.to_string())
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+fn print_success(
+    artifacts: &generation::GeneratedArtifacts,
+    project_path: &Path,
+    targets: TargetSet,
+) {
     println!("✅ Generated scaffold in {}", project_path.display());
-    println!("   📋 PROGRESS.md");
-    println!("   📄 IMPLEMENTATION_PLAN.md");
-    println!("   🤖 .vscode/orchestrator.prompt.md");
-    println!("   📁 tasks/ ({} task files)", artifacts.tasks.len());
+    println!("   Universal:");
+    println!("     📋 PROGRESS.md");
+    println!("     📄 IMPLEMENTATION_PLAN.md");
+    println!("     📁 tasks/ ({} task files)", artifacts.tasks.len());
     if artifacts.agents_md.is_some() {
-        println!("   📝 AGENTS.md");
+        println!("     📝 AGENTS.md");
     }
-    println!("   📊 features.json");
-    if artifacts.evaluator_prompt.is_some() {
-        println!("   🔎 .vscode/evaluator.prompt.md");
+    println!("     📊 features.json");
+
+    if targets.contains(Target::Vscode) {
+        println!("   VSCode:");
+        println!("     🤖 .vscode/orchestrator.prompt.md");
+        if artifacts.evaluator_vscode.is_some() {
+            println!("     🔎 .vscode/evaluator.prompt.md");
+        }
+        println!("     🗂  .vscode/planner.prompt.md");
+        println!("     🔍 .vscode/background-auditor.prompt.md");
     }
-    println!("   🗂  .vscode/planner.prompt.md");
-    println!("   🔍 .vscode/background-auditor.prompt.md");
-    println!("   🪝 .claude/settings.json");
+
+    if targets.contains(Target::Opencode) {
+        println!("   opencode:");
+        println!("     🤖 .opencode/agents/wiggum-orchestrator.md");
+        println!("     🔧 .opencode/agents/wiggum-implementer.md");
+        if artifacts.evaluator_opencode.is_some() {
+            println!("     🔎 .opencode/agents/wiggum-evaluator.md");
+        }
+        println!("     🗂  .opencode/agents/wiggum-planner.md");
+        println!("     🔍 .opencode/agents/wiggum-auditor.md");
+    }
+
+    if targets.contains(Target::Claude) {
+        println!("   Claude:");
+        println!("     🪝 .claude/settings.json");
+    }
 
     println!();
     println!("Next steps:");
     println!("  1. Review and enrich the task files in tasks/");
     println!("     - Add implementation guidance, code snippets, test specs");
     println!("     - Fill in the <!-- TODO --> sections");
-    println!("  2. Open the project in VS Code with Copilot Agent mode");
-    println!("  3. Run the orchestrator prompt to start the loop");
-
-    Ok(())
+    if targets.contains(Target::Vscode) {
+        println!(
+            "  2. In VSCode: open the folder, start Copilot in agent mode, paste .vscode/orchestrator.prompt.md"
+        );
+    }
+    if targets.contains(Target::Opencode) {
+        println!("  2. In opencode: open the folder — the wiggum-orchestrator agent is auto-discovered");
+        println!("     Run `wiggum watch` in a separate terminal to monitor progress.");
+    }
+    if targets.contains(Target::Claude) {
+        println!("  2. In Claude Code: open the folder — the PreCompact hook is auto-registered");
+    }
 }
 
 #[allow(clippy::cast_precision_loss)]
@@ -230,6 +304,7 @@ fn print_dry_run(
     artifacts: &generation::GeneratedArtifacts,
     project_path: &Path,
     resolved: &[wiggum::domain::plan::ResolvedTask],
+    targets: TargetSet,
     estimate_tokens: bool,
 ) -> wiggum::error::Result<()> {
     println!("Dry run — would generate:\n");
@@ -241,10 +316,60 @@ fn print_dry_run(
         "  IMPLEMENTATION_PLAN.md  ({:.1} KB)",
         artifacts.plan_doc.len() as f64 / 1024.0
     );
-    println!(
-        "  .vscode/orchestrator.prompt.md  ({:.1} KB)",
-        artifacts.orchestrator.len() as f64 / 1024.0
-    );
+
+    if targets.contains(Target::Vscode) {
+        println!(
+            "  .vscode/orchestrator.prompt.md  ({:.1} KB)",
+            artifacts.orchestrator_vscode.len() as f64 / 1024.0
+        );
+        if let Some(eval) = &artifacts.evaluator_vscode {
+            println!(
+                "  .vscode/evaluator.prompt.md     ({:.1} KB)",
+                eval.len() as f64 / 1024.0
+            );
+        }
+        println!(
+            "  .vscode/planner.prompt.md        ({:.1} KB)",
+            artifacts.planner_vscode.len() as f64 / 1024.0
+        );
+        println!(
+            "  .vscode/background-auditor.prompt.md  ({:.1} KB)",
+            artifacts.background_auditor_vscode.len() as f64 / 1024.0
+        );
+    }
+
+    if targets.contains(Target::Opencode) {
+        println!(
+            "  .opencode/agents/wiggum-orchestrator.md  ({:.1} KB)",
+            artifacts.orchestrator_opencode.len() as f64 / 1024.0
+        );
+        println!(
+            "  .opencode/agents/wiggum-implementer.md   ({:.1} KB)",
+            artifacts.implementer.len() as f64 / 1024.0
+        );
+        if let Some(eval) = &artifacts.evaluator_opencode {
+            println!(
+                "  .opencode/agents/wiggum-evaluator.md    ({:.1} KB)",
+                eval.len() as f64 / 1024.0
+            );
+        }
+        println!(
+            "  .opencode/agents/wiggum-planner.md       ({:.1} KB)",
+            artifacts.planner_opencode.len() as f64 / 1024.0
+        );
+        println!(
+            "  .opencode/agents/wiggum-auditor.md       ({:.1} KB)",
+            artifacts.background_auditor_opencode.len() as f64 / 1024.0
+        );
+    }
+
+    if targets.contains(Target::Claude) {
+        println!(
+            "  .claude/settings.json           ({:.1} KB)",
+            artifacts.hooks_json.len() as f64 / 1024.0
+        );
+    }
+
     println!("  tasks/");
     for (filename, content) in &artifacts.tasks {
         println!("    {filename}  ({:.1} KB)", content.len() as f64 / 1024.0);
@@ -259,38 +384,8 @@ fn print_dry_run(
         "  features.json           ({:.1} KB)",
         artifacts.features_json.len() as f64 / 1024.0
     );
-    if let Some(eval) = &artifacts.evaluator_prompt {
-        println!(
-            "  .vscode/evaluator.prompt.md  ({:.1} KB)",
-            eval.len() as f64 / 1024.0
-        );
-    }
-    println!(
-        "  .vscode/planner.prompt.md       ({:.1} KB)",
-        artifacts.planner_prompt.len() as f64 / 1024.0
-    );
-    println!(
-        "  .vscode/background-auditor.prompt.md  ({:.1} KB)",
-        artifacts.background_auditor_prompt.len() as f64 / 1024.0
-    );
-    println!(
-        "  .claude/settings.json           ({:.1} KB)",
-        artifacts.hooks_json.len() as f64 / 1024.0
-    );
-    let total_size = artifacts.progress.len()
-        + artifacts.plan_doc.len()
-        + artifacts.orchestrator.len()
-        + artifacts.tasks.iter().map(|(_, c)| c.len()).sum::<usize>()
-        + artifacts.agents_md.as_ref().map_or(0, String::len)
-        + artifacts.features_json.len()
-        + artifacts.evaluator_prompt.as_ref().map_or(0, String::len)
-        + artifacts.planner_prompt.len()
-        + artifacts.background_auditor_prompt.len()
-        + artifacts.hooks_json.len();
-    let total_files = 7
-        + artifacts.tasks.len()
-        + usize::from(artifacts.agents_md.is_some())
-        + usize::from(artifacts.evaluator_prompt.is_some());
+
+    let (total_size, total_files) = artifact_totals(artifacts, targets);
     println!(
         "\n  Total: {} files, {:.1} KB",
         total_files,
@@ -305,9 +400,46 @@ fn print_dry_run(
     }
     if estimate_tokens {
         println!();
-        println!("{}", generation::tokens::format_report(artifacts));
+        println!("{}", generation::tokens::format_report(artifacts, &targets));
     }
     Ok(())
+}
+
+/// Sum sizes and count files for the active targets only.
+fn artifact_totals(artifacts: &generation::GeneratedArtifacts, targets: TargetSet) -> (usize, usize) {
+    use wiggum::domain::targets::Target;
+
+    let mut size = artifacts.progress.len()
+        + artifacts.plan_doc.len()
+        + artifacts.features_json.len()
+        + artifacts.tasks.iter().map(|(_, c)| c.len()).sum::<usize>()
+        + artifacts.agents_md.as_ref().map_or(0, String::len);
+
+    let mut files: usize = 4 // PROGRESS, plan_doc, features, agents_md
+        + artifacts.tasks.len()
+        + usize::from(artifacts.agents_md.is_some());
+
+    if targets.contains(Target::Vscode) {
+        size += artifacts.orchestrator_vscode.len()
+            + artifacts.evaluator_vscode.as_ref().map_or(0, String::len)
+            + artifacts.planner_vscode.len()
+            + artifacts.background_auditor_vscode.len();
+        files += 3 + usize::from(artifacts.evaluator_vscode.is_some());
+    }
+    if targets.contains(Target::Opencode) {
+        size += artifacts.orchestrator_opencode.len()
+            + artifacts.implementer.len()
+            + artifacts.evaluator_opencode.as_ref().map_or(0, String::len)
+            + artifacts.planner_opencode.len()
+            + artifacts.background_auditor_opencode.len();
+        files += 4 + usize::from(artifacts.evaluator_opencode.is_some());
+    }
+    if targets.contains(Target::Claude) {
+        size += artifacts.hooks_json.len();
+        files += 1;
+    }
+
+    (size, files)
 }
 
 fn cmd_validate(plan_path: &Path, run_lint: bool) -> wiggum::error::Result<()> {

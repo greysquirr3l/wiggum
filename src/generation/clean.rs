@@ -11,10 +11,18 @@ const GENERATED_FILES: &[&str] = &[
     "PROGRESS.md",
     "IMPLEMENTATION_PLAN.md",
     "AGENTS.md",
+    // VSCode target
     ".vscode/orchestrator.prompt.md",
     ".vscode/evaluator.prompt.md",
     ".vscode/planner.prompt.md",
     ".vscode/background-auditor.prompt.md",
+    // opencode target
+    ".opencode/agents/wiggum-orchestrator.md",
+    ".opencode/agents/wiggum-implementer.md",
+    ".opencode/agents/wiggum-evaluator.md",
+    ".opencode/agents/wiggum-planner.md",
+    ".opencode/agents/wiggum-auditor.md",
+    // Claude target
     ".claude/settings.json",
 ];
 
@@ -88,6 +96,21 @@ pub fn remove_artifacts(plan: &Plan, project_path: &Path) -> Result<Vec<PathBuf>
         fs::remove_dir(&vscode_dir)?;
         info!("Removed empty directory: {}", vscode_dir.display());
         removed.push(vscode_dir);
+    }
+
+    // Clean up .opencode/agents/ if empty after removing agent files
+    let opencode_agents_dir = project_path.join(".opencode/agents");
+    if opencode_agents_dir.is_dir() && is_dir_empty(&opencode_agents_dir) {
+        fs::remove_dir(&opencode_agents_dir)?;
+        info!("Removed empty directory: {}", opencode_agents_dir.display());
+        removed.push(opencode_agents_dir);
+    }
+    // Clean up .opencode/ if empty after removing agents/
+    let opencode_dir = project_path.join(".opencode");
+    if opencode_dir.is_dir() && is_dir_empty(&opencode_dir) {
+        fs::remove_dir(&opencode_dir)?;
+        info!("Removed empty directory: {}", opencode_dir.display());
+        removed.push(opencode_dir);
     }
 
     // Clean up .claude/ if empty after removing settings.json
@@ -263,5 +286,69 @@ depends_on = ["setup"]
         assert!(root.join(".vscode/settings.json").exists());
         // .vscode/ dir survives because it's not empty
         assert!(root.join(".vscode").is_dir());
+    }
+
+    #[test]
+    fn collect_targets_includes_opencode_files() {
+        let tmp = TempDir::new().unwrap();
+        let root = tmp.path();
+
+        fs::create_dir_all(root.join(".opencode/agents")).unwrap();
+        fs::write(
+            root.join(".opencode/agents/wiggum-orchestrator.md"),
+            "orch",
+        )
+        .unwrap();
+        fs::write(
+            root.join(".opencode/agents/wiggum-implementer.md"),
+            "impl",
+        )
+        .unwrap();
+
+        let plan = sample_plan(&root.to_string_lossy());
+        let targets = collect_targets(&plan, root).unwrap();
+
+        assert!(
+            targets
+                .iter()
+                .any(|p| p.ends_with("wiggum-orchestrator.md")),
+            "opencode orchestrator must be in clean targets"
+        );
+        assert!(
+            targets.iter().any(|p| p.ends_with("wiggum-implementer.md")),
+            "opencode implementer must be in clean targets"
+        );
+    }
+
+    #[test]
+    fn remove_artifacts_deletes_opencode_files() {
+        let tmp = TempDir::new().unwrap();
+        let root = tmp.path();
+
+        fs::create_dir_all(root.join(".opencode/agents")).unwrap();
+        fs::write(
+            root.join(".opencode/agents/wiggum-orchestrator.md"),
+            "orch",
+        )
+        .unwrap();
+        fs::write(
+            root.join(".opencode/agents/wiggum-implementer.md"),
+            "impl",
+        )
+        .unwrap();
+        fs::write(root.join(".opencode/agents/wiggum-planner.md"), "planner").unwrap();
+        fs::write(root.join(".opencode/agents/wiggum-auditor.md"), "auditor").unwrap();
+
+        let plan = sample_plan(&root.to_string_lossy());
+        remove_artifacts(&plan, root).unwrap();
+
+        assert!(!root.join(".opencode/agents/wiggum-orchestrator.md").exists());
+        assert!(!root.join(".opencode/agents/wiggum-implementer.md").exists());
+        assert!(!root.join(".opencode/agents/wiggum-planner.md").exists());
+        assert!(!root.join(".opencode/agents/wiggum-auditor.md").exists());
+        // Both .opencode/agents/ and .opencode/ should be cleaned up since
+        // they're empty.
+        assert!(!root.join(".opencode/agents").exists());
+        assert!(!root.join(".opencode").exists());
     }
 }

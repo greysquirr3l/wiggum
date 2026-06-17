@@ -1,4 +1,6 @@
-//! Generate `.vscode/background-auditor.prompt.md` — the continuous quality auditor agent prompt.
+//! Generate `.vscode/background-auditor.prompt.md` and
+//! `.opencode/agents/wiggum-auditor.md` — the continuous quality auditor
+//! agent prompt.
 
 use tera::{Context, Tera};
 
@@ -6,7 +8,7 @@ use crate::domain::plan::Plan;
 use crate::error::{Result, WiggumError};
 use crate::generation::templates::get_tera;
 
-/// Render the background auditor prompt using the default template.
+/// Render the `VSCode` background auditor prompt using the default `Tera` instance.
 ///
 /// # Errors
 ///
@@ -15,7 +17,7 @@ pub fn render(plan: &Plan) -> Result<String> {
     render_with(get_tera(), plan)
 }
 
-/// Render the background auditor prompt using a custom Tera instance.
+/// Render the `VSCode` background auditor prompt using a custom `Tera` instance.
 ///
 /// # Errors
 ///
@@ -32,6 +34,35 @@ pub fn render_with(tera: &Tera, plan: &Plan) -> Result<String> {
     ctx.insert("preflight_lint", &plan.preflight.lint);
 
     tera.render("background_auditor.md", &ctx)
+        .map_err(|e| WiggumError::Template(e.to_string()))
+}
+
+/// Render the opencode background auditor subagent prompt (`wiggum-auditor.md`).
+///
+/// # Errors
+///
+/// Returns an error if template rendering fails.
+pub fn render_opencode(plan: &Plan) -> Result<String> {
+    render_opencode_with(get_tera(), plan)
+}
+
+/// Render the opencode background auditor subagent prompt using a custom Tera instance.
+///
+/// # Errors
+///
+/// Returns an error if template rendering fails.
+pub fn render_opencode_with(tera: &Tera, plan: &Plan) -> Result<String> {
+    let mut ctx = Context::new();
+
+    ctx.insert("project_name", &plan.project.name);
+    ctx.insert("project_path", &plan.project.path);
+    ctx.insert("language", &plan.project.language.to_string());
+    ctx.insert("architecture", &plan.project.architecture);
+    ctx.insert("preflight_build", &plan.preflight.build);
+    ctx.insert("preflight_test", &plan.preflight.test);
+    ctx.insert("preflight_lint", &plan.preflight.lint);
+
+    tera.render("background_auditor_opencode.md", &ctx)
         .map_err(|e| WiggumError::Template(e.to_string()))
 }
 
@@ -72,5 +103,14 @@ goal = "Set up the project."
         let plan = crate::domain::plan::Plan::from_toml(MINIMAL_PLAN).unwrap();
         let output = render(&plan).unwrap();
         assert!(output.contains("Wiring"), "expected wiring check in output");
+    }
+
+    #[test]
+    fn render_opencode_contains_subagent_frontmatter() {
+        let plan = crate::domain::plan::Plan::from_toml(MINIMAL_PLAN).unwrap();
+        let output = render_opencode(&plan).unwrap();
+        assert!(output.starts_with("---"), "must start with YAML frontmatter");
+        assert!(output.contains("mode: subagent"));
+        assert!(output.contains("Wiring"));
     }
 }

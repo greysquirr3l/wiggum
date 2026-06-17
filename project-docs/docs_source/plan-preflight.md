@@ -93,16 +93,24 @@ subagent_model = "claude-sonnet-4.5"   # every runSubagent call for implementati
 model          = "claude-sonnet-4.5"   # evaluator agent
 ```
 
-How each field is applied:
+How each field is applied depends on the active [target](./targets.md):
 
-- `[orchestrator] model` — rendered as a **Recommended model** header at the top of
-  `orchestrator.prompt.md`. Wiggum cannot enforce a model from a prompt file, so this
-  is a reminder to set the picker before you start the loop, not a guarantee.
-- `[orchestrator] subagent_model` — injected into the orchestrator's instructions as
-  `model: "<name>"` on every `#tool:agent/runSubagent` call dispatched for
-  implementation work (including each entry in a parallel group).
-- `[evaluator] model` — header note on `evaluator.prompt.md` plus the `model:`
-  argument when the orchestrator dispatches the evaluator as a subagent.
+- **VSCode target** (default):
+  - `[orchestrator] model` — rendered as a **Recommended model** header at the top
+    of `orchestrator.prompt.md`. Wiggum cannot enforce a model from a prompt file,
+    so this is a reminder to set the picker before you start the loop.
+  - `[orchestrator] subagent_model` — injected into the orchestrator's instructions
+    as `model: "<name>"` on every `#tool:agent/runSubagent` call dispatched for
+    implementation work.
+  - `[evaluator] model` — header note on `evaluator.prompt.md` plus the `model:`
+    argument when the orchestrator dispatches the evaluator as a subagent.
+- **opencode target:**
+  - `[orchestrator] model` — written into the orchestrator agent's frontmatter
+    (`model:` field). opencode uses the frontmatter model when the agent runs.
+  - `[orchestrator] subagent_model` — written into the implementer agent's
+    frontmatter. opencode does not support per-dispatch `model:` arguments —
+    the subagent's model is pinned by the agent definition itself.
+  - `[evaluator] model` — written into the evaluator agent's frontmatter.
 
 Equivalent ChatGPT or Gemini model identifiers work the same way — the string is
 passed through to `runSubagent` verbatim, so whatever the picker accepts is valid

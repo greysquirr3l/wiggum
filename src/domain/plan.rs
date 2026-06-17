@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use crate::error::{Result, WiggumError};
 
 use super::languages::LanguageProfile;
+use super::targets::TargetSet;
 
 /// Top-level plan definition, parsed from TOML.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -20,7 +21,47 @@ pub struct Plan {
     pub integration: IntegrationConfig,
     #[serde(default)]
     pub style: StyleConfig,
+    /// Per-target output control. When unset, only the `vscode` target is
+    /// generated (back-compat). The `--target` CLI flag overrides this.
+    #[serde(default)]
+    pub targets: TargetConfig,
     pub phases: Vec<Phase>,
+}
+
+/// Plan-level target configuration.
+///
+/// Mirrors the `TargetSet` bit-set but uses `Option<bool>` per target so a
+/// `[targets]` section can selectively enable or disable individual targets
+/// without unsetting the others.
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
+pub struct TargetConfig {
+    /// Emit `.vscode/*.prompt.md` files. Defaults to `true` if the section
+    /// is present, otherwise `TargetSet::vscode_only()` is used.
+    #[serde(default)]
+    pub vscode: Option<bool>,
+    /// Emit `.opencode/agents/wiggum-*.md` agent files. Defaults to `false`.
+    #[serde(default)]
+    pub opencode: Option<bool>,
+    /// Emit `.claude/settings.json` hooks. Defaults to `false`.
+    #[serde(default)]
+    pub claude: Option<bool>,
+}
+
+impl TargetConfig {
+    /// Resolve to a `TargetSet`. When all three options are `None`, returns
+    /// the back-compat default (`vscode` only) via `TargetSet::vscode_only()`.
+    /// Otherwise, the absent fields are treated as `false`.
+    #[must_use]
+    pub fn resolve(self) -> TargetSet {
+        if self.vscode.is_none() && self.opencode.is_none() && self.claude.is_none() {
+            return TargetSet::vscode_only();
+        }
+        TargetSet {
+            vscode: self.vscode.unwrap_or(false),
+            opencode: self.opencode.unwrap_or(false),
+            claude: self.claude.unwrap_or(false),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

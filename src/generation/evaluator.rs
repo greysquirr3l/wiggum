@@ -77,6 +77,64 @@ fn render_evaluator(
         .map_err(|e| WiggumError::Template(e.to_string()))
 }
 
+/// Render the opencode evaluator subagent prompt (`wiggum-evaluator.md`).
+///
+/// # Errors
+///
+/// Returns an error if template rendering fails.
+pub fn render_opencode(plan: &Plan, tasks: &[ResolvedTask]) -> Result<Option<String>> {
+    render_opencode_with(get_tera(), plan, tasks)
+}
+
+/// Render the opencode evaluator subagent prompt using a custom Tera instance.
+///
+/// # Errors
+///
+/// Returns an error if template rendering fails.
+pub fn render_opencode_with(
+    tera: &Tera,
+    plan: &Plan,
+    tasks: &[ResolvedTask],
+) -> Result<Option<String>> {
+    let Some(evaluator) = &plan.evaluator else {
+        return Ok(None);
+    };
+    let mut ctx = Context::new();
+
+    ctx.insert("project_name", &plan.project.name);
+    ctx.insert("project_path", &plan.project.path);
+    ctx.insert("evaluator_persona", &evaluator.persona);
+    ctx.insert("evaluator_model", &evaluator.model);
+    ctx.insert("pass_threshold", &evaluator.pass_threshold);
+    ctx.insert("hard_fail", &evaluator.hard_fail);
+    ctx.insert(
+        "test_tool",
+        evaluator
+            .test_tool
+            .as_deref()
+            .unwrap_or(&plan.preflight.test),
+    );
+    ctx.insert("preflight_build", &plan.preflight.build);
+    ctx.insert("preflight_test", &plan.preflight.test);
+    ctx.insert("preflight_lint", &plan.preflight.lint);
+    ctx.insert("task_count_padded", &format!("{:02}", tasks.len()));
+
+    let criteria_value =
+        serde_json::to_value(&evaluator.criteria).unwrap_or(serde_json::Value::Array(Vec::new()));
+    ctx.insert("criteria", &criteria_value);
+    ctx.insert("contract_review", &evaluator.contract_review);
+    let mode_str = match evaluator.mode {
+        EvalMode::Blocking => "blocking",
+        EvalMode::Advisor => "advisor",
+    };
+    ctx.insert("evaluator_mode", mode_str);
+
+    let rendered = tera
+        .render("evaluator_opencode.md", &ctx)
+        .map_err(|e| WiggumError::Template(e.to_string()))?;
+    Ok(Some(rendered))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -109,6 +167,7 @@ mod tests {
             security: SecurityConfig::default(),
             integration: IntegrationConfig::default(),
             style: StyleConfig::default(),
+            targets: crate::domain::plan::TargetConfig::default(),
             phases: vec![Phase {
                 name: "Foundation".to_string(),
                 order: 1,
@@ -185,6 +244,20 @@ mod tests {
         assert!(output.contains("cargo build"));
         assert!(output.contains("cargo test"));
         assert!(output.contains("cargo clippy"));
+        Ok(())
+    }
+
+    #[test]
+    fn opencode_evaluator_has_subagent_frontmatter()
+    -> std::result::Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        let plan = make_plan(true);
+        let tasks = make_tasks();
+        let output = render_opencode(&plan, &tasks)?.ok_or("expected Some")?;
+        assert!(output.starts_with("---"), "must start with YAML frontmatter");
+        assert!(output.contains("mode: subagent"));
+        assert!(output.contains("permission:"));
+        assert!(output.contains("edit: deny"));
+        assert!(!output.contains("runSubagent"));
         Ok(())
     }
 }

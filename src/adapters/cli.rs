@@ -38,6 +38,12 @@ pub enum Command {
         /// Skip AGENTS.md generation
         #[arg(long)]
         skip_agents_md: bool,
+
+        /// Override the target tool(s) to generate artifacts for.
+        /// `vscode` (default), `opencode`, `claude`, or `all`.
+        /// Overrides the plan-level `[targets]` section.
+        #[arg(long, value_parser = ["vscode", "opencode", "claude", "all"])]
+        target: Option<String>,
     },
 
     /// Validate a plan file without generating artifacts

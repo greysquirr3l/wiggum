@@ -2,7 +2,11 @@
 
 When you run `wiggum generate`, the following artifacts are produced in your project directory.
 
-## Task files — `tasks/T{NN}-{slug}.md`
+## Universal artifacts (always emitted)
+
+These files are produced regardless of the selected target set. They are tool-agnostic and form the shared state of the loop.
+
+### Task files — `tasks/T{NN}-{slug}.md`
 
 Each task becomes a numbered markdown file with a consistent structure:
 
@@ -15,7 +19,7 @@ Each task becomes a numbered markdown file with a consistent structure:
 - **Preflight** — Commands to run before marking complete (build, test, lint, and security audit)
 - **Exit Criteria** — Verifiable conditions for completion, including a `cargo audit` (or equivalent) check
 
-## Progress tracker — `PROGRESS.md`
+### Progress tracker — `PROGRESS.md`
 
 A markdown table tracking all phases and tasks with status columns:
 
@@ -30,15 +34,15 @@ Includes a **Codebase State** section where subagents record which files were cr
 
 Includes a learnings column where the orchestrator records insights from each completed task.
 
-## Implementation plan — `IMPLEMENTATION_PLAN.md`
+### Implementation plan — `IMPLEMENTATION_PLAN.md`
 
 A high-level architecture document derived from your plan's project description and phase structure. Subagents reference this for context about how their task fits into the overall project.
 
-## Orchestrator prompt — `.vscode/orchestrator.prompt.md`
+### Agents manifest — `AGENTS.md`
 
-The agent-mode prompt that drives the implementation loop. It tells the orchestrator how to read progress, spawn subagents, verify their output independently, and update the tracker. Includes a sprint contract step, a codebase state handoff step, and a guard against premature completion.
+Defines agent roles and capabilities. Auto-discovered by opencode (and any other tool that follows the `AGENTS.md` convention). Can be skipped with `--skip-agents-md`.
 
-## Feature registry — `features.json`
+### Feature registry — `features.json`
 
 A structured JSON file listing every task with its pass/fail state and per-criterion results. Both the orchestrator and evaluator reference this as the source of truth for what is actually complete.
 
@@ -64,39 +68,45 @@ A structured JSON file listing every task with its pass/fail state and per-crite
 
 Custom criteria can be added per-task via the `evaluation_criteria` field in your plan TOML.
 
-## Auto-injected security hardening task
+### Auto-injected security hardening task
 
 When your plan contains web-facing surface (task slugs or titles containing `http`, `api`, `server`, `webhook`, `upload`, `auth`, etc.), Wiggum automatically appends a `security-hardening` task as the final task in the resolved task list. This task has pre-populated `hints`, `test_hints`, `must_haves`, and `evaluation_criteria` covering all six OWASP baseline categories.
 
 Suppress with `[security] skip_hardening_task = true` in your plan, or by including your own task with the slug `security-hardening`. See [Security](./security.md) for details.
 
-## Evaluator prompt — `.vscode/evaluator.prompt.md`
+## Per-target artifacts
 
-Only generated when `[evaluator]` is configured in the plan. Defines a skeptical QA agent that re-runs preflight independently, scores each exit criterion, and updates `features.json` with verified results. Prevents false completions caused by the orchestrator trusting the subagent's self-report.
+Wiggum emits tool-specific agent prompts and configuration based on the active `[targets]` set. See [Targets](./targets.md) for how to select targets.
 
-## Planner prompt — `.vscode/planner.prompt.md`
+### VSCode target — `.vscode/*.prompt.md`
 
-An agent-mode prompt for the planning phase, generated alongside the orchestrator prompt.
-The planner subagent assists with breaking down new work items, estimating complexity,
-and suggesting task decompositions — without touching the implementation.
+| File | Role |
+|---|---|
+| `.vscode/orchestrator.prompt.md` | The agent-mode prompt that drives the implementation loop. It tells the orchestrator how to read progress, spawn subagents, verify their output independently, and update the tracker. Includes a sprint contract step, a codebase state handoff step, and a guard against premature completion. |
+| `.vscode/evaluator.prompt.md` | Only generated when `[evaluator]` is configured. Defines a skeptical QA agent that re-runs preflight independently, scores each exit criterion, and updates `features.json` with verified results. |
+| `.vscode/planner.prompt.md` | An agent-mode prompt for the planning phase. The planner subagent assists with breaking down new work items, estimating complexity, and suggesting task decompositions — without touching the implementation. |
+| `.vscode/background-auditor.prompt.md` | A continuously running QA companion that watches for regressions while the orchestrator advances through tasks. |
 
-## Background auditor prompt — `.vscode/background-auditor.prompt.md`
+These prompts use GitHub Copilot's `runSubagent` tool to dispatch subagents.
 
-A continuously running QA companion that watches for regressions while the orchestrator
-advances through tasks. Unlike the evaluator (which scores individual tasks), the auditor
-monitors cross-cutting concerns such as security rule drift, architectural boundary violations,
-and accumulating technical debt across completed tasks.
+### opencode target — `.opencode/agents/wiggum-*.md`
 
-## Claude hooks configuration — `.claude/settings.json`
+| File | Role |
+|---|---|
+| `.opencode/agents/wiggum-orchestrator.md` | Primary agent (`mode: primary`) that drives the loop. Dispatches the implementer via the `task` tool with the per-task context. |
+| `.opencode/agents/wiggum-implementer.md` | Subagent (`mode: subagent`) that executes a single task file. The orchestrator references the specific task file via `@path` at dispatch time. |
+| `.opencode/agents/wiggum-evaluator.md` | Subagent. Only generated when `[evaluator]` is configured. |
+| `.opencode/agents/wiggum-planner.md` | Subagent for the planning phase. |
+| `.opencode/agents/wiggum-auditor.md` | Subagent for continuous cross-task regression watching. |
+
+The agent frontmatter pins the model and declares permissions — for example, the orchestrator allows `task` only for `wiggum-implementer`, `wiggum-evaluator`, and `wiggum-auditor`, and denies `edit` so it can only update `PROGRESS.md` through the implementer.
+
+### Claude target — `.claude/settings.json`
 
 A Claude Code `settings.json` file pre-configured with a `PreCompact` hook that blocks
 context compression while any in-progress task marker (`[~]`) exists in `PROGRESS.md`.
 This prevents Claude from compacting away active working state mid-task, preserving the
 full task context until the task is marked complete.
-
-## Agents manifest — `AGENTS.md`
-
-Defines agent roles and capabilities. Can be skipped with `--skip-agents-md`.
 
 ## Parallel groups
 

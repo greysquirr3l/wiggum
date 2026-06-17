@@ -11,6 +11,7 @@ use crate::adapters::fs::FsAdapter;
 use crate::domain::dag::validate_dag;
 use crate::domain::lint;
 use crate::domain::plan::Plan;
+use crate::domain::targets::TargetSet;
 use crate::error::{Result, WiggumError};
 use crate::generation;
 use crate::ports::{PlanReader, ProgressStore};
@@ -616,6 +617,11 @@ fn core_tool_definitions() -> Vec<ToolDefinition> {
                         "type": "boolean",
                         "description": "Overwrite existing files",
                         "default": false
+                    },
+                    "target": {
+                        "type": "string",
+                        "enum": ["vscode", "opencode", "claude", "all"],
+                        "description": "Override target tool selection. Defaults to the plan's [targets] section, or 'vscode' if unset."
                     }
                 },
                 "required": ["plan_path"]
@@ -803,9 +809,19 @@ fn tool_generate_plan(args: &Value) -> Result<String> {
         .and_then(|v| v.as_str())
         .ok_or_else(|| WiggumError::Validation("plan_path is required".to_string()))?;
 
+    let target = args
+        .get("target")
+        .and_then(|v| v.as_str())
+        .unwrap_or("vscode");
+
     let fs = FsAdapter;
     let toml_content = fs.read_plan(&PathBuf::from(plan_path))?;
     let plan = Plan::from_toml(&toml_content)?;
+    let targets = if target.eq_ignore_ascii_case("all") {
+        TargetSet::all()
+    } else {
+        TargetSet::from_cli_str(target).map_err(|e| WiggumError::Validation(format!("target: {e}")))?
+    };
     let artifacts = generation::generate_all(&plan)?;
 
     let project_path = PathBuf::from(&plan.project.path);
@@ -817,12 +833,13 @@ fn tool_generate_plan(args: &Value) -> Result<String> {
         _ => "",
     };
 
-    generation::write_artifacts(&fs, &project_path, &artifacts)?;
+    generation::write_artifacts(&fs, &project_path, &artifacts, &targets)?;
 
     Ok(format!(
-        "Generated {} task files, PROGRESS.md, IMPLEMENTATION_PLAN.md, and orchestrator.prompt.md in {}{vcs_warning}",
+        "Generated {} task files, PROGRESS.md, IMPLEMENTATION_PLAN.md, and target-specific agents in {} (targets: {}{vcs_warning})",
         artifacts.tasks.len(),
-        plan.project.path
+        plan.project.path,
+        targets.iter().map(|t| t.to_string()).collect::<Vec<_>>().join(", ")
     ))
 }
 

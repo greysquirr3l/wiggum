@@ -36,8 +36,23 @@ wiggum generate plan.toml --dry-run --estimate-tokens
 wiggum generate plan.toml
 ```
 
-This produces the task files, `PROGRESS.md`, `IMPLEMENTATION_PLAN.md`, and `orchestrator.prompt.md` in your project directory.
+This produces the task files, `PROGRESS.md`, `IMPLEMENTATION_PLAN.md`, and the
+target-specific agent prompts in your project directory.
+
+By default, Wiggum emits VSCode + Copilot prompt files (`.vscode/*.prompt.md`).
+To target opencode instead, pass `--target opencode` or add `[targets] opencode = true` to your plan. Run `wiggum generate plan.toml --target all` to emit both:
+
+- `.vscode/orchestrator.prompt.md` (VSCode + Copilot)
+- `.opencode/agents/wiggum-orchestrator.md` (opencode)
+
+See [Targets](./targets.md) for the full reference.
 
 ## 6. Run the loop
 
-Open your AI coding tool, load the generated `orchestrator.prompt.md` as the agent prompt, and let it work through the tasks.
+Open your AI coding tool, load the generated orchestrator prompt as the agent
+prompt, and let it work through the tasks.
+
+- **VSCode + Copilot:** open the project, switch to agent mode, paste
+  `.vscode/orchestrator.prompt.md` as the user message.
+- **opencode:** open the project — the `wiggum-orchestrator` agent is
+  auto-discovered from `.opencode/agents/`. Select it from the agent picker.

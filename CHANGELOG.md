@@ -4,11 +4,39 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.13.0] - 2026-06-17
+
+### Added
+
+- **Native opencode support** — Wiggum can now generate opencode agent files. New `.opencode/agents/wiggum-orchestrator.md` (primary), `wiggum-implementer.md`, `wiggum-evaluator.md` (when `[evaluator]` is configured), `wiggum-planner.md`, and `wiggum-auditor.md`. The orchestrator uses opencode's `task` tool to dispatch the implementer subagent; the implementer body is shared across all dispatches and references the task file via `@path` at dispatch time.
+- **Per-target model resolution** — `[orchestrator].model`, `[orchestrator].subagent_model`, and `[evaluator].model` are now written into opencode agent frontmatter rather than into a per-dispatch `model:` argument (which opencode does not support).
+- **`[targets]` TOML section** — `vscode`, `opencode`, and `claude` boolean fields on the plan. Absent section defaults to `vscode = true` for back-compat. See [Targets](./docs/targets.md).
+- **`--target <vscode|opencode|claude|all>` CLI flag** on `wiggum generate`. Overrides the plan's `[targets]` section. `--target all` enables every target.
+- **Claude target** — Claude Code `.claude/settings.json` is now opt-in via `[targets] claude = true` or `--target claude`. The default target set (`vscode` only) does not emit Claude hooks.
+- **Per-target template overrides** — `.wiggum/templates/opencode/orchestrator.md` overrides the opencode variant. The legacy flat layout (`.wiggum/templates/orchestrator_opencode.md`) is still supported.
+- **`wiggum_generate_plan` MCP tool** — accepts an optional `target` argument (`vscode`, `opencode`, `claude`, or `all`) that flows through to the writer.
+- **New docs page** — `docs/targets.md` documents the target model, precedence, and per-target differences.
 
 ### Changed
 
-- Refreshed package and docs descriptions to describe Wiggum as an agentic implementation scaffold for dependency-aware AI coding workflows (replacing Ralph Wiggum loop phrasing in top-level metadata and primary docs).
+- `wiggum::generation::GeneratedArtifacts` struct fields renamed:
+  - `orchestrator` → `orchestrator_vscode`
+  - `evaluator_prompt` → `evaluator_vscode`
+  - `planner_prompt` → `planner_vscode`
+  - `background_auditor_prompt` → `background_auditor_vscode`
+  - New siblings: `orchestrator_opencode`, `implementer`, `evaluator_opencode`, `planner_opencode`, `background_auditor_opencode`
+  - `wiggum::generation::write_artifacts` now takes a `&TargetSet` as its fourth argument.
+  - `wiggum::generation::tokens::estimate_all` and `format_report` now take a `&TargetSet` and only include active targets.
+- `wiggum generate` output is grouped per-target. The "Next steps" block is tailored to the active targets (VSCode, opencode, Claude).
+- `wiggum::domain::targets` — new module. `Target` enum and `TargetSet` bit-set.
+
+### Migration
+
+- Plans without a `[targets]` section continue to emit only the VSCode target. No change required.
+- To enable opencode: add `[targets] opencode = true` to the plan TOML, or pass `--target opencode` (or `--target all`) on the CLI.
+- Library consumers of `GeneratedArtifacts` must update field names: `orchestrator` → `orchestrator_vscode` (and friends). `write_artifacts`/`generate_all` callers must pass a `&TargetSet`.
+
+## [0.12.0] - 2026-05-28
 
 ## [0.12.0] - 2026-05-28
 
