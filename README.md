@@ -250,6 +250,30 @@ avoid_god_files = true
 # avoid_god_files = false
 ```
 
+## Development
+
+### Git hooks
+
+Install the pre-commit hook to automatically format code and run security audits:
+
+```bash
+./scripts/install-hooks.sh
+```
+
+The hook will:
+- Run `cargo fmt --all` and auto-stage formatting changes
+- Run `cargo audit` to check for security vulnerabilities
+
+To bypass the hook (not recommended), use `git commit --no-verify`.
+
+### Prerequisites
+
+Install `cargo-audit` for security vulnerability scanning:
+
+```bash
+cargo install cargo-audit
+```
+
 ## Documentation
 
 Full docs: [greysquirr3l.github.io/wiggum](https://greysquirr3l.github.io/wiggum)
