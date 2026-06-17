@@ -263,7 +263,10 @@ goal = "Set up the project."
         let plan = opencode_plan();
         let resolved = plan.resolve_tasks().unwrap();
         let rendered = render_opencode(&plan, &resolved).unwrap();
-        assert!(rendered.starts_with("---"), "must start with YAML frontmatter");
+        assert!(
+            rendered.starts_with("---"),
+            "must start with YAML frontmatter"
+        );
         assert!(rendered.contains("mode: primary"));
         assert!(rendered.contains("description:"));
         assert!(rendered.contains("anthropic/claude-sonnet-4-20250514"));
@@ -274,9 +277,15 @@ goal = "Set up the project."
         let plan = opencode_plan();
         let resolved = plan.resolve_tasks().unwrap();
         let rendered = render_opencode(&plan, &resolved).unwrap();
-        assert!(rendered.contains("`task` tool"), "must reference the `task` tool");
+        assert!(
+            rendered.contains("`task` tool"),
+            "must reference the `task` tool"
+        );
         assert!(rendered.contains("subagent_type: \"wiggum-implementer\""));
-        assert!(!rendered.contains("runSubagent"), "must NOT use VSCode runSubagent");
+        assert!(
+            !rendered.contains("runSubagent"),
+            "must NOT use VSCode runSubagent"
+        );
     }
 
     #[test]
@@ -287,7 +296,10 @@ goal = "Set up the project."
         let rendered = render_opencode(&plan, &resolved).unwrap();
         // The orchestrator's own model goes in its frontmatter; the subagent
         // model is only mentioned in the implementer frontmatter.
-        assert!(!rendered.contains("pass `model:"), "opencode has no per-dispatch model arg");
+        assert!(
+            !rendered.contains("pass `model:"),
+            "opencode has no per-dispatch model arg"
+        );
     }
 
     #[test]
@@ -310,8 +322,7 @@ goal = "Set up the project."
         assert!(rendered.contains("Security (non-negotiable)"));
         // Strategy block is one of the four variants.
         assert!(
-            rendered.contains("Strategy: ")
-                || rendered.contains("## Your job"),
+            rendered.contains("Strategy: ") || rendered.contains("## Your job"),
             "must include strategy body or default job block"
         );
     }

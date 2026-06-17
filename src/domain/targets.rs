@@ -70,7 +70,7 @@ impl FromStr for Target {
 ///
 /// `TargetSet` is a bit-set style wrapper. Construct one via [`TargetSet::default`]
 /// (yields `vscode` for back-compat), [`TargetSet::from_iter`], or
-/// [`TargetSet::resolve`] which applies the CLI/plan/default precedence.
+/// [`crate::domain::plan::TargetConfig::resolve`] which applies the CLI/plan/default precedence.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub struct TargetSet {
     pub vscode: bool,

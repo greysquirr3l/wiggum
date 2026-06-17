@@ -145,18 +145,26 @@ fn write_artifacts_opencode_target_writes_opencode_agents() {
     assert!(project_path.join("PROGRESS.md").exists());
     assert!(project_path.join("AGENTS.md").exists());
     assert!(!project_path.join(".vscode").exists());
-    assert!(project_path
-        .join(".opencode/agents/wiggum-orchestrator.md")
-        .exists());
-    assert!(project_path
-        .join(".opencode/agents/wiggum-implementer.md")
-        .exists());
-    assert!(project_path
-        .join(".opencode/agents/wiggum-planner.md")
-        .exists());
-    assert!(project_path
-        .join(".opencode/agents/wiggum-auditor.md")
-        .exists());
+    assert!(
+        project_path
+            .join(".opencode/agents/wiggum-orchestrator.md")
+            .exists()
+    );
+    assert!(
+        project_path
+            .join(".opencode/agents/wiggum-implementer.md")
+            .exists()
+    );
+    assert!(
+        project_path
+            .join(".opencode/agents/wiggum-planner.md")
+            .exists()
+    );
+    assert!(
+        project_path
+            .join(".opencode/agents/wiggum-auditor.md")
+            .exists()
+    );
 }
 
 #[test]
@@ -194,9 +202,11 @@ fn write_artifacts_all_targets_writes_everything() {
         .expect("Failed to write artifacts");
 
     assert!(project_path.join(".vscode/orchestrator.prompt.md").exists());
-    assert!(project_path
-        .join(".opencode/agents/wiggum-orchestrator.md")
-        .exists());
+    assert!(
+        project_path
+            .join(".opencode/agents/wiggum-orchestrator.md")
+            .exists()
+    );
     assert!(project_path.join(".claude/settings.json").exists());
 }
 
@@ -381,8 +391,7 @@ fn generate_all_includes_new_3_0_artifacts() {
         "hooks.json should contain Claude hook structure"
     );
     assert!(
-        artifacts.planner_vscode.contains("planner")
-            || artifacts.planner_vscode.contains("plan"),
+        artifacts.planner_vscode.contains("planner") || artifacts.planner_vscode.contains("plan"),
         "planner prompt should reference planning"
     );
 }

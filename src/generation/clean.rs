@@ -294,16 +294,8 @@ depends_on = ["setup"]
         let root = tmp.path();
 
         fs::create_dir_all(root.join(".opencode/agents")).unwrap();
-        fs::write(
-            root.join(".opencode/agents/wiggum-orchestrator.md"),
-            "orch",
-        )
-        .unwrap();
-        fs::write(
-            root.join(".opencode/agents/wiggum-implementer.md"),
-            "impl",
-        )
-        .unwrap();
+        fs::write(root.join(".opencode/agents/wiggum-orchestrator.md"), "orch").unwrap();
+        fs::write(root.join(".opencode/agents/wiggum-implementer.md"), "impl").unwrap();
 
         let plan = sample_plan(&root.to_string_lossy());
         let targets = collect_targets(&plan, root).unwrap();
@@ -326,23 +318,19 @@ depends_on = ["setup"]
         let root = tmp.path();
 
         fs::create_dir_all(root.join(".opencode/agents")).unwrap();
-        fs::write(
-            root.join(".opencode/agents/wiggum-orchestrator.md"),
-            "orch",
-        )
-        .unwrap();
-        fs::write(
-            root.join(".opencode/agents/wiggum-implementer.md"),
-            "impl",
-        )
-        .unwrap();
+        fs::write(root.join(".opencode/agents/wiggum-orchestrator.md"), "orch").unwrap();
+        fs::write(root.join(".opencode/agents/wiggum-implementer.md"), "impl").unwrap();
         fs::write(root.join(".opencode/agents/wiggum-planner.md"), "planner").unwrap();
         fs::write(root.join(".opencode/agents/wiggum-auditor.md"), "auditor").unwrap();
 
         let plan = sample_plan(&root.to_string_lossy());
         remove_artifacts(&plan, root).unwrap();
 
-        assert!(!root.join(".opencode/agents/wiggum-orchestrator.md").exists());
+        assert!(
+            !root
+                .join(".opencode/agents/wiggum-orchestrator.md")
+                .exists()
+        );
         assert!(!root.join(".opencode/agents/wiggum-implementer.md").exists());
         assert!(!root.join(".opencode/agents/wiggum-planner.md").exists());
         assert!(!root.join(".opencode/agents/wiggum-auditor.md").exists());

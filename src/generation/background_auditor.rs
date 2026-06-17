@@ -109,7 +109,10 @@ goal = "Set up the project."
     fn render_opencode_contains_subagent_frontmatter() {
         let plan = crate::domain::plan::Plan::from_toml(MINIMAL_PLAN).unwrap();
         let output = render_opencode(&plan).unwrap();
-        assert!(output.starts_with("---"), "must start with YAML frontmatter");
+        assert!(
+            output.starts_with("---"),
+            "must start with YAML frontmatter"
+        );
         assert!(output.contains("mode: subagent"));
         assert!(output.contains("Wiring"));
     }

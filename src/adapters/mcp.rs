@@ -820,7 +820,8 @@ fn tool_generate_plan(args: &Value) -> Result<String> {
     let targets = if target.eq_ignore_ascii_case("all") {
         TargetSet::all()
     } else {
-        TargetSet::from_cli_str(target).map_err(|e| WiggumError::Validation(format!("target: {e}")))?
+        TargetSet::from_cli_str(target)
+            .map_err(|e| WiggumError::Validation(format!("target: {e}")))?
     };
     let artifacts = generation::generate_all(&plan)?;
 
@@ -839,7 +840,11 @@ fn tool_generate_plan(args: &Value) -> Result<String> {
         "Generated {} task files, PROGRESS.md, IMPLEMENTATION_PLAN.md, and target-specific agents in {} (targets: {}{vcs_warning})",
         artifacts.tasks.len(),
         plan.project.path,
-        targets.iter().map(|t| t.to_string()).collect::<Vec<_>>().join(", ")
+        targets
+            .iter()
+            .map(|t| t.to_string())
+            .collect::<Vec<_>>()
+            .join(", ")
     ))
 }
 

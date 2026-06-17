@@ -24,7 +24,10 @@ static TEMPLATES: LazyLock<Tera> = LazyLock::new(|| {
         ("implementer.md", IMPLEMENTER_TEMPLATE),
         ("evaluator_opencode.md", EVALUATOR_OPENCODE_TEMPLATE),
         ("planner_opencode.md", PLANNER_OPENCODE_TEMPLATE),
-        ("background_auditor_opencode.md", BACKGROUND_AUDITOR_OPENCODE_TEMPLATE),
+        (
+            "background_auditor_opencode.md",
+            BACKGROUND_AUDITOR_OPENCODE_TEMPLATE,
+        ),
     ];
 
     for (name, content) in templates {

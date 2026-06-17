@@ -253,7 +253,10 @@ mod tests {
         let plan = make_plan(true);
         let tasks = make_tasks();
         let output = render_opencode(&plan, &tasks)?.ok_or("expected Some")?;
-        assert!(output.starts_with("---"), "must start with YAML frontmatter");
+        assert!(
+            output.starts_with("---"),
+            "must start with YAML frontmatter"
+        );
         assert!(output.contains("mode: subagent"));
         assert!(output.contains("permission:"));
         assert!(output.contains("edit: deny"));

@@ -160,7 +160,8 @@ fn cmd_generate(
     let targets = resolve_targets(&plan, opts.target_override.as_deref())?;
     if targets.is_empty() {
         return Err(WiggumError::Validation(
-            "no target selected — at least one of vscode/opencode/claude must be enabled".to_string(),
+            "no target selected — at least one of vscode/opencode/claude must be enabled"
+                .to_string(),
         ));
     }
 
@@ -211,7 +212,10 @@ fn cmd_generate(
 
     if opts.estimate_tokens {
         println!();
-        println!("{}", generation::tokens::format_report(&artifacts, &targets));
+        println!(
+            "{}",
+            generation::tokens::format_report(&artifacts, &targets)
+        );
         println!();
     }
 
@@ -291,7 +295,9 @@ fn print_success(
         );
     }
     if targets.contains(Target::Opencode) {
-        println!("  2. In opencode: open the folder — the wiggum-orchestrator agent is auto-discovered");
+        println!(
+            "  2. In opencode: open the folder — the wiggum-orchestrator agent is auto-discovered"
+        );
         println!("     Run `wiggum watch` in a separate terminal to monitor progress.");
     }
     if targets.contains(Target::Claude) {
@@ -406,7 +412,10 @@ fn print_dry_run(
 }
 
 /// Sum sizes and count files for the active targets only.
-fn artifact_totals(artifacts: &generation::GeneratedArtifacts, targets: TargetSet) -> (usize, usize) {
+fn artifact_totals(
+    artifacts: &generation::GeneratedArtifacts,
+    targets: TargetSet,
+) -> (usize, usize) {
     use wiggum::domain::targets::Target;
 
     let mut size = artifacts.progress.len()
