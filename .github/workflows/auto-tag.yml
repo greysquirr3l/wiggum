@@ -6,18 +6,26 @@ on:
     types: [completed]
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   tag:
     name: Push version tag if missing
     if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
-      - uses: actions/checkout@v5
+      # Check out main rather than the workflow_run head_sha: a workflow_run
+      # event is triggered by another workflow and its head_sha can be set by
+      # an attacker who controls a previous run. Since we already gate on
+      # head_branch == 'main', main's HEAD is the same merge commit and the
+      # tag/commit we operate on.
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: main
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Gate on release commit
         id: gate
