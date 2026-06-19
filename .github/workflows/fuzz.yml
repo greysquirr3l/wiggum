@@ -1,0 +1,53 @@
+name: Fuzz
+
+on:
+  schedule:
+    - cron: "0 3 * * 0" # weekly on Sunday at 03:00 UTC
+  workflow_dispatch:
+    inputs:
+      fuzz-seconds:
+        description: "Per-target fuzzing duration in seconds"
+        required: false
+        default: "600"
+
+permissions:
+  contents: read
+
+jobs:
+  fuzz:
+    name: Fuzz (${{ matrix.sanitizer }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        sanitizer: [address]
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+
+      - name: Build fuzzers
+        uses: google/clusterfuzzlite/actions/build_fuzzers@884713a6c30a92e5e8544c39945cd7cb630abcd1 # v1
+        with:
+          language: rust
+          sanitizer: ${{ matrix.sanitizer }}
+
+      - name: Run fuzzers
+        uses: google/clusterfuzzlite/actions/run_fuzzers@884713a6c30a92e5e8544c39945cd7cb630abcd1 # v1
+        with:
+          language: rust
+          sanitizer: ${{ matrix.sanitizer }}
+          mode: batch
+          parallel-fuzzing: true
+          fuzz-seconds: ${{ github.event.inputs.fuzz-seconds || '600' }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload crash artifacts
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: fuzz-crashes-${{ matrix.sanitizer }}
+          path: |
+            **/crash-*
+            **/oom-*
+            **/timeout-*
+          if-no-files-found: ignore
