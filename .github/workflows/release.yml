@@ -1,12 +1,10 @@
 name: Release
 
 on:
-  # Triggered by auto-tag.yml pushing a version tag via GITHUB_TOKEN.
-  # A GITHUB_TOKEN push cannot trigger on: push: tags, so we chain via
-  # workflow_run instead to avoid the GitHub Actions re-trigger restriction.
-  workflow_run:
-    workflows: ["Auto-tag on release merge"]
-    types: [completed]
+  # Triggered by auto-tag.yml via `gh workflow run` after it pushes the v*
+  # tag, and by manual tag pushes / workflow_dispatch. A GITHUB_TOKEN tag
+  # push does not retrigger workflows, so auto-tag dispatches this workflow
+  # explicitly.
   push:
     tags:
       - "v*"
@@ -29,10 +27,6 @@ jobs:
   resolve-tag:
     name: Resolve release tag
     runs-on: ubuntu-latest
-    # Skip if this is a workflow_run that didn't succeed
-    if: >-
-      github.event_name != 'workflow_run' ||
-      github.event.workflow_run.conclusion == 'success'
     outputs:
       tag: ${{ steps.tag.outputs.tag }}
       version: ${{ steps.tag.outputs.version }}
