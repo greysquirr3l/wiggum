@@ -36,7 +36,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - To enable opencode: add `[targets] opencode = true` to the plan TOML, or pass `--target opencode` (or `--target all`) on the CLI.
 - Library consumers of `GeneratedArtifacts` must update field names: `orchestrator` → `orchestrator_vscode` (and friends). `write_artifacts`/`generate_all` callers must pass a `&TargetSet`.
 
-## [0.12.0] - 2026-05-28
+## [0.14.0] - 2026-06-19
+
+### Added
+
+- **ClusterFuzzLite fuzzing** — weekly scheduled workflow builds and runs the `wiggum-fuzz` harness against the TOML plan parser and the Tera template renderers under the address sanitizer; crash/oom/timeout artefacts upload as workflow artefacts on failure.
+- **Local fuzzing entry point** — `fuzz/README.md` documents prerequisites (`cargo install cargo-fuzz`), the two targets, common commands, and the crash-repro flow. A `rust-toolchain.toml` in `fuzz/` pins nightly so `cargo fuzz` works regardless of the developer's default toolchain.
+- **Pre-commit hook** — runs `cargo fmt --all`, `gitleaks protect` (secrets detection), and `cargo audit` before every commit. Formatting fixes are auto-staged. Installed via `scripts/install-hooks.sh`.
+- **Pre-push and commit-msg hooks** — pre-push runs the full `cargo test` suite; commit-msg enforces the conventional-commits format and the 72-char subject guideline.
+
+### Fixed
+
+- **Session guardrail test flake** — `session_guardrail_flags_read_volume_anomaly` and `session_guardrail_flags_read_to_write_anomaly` now serialize on a test-local mutex so they no longer race the shared `SESSION_GUARDRAIL_STATE` counter under `cargo test`'s default threaded runner.
+- **Release workflow no-op on non-release pushes** — the `Release` workflow exits 0 (with empty outputs) when triggered by auto-tag without a `v*` tag, instead of failing the run red on every non-release push. Downstream release jobs are gated with `if: needs.resolve-tag.outputs.tag != ''`.
+- **Code-scanning alerts and workflow supply chain** — addressed alerts and pinned third-party Actions to branch-reachable SHAs across the CI workflows.
+- **OSSF Scorecard pin** — `ossf/scorecard-action` is now referenced at a commit SHA, not a mutable tag.
+- **Annotated-tag dereference** — release tooling now dereferences annotated tags to the underlying commit SHA so auto-tagging is stable.
+
+### Changed
+
+- **Documentation refresh** — post-0.13.0 doc pass.
 
 ## [0.12.0] - 2026-05-28
 
