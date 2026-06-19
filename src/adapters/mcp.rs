@@ -1265,8 +1265,13 @@ mod tests {
         assert!(count >= 1);
     }
 
+    static SESSION_GUARDRAIL_TEST_LOCK: LazyLock<Mutex<()>> = LazyLock::new(Mutex::default);
+
     #[test]
     fn session_guardrail_flags_read_to_write_anomaly() {
+        let _guard = SESSION_GUARDRAIL_TEST_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         reset_session_guardrail_state();
 
         for _ in 0..READ_TO_WRITE_ALERT_THRESHOLD {
@@ -1286,6 +1291,9 @@ mod tests {
 
     #[test]
     fn session_guardrail_flags_read_volume_anomaly() {
+        let _guard = SESSION_GUARDRAIL_TEST_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         reset_session_guardrail_state();
 
         let mut alert = None;
