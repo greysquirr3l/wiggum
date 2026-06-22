@@ -19,14 +19,20 @@ env:
   CARGO_TERM_COLOR: always
   RUST_VERSION: "1.95.0"
 
-# Top-level permissions - individual jobs may override
-permissions:
-  contents: read
+# Default-deny; jobs expand as needed.
+permissions: {}
+
+# Don't run two releases for the same tag in parallel.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   resolve-tag:
     name: Resolve release tag
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     outputs:
       tag: ${{ steps.tag.outputs.tag }}
       version: ${{ steps.tag.outputs.version }}
@@ -60,13 +66,15 @@ jobs:
           fi
 
           VERSION="${TAG#v}"
-          echo "tag=$TAG"     >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG"        >> "$GITHUB_OUTPUT"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Resolved: tag=$TAG version=$VERSION"
 
   verify-ci:
     name: Verify CI is green
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     if: needs.resolve-tag.outputs.tag != ''
     needs: [resolve-tag]
     steps:
@@ -146,40 +154,31 @@ jobs:
     runs-on: ${{ matrix.os }}
     if: needs.resolve-tag.outputs.tag != ''
     needs: [resolve-tag]
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           ref: ${{ needs.resolve-tag.outputs.tag }}
           persist-credentials: false
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # v1
+      - uses: ./.github/actions/rust-setup
         with:
           toolchain: ${{ env.RUST_VERSION }}
           targets: ${{ matrix.target }}
+          cache-prefix: cargo-release-${{ matrix.target }}
 
       - name: Install cross-compilation tool
         if: matrix.use_cross
-        run: cargo install cross --git https://github.com/cross-rs/cross
-
-      - name: Cache cargo registry
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-release-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-release-${{ matrix.target }}-
+        run: cargo install cross --git https://github.com/cross-rs/cross --locked
 
       - name: Build release binary (native)
         if: matrix.use_cross == false
-        run: cargo build --release --bin wiggum --target ${{ matrix.target }}
+        run: cargo build --release --bin wiggum --target ${{ matrix.target }} --locked
 
       - name: Build release binary (cross)
         if: matrix.use_cross
-        run: cross build --release --bin wiggum --target ${{ matrix.target }}
+        run: cross build --release --bin wiggum --target ${{ matrix.target }} --locked
 
       - name: Strip binary (Unix)
         if: runner.os != 'Windows' && matrix.use_cross == false
@@ -200,40 +199,31 @@ jobs:
           cd ../../..
 
       - name: Upload artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7 (Node 24)
         with:
           name: ${{ matrix.name }}
           path: |
             ${{ matrix.name }}.tar.gz
             ${{ matrix.name }}.zip
-          if-no-files-found: ignore
+          if-no-files-found: error
 
   publish-crate:
     name: Publish to crates.io
     runs-on: ubuntu-latest
     if: needs.resolve-tag.outputs.tag != ''
     needs: [resolve-tag, verify-ci]
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           ref: ${{ needs.resolve-tag.outputs.tag }}
           persist-credentials: false
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # v1
+      - uses: ./.github/actions/rust-setup
         with:
           toolchain: ${{ env.RUST_VERSION }}
-
-      - name: Cache cargo registry
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-publish-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-publish-
+          cache-prefix: cargo-publish
 
       - name: Verify version matches tag
         env:
@@ -246,22 +236,29 @@ jobs:
           fi
 
       - name: Publish to crates.io
-        run: |
-          WIGGUM_VERSION=$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "wiggum") | .version')
-          if cargo search wiggum --limit 1 2>/dev/null | grep -q "^wiggum = \"$WIGGUM_VERSION\""; then
-            echo "wiggum@$WIGGUM_VERSION already published, skipping"
-          else
-            cargo publish 2>&1 || {
-              # Tolerate "already exists" from index lag; fail on real errors
-              if cargo search wiggum --limit 1 2>/dev/null | grep -q "^wiggum = \"$WIGGUM_VERSION\""; then
-                echo "wiggum@$WIGGUM_VERSION confirmed published (index caught up)"
-              else
-                exit 1
-              fi
-            }
-          fi
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+          RELEASE_VERSION: ${{ needs.resolve-tag.outputs.version }}
+        run: |
+          set -o pipefail
+          log=$(mktemp)
+          trap 'rm -f "$log"' EXIT
+
+          # Race-tolerant publish: a parallel/concurrent publish or a stale
+          # crates.io index can cause "already exists" between pre-checks and
+          # the actual upload. Treat that single error as a success.
+          if cargo publish --locked --token "${CARGO_REGISTRY_TOKEN}" 2>&1 | tee "$log"; then
+            echo "wiggum@${RELEASE_VERSION} published successfully"
+            exit 0
+          fi
+
+          if grep -qE "already exists on crates.io" "$log"; then
+            echo "wiggum@${RELEASE_VERSION} already published (treating as success)"
+            exit 0
+          fi
+
+          echo "::error::cargo publish failed for wiggum@${RELEASE_VERSION}"
+          exit 1
 
   github-release:
     name: Create GitHub Release
@@ -277,7 +274,7 @@ jobs:
           persist-credentials: false
 
       - name: Download all artifacts
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8 (Node 24)
         with:
           path: artifacts
 
@@ -297,7 +294,7 @@ jobs:
           echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3
+        uses: softprops/action-gh-release@2bb465e97f322d3cb2a965294d483e0d26a67aa9 # v3 (Node 24)
         with:
           body: ${{ steps.changelog.outputs.notes }}
           files: artifacts/**/*

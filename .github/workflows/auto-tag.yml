@@ -5,8 +5,8 @@ on:
     workflows: ["CI"]
     types: [completed]
 
-permissions:
-  contents: read
+# Default-deny; tag job expands to contents:write and actions:write.
+permissions: {}
 
 jobs:
   tag:
@@ -22,7 +22,7 @@ jobs:
       # an attacker who controls a previous run. Since we already gate on
       # head_branch == 'main', main's HEAD is the same merge commit and the
       # tag/commit we operate on.
-      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5 (Node 24)
         with:
           ref: main
           fetch-depth: 0

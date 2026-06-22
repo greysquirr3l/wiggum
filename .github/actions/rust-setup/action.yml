@@ -1,0 +1,50 @@
+name: Rust setup
+description: Checkout, install Rust toolchain, and restore the shared cargo cache. Unifies cache keys across jobs to maximize cache reuse.
+
+inputs:
+  toolchain:
+    description: Rust toolchain version (e.g. 1.95.0, stable, nightly-YYYY-MM-DD).
+    required: true
+  components:
+    description: Space-separated rustup components to install (e.g. "clippy rustfmt").
+    required: false
+    default: ""
+  targets:
+    description: Comma-separated target triples to add via rustup.
+    required: false
+    default: ""
+  cache-prefix:
+    description: Cache namespace. Jobs sharing the same prefix share a cache; different prefixes isolate.
+    required: false
+    default: "cargo"
+  fetch-depth:
+    description: Git fetch depth for checkout. Use "0" to fetch all branches and tags.
+    required: false
+    default: "0"
+
+runs:
+  using: composite
+  steps:
+    - name: Checkout repository
+      uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      with:
+        fetch-depth: ${{ inputs.fetch-depth }}
+        persist-credentials: false
+
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # v1
+      with:
+        toolchain: ${{ inputs.toolchain }}
+        components: ${{ inputs.components }}
+        targets: ${{ inputs.targets }}
+
+    - name: Restore cargo cache
+      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-${{ inputs.cache-prefix }}-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-${{ inputs.cache-prefix }}-

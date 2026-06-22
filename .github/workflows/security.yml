@@ -16,8 +16,12 @@ on:
     - cron: "0 0 * * *"
   workflow_dispatch:
 
-permissions:
-  contents: read
+# Default-deny.
+permissions: {}
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   RUST_VERSION: "1.95.0"
@@ -26,33 +30,27 @@ jobs:
   cargo-audit:
     name: Audit dependencies for security vulnerabilities
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # v1
+      - uses: ./.github/actions/rust-setup
         with:
           toolchain: ${{ env.RUST_VERSION }}
-
       - name: Install cargo-audit
         run: cargo install cargo-audit --locked
-
       - name: Run cargo audit
         run: cargo audit
 
   cargo-deny:
     name: Check licenses and bans
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # v1
+      - uses: ./.github/actions/rust-setup
         with:
           toolchain: ${{ env.RUST_VERSION }}
-
       - name: Install cargo-deny
         run: cargo install cargo-deny --locked
-
       - name: Run cargo deny
         run: cargo deny check
