@@ -8,6 +8,7 @@ use serde_json::Value;
 use tracing::warn;
 
 use crate::adapters::fs::FsAdapter;
+use crate::adapters::mcp::protocol::{CacheHint, McpVersion, ResponseContext, negotiate};
 use crate::domain::dag::validate_dag;
 use crate::domain::lint;
 use crate::domain::plan::Plan;
@@ -15,6 +16,8 @@ use crate::domain::targets::TargetSet;
 use crate::error::{Result, WiggumError};
 use crate::generation;
 use crate::ports::{PlanReader, ProgressStore};
+
+pub mod protocol;
 
 // ─── JSON-RPC types ──────────────────────────────────────────────────
 
@@ -324,7 +327,12 @@ fn security_event(tool_name: &str, event: &str, detail: &str) {
     );
 }
 
-fn tool_result_response(id: Value, text: String, is_error: Option<bool>) -> JsonRpcResponse {
+fn tool_result_response(
+    id: Value,
+    text: String,
+    is_error: Option<bool>,
+    ctx: ResponseContext,
+) -> JsonRpcResponse {
     let tool_result = ToolResult {
         content: vec![ContentBlock {
             content_type: "text".to_string(),
@@ -334,7 +342,7 @@ fn tool_result_response(id: Value, text: String, is_error: Option<bool>) -> Json
     };
 
     match serde_json::to_value(tool_result) {
-        Ok(val) => success_response(id, val),
+        Ok(val) => success_response(id, val, ctx),
         Err(e) => error_response(id, -32603, &format!("Internal error: {e}")),
     }
 }
@@ -363,6 +371,7 @@ fn maybe_block_input_guardrail(
     id: Value,
     tool_name: &str,
     arguments: &Value,
+    ctx: ResponseContext,
 ) -> Option<JsonRpcResponse> {
     let pattern = detect_input_guardrail_hit(arguments)?;
     if !is_mutating_tool(tool_name) {
@@ -381,10 +390,15 @@ fn maybe_block_input_guardrail(
             "Error: blocked by MCP input guardrail (suspicious instruction pattern: {pattern})"
         ),
         Some(true),
+        ctx,
     ))
 }
 
-fn maybe_block_session_guardrail(id: Value, tool_name: &str) -> Option<JsonRpcResponse> {
+fn maybe_block_session_guardrail(
+    id: Value,
+    tool_name: &str,
+    ctx: ResponseContext,
+) -> Option<JsonRpcResponse> {
     let detail = evaluate_session_guardrail(tool_name)?;
     let strict_mode = strict_guardrail_mode_enabled();
     let event = if strict_mode {
@@ -399,13 +413,19 @@ fn maybe_block_session_guardrail(id: Value, tool_name: &str) -> Option<JsonRpcRe
             id,
             format!("Error: blocked by MCP session guardrail (detail: {detail})"),
             Some(true),
+            ctx,
         ))
     } else {
         None
     }
 }
 
-fn normalize_success_output(id: Value, tool_name: &str, text: &str) -> JsonRpcResponse {
+fn normalize_success_output(
+    id: Value,
+    tool_name: &str,
+    text: &str,
+    ctx: ResponseContext,
+) -> JsonRpcResponse {
     let (redacted_text, redaction_count) = redact_output_content(text);
     if redaction_count > 0 {
         security_event(
@@ -425,13 +445,19 @@ fn normalize_success_output(id: Value, tool_name: &str, text: &str) -> JsonRpcRe
             id,
             format!("Error: blocked by MCP output guardrail (sensitive marker: {pattern})"),
             Some(true),
+            ctx,
         )
     } else {
-        tool_result_response(id, redacted_text, None)
+        tool_result_response(id, redacted_text, None, ctx)
     }
 }
 
-fn normalize_error_output(id: Value, tool_name: &str, error_text: &str) -> JsonRpcResponse {
+fn normalize_error_output(
+    id: Value,
+    tool_name: &str,
+    error_text: &str,
+    ctx: ResponseContext,
+) -> JsonRpcResponse {
     let (redacted_text, redaction_count) = redact_output_content(error_text);
     if redaction_count > 0 {
         security_event(
@@ -452,9 +478,10 @@ fn normalize_error_output(id: Value, tool_name: &str, error_text: &str) -> JsonR
             "Error: blocked by MCP output guardrail (error message contained sensitive marker)"
                 .to_string(),
             Some(true),
+            ctx,
         )
     } else {
-        tool_result_response(id, redacted_text, Some(true))
+        tool_result_response(id, redacted_text, Some(true), ctx)
     }
 }
 
@@ -521,34 +548,82 @@ fn write_response(stdout: &mut io::Stdout, response: &JsonRpcResponse) -> Result
 
 fn handle_request(request: &JsonRpcRequest) -> JsonRpcResponse {
     let id = request.id.clone().unwrap_or(Value::Null);
+    let method = request.method.as_str();
 
-    match request.method.as_str() {
-        "initialize" => {
-            match serde_json::to_value(InitializeResult {
-                protocol_version: "2025-11-25".to_string(),
-                capabilities: Capabilities {
-                    tools: ToolsCapability {
-                        list_changed: false,
-                    },
-                },
-                server_info: ServerInfo {
-                    name: "wiggum".to_string(),
-                    version: env!("CARGO_PKG_VERSION").to_string(),
-                },
-            }) {
-                Ok(val) => success_response(id, val),
-                Err(e) => error_response(id, -32603, &format!("Internal error: {e}")),
-            }
-        }
+    // `initialize` is the legacy handshake — always respond with the
+    // 2025-11-25 shape regardless of any `_meta` version the caller sent.
+    // Draft clients should use `server/discover` instead.
+    if method == "initialize" {
+        return handle_initialize(id);
+    }
+
+    let ctx = ResponseContext::new(negotiate(method, &request.params));
+
+    match method {
+        "server/discover" => handle_server_discover(id),
         "notifications/initialized" | "notifications/cancelled" => {
             // Notifications must not be responded to; caller skips write when id is None
-            success_response(id, Value::Null)
+            success_response(id, Value::Null, ctx)
         }
-        "ping" => success_response(id, serde_json::json!({})),
-        "tools/list" => handle_tools_list(id),
-        "tools/call" => handle_tool_call(id, &request.params),
-        _ => error_response(id, -32601, &format!("Unknown method: {}", request.method)),
+        "ping" => success_response(id, serde_json::json!({}), ctx),
+        "tools/list" => handle_tools_list(id, ctx),
+        "tools/call" => handle_tool_call(id, &request.params, ctx),
+        "logging/setLevel" => {
+            // Removed in the draft; accepted and ignored for back-compat with
+            // 2025-11-25 clients that still send it.
+            success_response(id, serde_json::json!({}), ctx)
+        }
+        "notifications/roots/list_changed" => {
+            // Removed in the draft; notifications don't elicit responses.
+            success_response(id, Value::Null, ctx)
+        }
+        _ => error_response(id, -32601, &format!("Unknown method: {method}")),
     }
+}
+
+fn handle_initialize(id: Value) -> JsonRpcResponse {
+    let ctx = ResponseContext::new(McpVersion::V2025_11_25);
+    let result = InitializeResult {
+        protocol_version: McpVersion::V2025_11_25.as_str().to_string(),
+        capabilities: Capabilities {
+            tools: ToolsCapability {
+                list_changed: false,
+            },
+        },
+        server_info: ServerInfo {
+            name: "wiggum".to_string(),
+            version: env!("CARGO_PKG_VERSION").to_string(),
+        },
+    };
+    match serde_json::to_value(result) {
+        Ok(val) => success_response(id, val, ctx),
+        Err(e) => error_response(id, -32603, &format!("Internal error: {e}")),
+    }
+}
+
+fn handle_server_discover(id: Value) -> JsonRpcResponse {
+    // Always emit the discovery result in the draft shape regardless of the
+    // caller's `_meta`. The discover response is the handshake replacement,
+    // so it must use the new schema even when the caller has not yet declared
+    // a version.
+    let ctx = ResponseContext::new(McpVersion::V2026_07Draft);
+    let supported: Vec<&'static str> = McpVersion::supported().iter().map(|v| v.as_str()).collect();
+    let default_version = McpVersion::V2026_07Draft.as_str();
+    let capabilities = serde_json::json!({
+        "tools": { "listChanged": false },
+        "extensions": {},
+    });
+    let server_info = serde_json::json!({
+        "name": "wiggum",
+        "version": env!("CARGO_PKG_VERSION"),
+    });
+    let payload = serde_json::json!({
+        "protocolVersions": supported,
+        "defaultProtocolVersion": default_version,
+        "capabilities": capabilities,
+        "serverInfo": server_info,
+    });
+    success_response(id, payload, ctx)
 }
 
 fn plan_path_schema() -> Value {
@@ -577,16 +652,29 @@ fn progress_path_schema() -> serde_json::Value {
     })
 }
 
-fn handle_tools_list(id: Value) -> JsonRpcResponse {
+fn handle_tools_list(id: Value, ctx: ResponseContext) -> JsonRpcResponse {
     let tools = tool_definitions();
 
-    success_response(
-        id.clone(),
-        match serde_json::to_value(ToolsListResult { tools }) {
-            Ok(val) => val,
-            Err(e) => return error_response(id, -32603, &format!("Internal error: {e}")),
-        },
-    )
+    let mut payload = match serde_json::to_value(ToolsListResult { tools }) {
+        Ok(val) => val,
+        Err(e) => return error_response(id, -32603, &format!("Internal error: {e}")),
+    };
+
+    // Draft responses must carry `ttlMs` and `cacheScope` so clients can avoid
+    // redundant polling. The 2025-11-25 shape omits these fields entirely.
+    if ctx.requires_result_type()
+        && let Value::Object(ref mut map) = payload
+    {
+        let hint = CacheHint::tools_list().to_json();
+        if let Some(ttl) = hint.get("ttlMs") {
+            map.entry("ttlMs".to_string()).or_insert(ttl.clone());
+        }
+        if let Some(scope) = hint.get("cacheScope") {
+            map.entry("cacheScope".to_string()).or_insert(scope.clone());
+        }
+    }
+
+    success_response(id, payload, ctx)
 }
 
 fn tool_definitions() -> Vec<ToolDefinition> {
@@ -770,26 +858,26 @@ fn extended_tool_definitions() -> Vec<ToolDefinition> {
     ]
 }
 
-fn handle_tool_call(id: Value, params: &Value) -> JsonRpcResponse {
+fn handle_tool_call(id: Value, params: &Value, ctx: ResponseContext) -> JsonRpcResponse {
     let tool_name = params.get("name").and_then(|v| v.as_str()).unwrap_or("");
     let arguments = params
         .get("arguments")
         .cloned()
         .unwrap_or_else(|| Value::Object(serde_json::Map::new()));
 
-    if let Some(response) = maybe_block_input_guardrail(id.clone(), tool_name, &arguments) {
+    if let Some(response) = maybe_block_input_guardrail(id.clone(), tool_name, &arguments, ctx) {
         return response;
     }
 
-    if let Some(response) = maybe_block_session_guardrail(id.clone(), tool_name) {
+    if let Some(response) = maybe_block_session_guardrail(id.clone(), tool_name, ctx) {
         return response;
     }
 
     let result = run_tool(tool_name, &arguments);
 
     match result {
-        Ok(text) => normalize_success_output(id, tool_name, &text),
-        Err(e) => normalize_error_output(id, tool_name, &format!("Error: {e}")),
+        Ok(text) => normalize_success_output(id, tool_name, &text, ctx),
+        Err(e) => normalize_error_output(id, tool_name, &format!("Error: {e}"), ctx),
     }
 }
 
@@ -797,9 +885,11 @@ fn handle_tool_call(id: Value, params: &Value) -> JsonRpcResponse {
 
 fn tool_version() -> String {
     let git_sha = option_env!("WIGGUM_GIT_SHA").unwrap_or("unknown");
+    let supported: Vec<&str> = McpVersion::supported().iter().map(|v| v.as_str()).collect();
     format!(
-        "wiggum {}\nGit SHA: {git_sha}\nMCP protocol: 2025-11-25",
-        env!("CARGO_PKG_VERSION")
+        "wiggum {}\nGit SHA: {git_sha}\nMCP protocols supported: {}",
+        env!("CARGO_PKG_VERSION"),
+        supported.join(", ")
     )
 }
 
@@ -1182,7 +1272,8 @@ fn tool_draft_plan(args: &Value) -> Result<String> {
     ))
 }
 
-fn success_response(id: Value, result: Value) -> JsonRpcResponse {
+fn success_response(id: Value, result: Value, ctx: ResponseContext) -> JsonRpcResponse {
+    let result = ctx.shape_result(result);
     JsonRpcResponse {
         jsonrpc: "2.0".to_string(),
         id,
@@ -1307,6 +1398,289 @@ mod tests {
                 .as_deref()
                 .unwrap_or_default()
                 .contains("read_volume_anomaly")
+        );
+    }
+
+    // ─── Dual-protocol request/response tests ─────────────────────
+
+    fn parse_response(response: &JsonRpcResponse) -> Value {
+        // Serialization of these simple structs should never fail. If it
+        // does, return `Null` and let downstream assertions report the
+        // missing fields with a useful diff.
+        serde_json::to_value(response).unwrap_or(Value::Null)
+    }
+
+    fn request(method: &str, params: Value) -> JsonRpcRequest {
+        JsonRpcRequest {
+            jsonrpc: "2.0".to_string(),
+            id: Some(Value::Number(1.into())),
+            method: method.to_string(),
+            params,
+        }
+    }
+
+    #[test]
+    fn initialize_response_is_legacy_2025_11_25_shape() {
+        // Even with no `_meta`, `initialize` must return the legacy shape so
+        // old clients that depend on the handshake keep working.
+        let req = request("initialize", serde_json::json!({}));
+        let response = handle_request(&req);
+        let result = parse_response(&response)
+            .get("result")
+            .cloned()
+            .unwrap_or(Value::Null);
+
+        assert_eq!(
+            result.get("protocolVersion").and_then(Value::as_str),
+            Some("2025-11-25")
+        );
+        assert!(
+            result.get("resultType").is_none(),
+            "legacy initialize response must not carry resultType"
+        );
+    }
+
+    #[test]
+    fn initialize_responds_legacy_even_with_draft_meta() {
+        // A draft client that still sends `initialize` (e.g. a partial
+        // upgrade) must get a valid legacy response.
+        let req = request(
+            "initialize",
+            serde_json::json!({ "_meta": { "io.modelcontextprotocol/protocolVersion": "draft" } }),
+        );
+        let response = handle_request(&req);
+        let result = parse_response(&response)
+            .get("result")
+            .cloned()
+            .unwrap_or(Value::Null);
+
+        assert_eq!(
+            result.get("protocolVersion").and_then(Value::as_str),
+            Some("2025-11-25")
+        );
+    }
+
+    #[test]
+    fn tools_list_default_shape_omits_cache_and_result_type() {
+        // No `_meta` — defaults to legacy 2025-11-25 shape.
+        let req = request("tools/list", serde_json::json!({}));
+        let response = handle_request(&req);
+        let result = parse_response(&response)
+            .get("result")
+            .cloned()
+            .unwrap_or(Value::Null);
+
+        assert!(
+            result.get("tools").is_some(),
+            "tools must be present, got {result:?}"
+        );
+        assert!(
+            result.get("resultType").is_none(),
+            "legacy tools/list must not carry resultType"
+        );
+        assert!(
+            result.get("ttlMs").is_none(),
+            "legacy tools/list must not carry ttlMs"
+        );
+        assert!(
+            result.get("cacheScope").is_none(),
+            "legacy tools/list must not carry cacheScope"
+        );
+    }
+
+    #[test]
+    fn tools_list_draft_shape_includes_cache_and_result_type() {
+        let req = request(
+            "tools/list",
+            serde_json::json!({
+                "_meta": { "io.modelcontextprotocol/protocolVersion": "draft" }
+            }),
+        );
+        let response = handle_request(&req);
+        let result = parse_response(&response)
+            .get("result")
+            .cloned()
+            .unwrap_or(Value::Null);
+
+        assert_eq!(
+            result.get("resultType").and_then(Value::as_str),
+            Some("complete")
+        );
+        assert_eq!(result.get("ttlMs").and_then(Value::as_u64), Some(3_600_000));
+        assert_eq!(
+            result.get("cacheScope").and_then(Value::as_str),
+            Some("public")
+        );
+        assert!(
+            result.get("tools").is_some(),
+            "tools must be present, got {result:?}"
+        );
+    }
+
+    #[test]
+    fn tools_list_explicit_2025_11_25_meta_returns_legacy_shape() {
+        let req = request(
+            "tools/list",
+            serde_json::json!({
+                "_meta": { "io.modelcontextprotocol/protocolVersion": "2025-11-25" }
+            }),
+        );
+        let response = handle_request(&req);
+        let result = parse_response(&response)
+            .get("result")
+            .cloned()
+            .unwrap_or(Value::Null);
+
+        assert!(result.get("resultType").is_none());
+        assert!(result.get("ttlMs").is_none());
+        assert!(result.get("cacheScope").is_none());
+    }
+
+    #[test]
+    fn server_discover_advertises_both_versions() {
+        let req = request("server/discover", serde_json::json!({}));
+        let response = handle_request(&req);
+        let result = parse_response(&response)
+            .get("result")
+            .cloned()
+            .unwrap_or(Value::Null);
+
+        let versions: Vec<String> = result
+            .get("protocolVersions")
+            .and_then(Value::as_array)
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(Value::as_str)
+                    .map(String::from)
+                    .collect()
+            })
+            .unwrap_or_default();
+        assert!(
+            versions.iter().any(|v| v == "2025-11-25"),
+            "supported versions must include 2025-11-25, got {versions:?}"
+        );
+        assert!(
+            versions.iter().any(|v| v == "draft"),
+            "supported versions must include draft, got {versions:?}"
+        );
+
+        assert_eq!(
+            result.get("defaultProtocolVersion").and_then(Value::as_str),
+            Some("draft")
+        );
+
+        let capabilities = result.get("capabilities").cloned().unwrap_or(Value::Null);
+        assert!(capabilities.get("tools").is_some());
+        assert!(capabilities.get("extensions").is_some());
+
+        let server_info = result.get("serverInfo").cloned().unwrap_or(Value::Null);
+        assert_eq!(
+            server_info.get("name").and_then(Value::as_str),
+            Some("wiggum")
+        );
+    }
+
+    #[test]
+    fn server_discover_response_carries_result_type() {
+        // `server/discover` is the new handshake replacement — its response
+        // must always carry `resultType: "complete"`.
+        let req = request("server/discover", serde_json::json!({}));
+        let response = handle_request(&req);
+        let result = parse_response(&response)
+            .get("result")
+            .cloned()
+            .unwrap_or(Value::Null);
+
+        assert_eq!(
+            result.get("resultType").and_then(Value::as_str),
+            Some("complete")
+        );
+    }
+
+    #[test]
+    fn logging_set_level_is_accepted_for_back_compat() {
+        // `logging/setLevel` is removed in the draft. We accept it silently
+        // so 2025-11-25 clients don't see a `Method not found` error during
+        // the transition.
+        let req = request("logging/setLevel", serde_json::json!({"level": "info"}));
+        let response = handle_request(&req);
+
+        assert!(
+            response.error.is_none(),
+            "logging/setLevel must be accepted, got error: {:?}",
+            response.error
+        );
+    }
+
+    #[test]
+    fn unknown_method_returns_method_not_found() {
+        let req = request("definitely/not/a/method", serde_json::json!({}));
+        let response = handle_request(&req);
+        let body = parse_response(&response);
+
+        assert_eq!(
+            body.get("error")
+                .and_then(|e| e.get("code"))
+                .and_then(Value::as_i64),
+            Some(-32601)
+        );
+    }
+
+    #[test]
+    fn tool_definitions_are_returned_in_deterministic_order() {
+        // The draft spec requires servers to return tools/list in a
+        // deterministic order so clients can cache effectively.
+        let first = tool_definitions();
+        let second = tool_definitions();
+        let names: Vec<&str> = first.iter().map(|t| t.name.as_str()).collect();
+        let second_names: Vec<&str> = second.iter().map(|t| t.name.as_str()).collect();
+
+        assert!(!names.is_empty(), "tool catalogue must not be empty");
+        assert_eq!(
+            names, second_names,
+            "tool catalogue order must be stable across calls"
+        );
+        assert_eq!(
+            names.first().copied(),
+            Some("wiggum_version"),
+            "wiggum_version must be first (read-only tool)"
+        );
+    }
+
+    #[test]
+    fn tool_version_reports_both_supported_versions() {
+        let text = tool_version();
+        assert!(text.contains("2025-11-25"), "missing 2025-11-25: {text}");
+        assert!(text.contains("draft"), "missing draft label: {text}");
+        assert!(
+            text.contains("MCP protocols supported"),
+            "missing supported-versions header: {text}"
+        );
+    }
+
+    #[test]
+    fn ping_returns_result_type_only_for_draft() {
+        let legacy = parse_response(&handle_request(&request("ping", serde_json::json!({}))));
+        assert!(
+            legacy
+                .get("result")
+                .and_then(|r| r.get("resultType"))
+                .is_none(),
+            "legacy ping must not carry resultType"
+        );
+
+        let draft = parse_response(&handle_request(&request(
+            "ping",
+            serde_json::json!({
+                "_meta": { "io.modelcontextprotocol/protocolVersion": "draft" }
+            }),
+        )));
+        assert_eq!(
+            draft
+                .get("result")
+                .and_then(|r| r.get("resultType"))
+                .and_then(Value::as_str),
+            Some("complete")
         );
     }
 }
