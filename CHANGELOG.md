@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- **MCP dual-protocol support** — the `wiggum serve --mcp` server now speaks both MCP `2025-11-25` and the upcoming `draft` revision in parallel over stdio. Old clients get the legacy handshake shape; new clients opt into the draft shape by setting `params._meta.io.modelcontextprotocol/protocolVersion = "draft"`.
+- **`server/discover` RPC** — the new draft entry point. Returns the set of supported protocol versions, the default version, server capabilities (including the new `extensions` field), and `serverInfo`. Clients should call this before any other request to learn which version to advertise.
+- **Draft response shaping** — `tools/list` responses to draft clients now include `ttlMs` (`3_600_000`) and `cacheScope` (`"public"`) cache hints and `resultType: "complete"` on every result, as required by the draft. Legacy responses are unchanged.
+- **Removed-method back-compat** — `ping`, `logging/setLevel`, and `notifications/roots/list_changed` are accepted (and silently no-op for the latter two) so 2025-11-25 clients don't see `Method not found` during the transition.
+- **`wiggum_version` tool output** — now lists both supported protocol versions instead of a single `MCP protocol:` line.
+- **`src/adapters/mcp/protocol.rs`** — new module isolating the version enum, `ResponseContext`, `CacheHint`, and per-request negotiation logic. Covered by 13 unit tests.
+
 ## [0.13.0] - 2026-06-17
 
 ### Added
