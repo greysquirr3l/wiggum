@@ -330,14 +330,45 @@ skip_wiring_audit = false
 # Set to true to disable the stub cleanup audit task
 skip_stub_audit = false
 
+# ─── Targets ───────────────────────────────────────────────────────────────────
+# Selects which AI coding tools' scaffold files wiggum generates. Each field is
+# optional; absent fields default to false. When the section is omitted entirely
+# wiggum defaults to `vscode = true` for back-compat. The `--target` CLI flag
+# overrides this section. See docs/targets.md for the full reference.
+#
+# Targets:
+#   vscode       — VSCode + GitHub Copilot Chat (.vscode/*.prompt.md)
+#   opencode     — opencode (.opencode/agents/wiggum-*.md, uses the `task` tool)
+#   claude       — Claude Code (CLAUDE.md + .claude/settings.json PreCompact hook)
+#   agent-rules  — fork-neutral rules files (.cursorrules, .windsurfrules,
+#                  .github/copilot-instructions.md) for Cursor, Windsurf,
+#                  GitHub Copilot — receives no orchestrator prompt since the
+#                  IDE drives its own agent loop
+#
+# [targets]
+# vscode      = true   # default when [targets] is absent
+# opencode    = false
+# claude      = false
+# agent-rules = false
+
 # ─── Style ────────────────────────────────────────────────────────────────────
-# Controls writing style guidance to reduce detectability of AI-generated code.
-# When enabled, prompts receive hints to avoid "slop" vocabulary (robust,
-# leverage, comprehensive, delve, etc.) and filler phrases, write self-documenting
-# code, and use natural commenting style.
+# Controls writing style guidance to reduce detectability of AI-generated code,
+# file-structure guidance, and (optionally) language-specific strict rule sets.
+#
+# `avoid_ai_patterns` and `avoid_god_files` are on by default — turn them off
+# only if you have a reason. `strict` is off by default; opt in per plan when
+# the project needs a verified-modern toolchain baseline (full pedantic clippy
+# for Rust, golangci-lint v2 for Go, PHPStan `level max` for PHP, etc.). See
+# docs/strict-lints.md for the per-language rule sets and tooling pins.
 
 [style]
 # Set to false to disable AI avoidance hints in generated prompts
 avoid_ai_patterns = true
 # Set to false to disable guidance that discourages creating "God" files
 avoid_god_files = true
+# Opt in to language-specific strict rules. Injects the verified-modern
+# toolchain baseline for this plan's language into every subagent prompt
+# (clippy::all + pedantic + nursery + cargo + perf for Rust, golangci-lint
+# v2 for Go, etc.). Off by default — only enable for projects where
+# "the build passes" is not the bar. See docs/strict-lints.md.
+# strict = true
