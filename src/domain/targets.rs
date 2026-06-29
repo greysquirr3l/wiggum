@@ -26,13 +26,21 @@ pub enum Target {
     /// opencode. Emits `.opencode/agents/wiggum-*.md` agent files using
     /// the `task` tool for subagent dispatch.
     Opencode,
-    /// Claude Code. Emits `.claude/settings.json` hooks.
+    /// Claude Code. Emits `.claude/settings.json` hooks plus `CLAUDE.md`
+    /// project memory at the repository root.
     Claude,
+    /// Fork-neutral rules files for `VSCode` forks that don't speak the
+    /// Copilot `runSubagent` or opencode `task` protocols. Emits
+    /// `.cursorrules` (Cursor), `.windsurfrules` (Windsurf), and
+    /// `.github/copilot-instructions.md` (GitHub Copilot / forks that read
+    /// it). The receiving IDE is responsible for its own agent loop;
+    /// wiggum only provides the rules + project context.
+    AgentRules,
 }
 
 impl Target {
     /// All targets, in stable display order.
-    pub const ALL: &[Self] = &[Self::Vscode, Self::Opencode, Self::Claude];
+    pub const ALL: &[Self] = &[Self::Vscode, Self::Opencode, Self::Claude, Self::AgentRules];
 
     /// Stable identifier used in CLI flags and TOML.
     #[must_use]
@@ -41,6 +49,7 @@ impl Target {
             Self::Vscode => "vscode",
             Self::Opencode => "opencode",
             Self::Claude => "claude",
+            Self::AgentRules => "agent-rules",
         }
     }
 }
@@ -59,8 +68,9 @@ impl FromStr for Target {
             "vscode" => Ok(Self::Vscode),
             "opencode" => Ok(Self::Opencode),
             "claude" => Ok(Self::Claude),
+            "agent-rules" | "agent_rules" | "rules" => Ok(Self::AgentRules),
             other => Err(format!(
-                "unknown target '{other}'; expected one of: vscode, opencode, claude"
+                "unknown target '{other}'; expected one of: vscode, opencode, claude, agent-rules"
             )),
         }
     }
@@ -71,11 +81,13 @@ impl FromStr for Target {
 /// `TargetSet` is a bit-set style wrapper. Construct one via [`TargetSet::default`]
 /// (yields `vscode` for back-compat), [`TargetSet::from_iter`], or
 /// [`crate::domain::plan::TargetConfig::resolve`] which applies the CLI/plan/default precedence.
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub struct TargetSet {
     pub vscode: bool,
     pub opencode: bool,
     pub claude: bool,
+    pub agent_rules: bool,
 }
 
 impl TargetSet {
@@ -87,6 +99,7 @@ impl TargetSet {
             vscode: true,
             opencode: false,
             claude: false,
+            agent_rules: false,
         }
     }
 
@@ -97,11 +110,12 @@ impl TargetSet {
             vscode: true,
             opencode: true,
             claude: true,
+            agent_rules: true,
         }
     }
 
-    /// Parse from a CLI string. Accepts `vscode`, `opencode`, `claude`, or
-    /// `all` (enables every target).
+    /// Parse from a CLI string. Accepts `vscode`, `opencode`, `claude`,
+    /// `agent-rules`, or `all` (enables every target).
     ///
     /// # Errors
     ///
@@ -117,7 +131,7 @@ impl TargetSet {
     /// True if at least one target is enabled.
     #[must_use]
     pub const fn is_empty(self) -> bool {
-        !(self.vscode || self.opencode || self.claude)
+        !(self.vscode || self.opencode || self.claude || self.agent_rules)
     }
 
     /// True if `target` is enabled in this set.
@@ -127,6 +141,7 @@ impl TargetSet {
             Target::Vscode => self.vscode,
             Target::Opencode => self.opencode,
             Target::Claude => self.claude,
+            Target::AgentRules => self.agent_rules,
         }
     }
 
@@ -136,12 +151,13 @@ impl TargetSet {
             Target::Vscode => self.vscode = true,
             Target::Opencode => self.opencode = true,
             Target::Claude => self.claude = true,
+            Target::AgentRules => self.agent_rules = true,
         }
     }
 
     /// Returns an iterator over enabled targets in stable order.
     pub fn iter(self) -> impl Iterator<Item = Target> {
-        let mut out = Vec::with_capacity(3);
+        let mut out = Vec::with_capacity(4);
         if self.vscode {
             out.push(Target::Vscode);
         }
@@ -150,6 +166,9 @@ impl TargetSet {
         }
         if self.claude {
             out.push(Target::Claude);
+        }
+        if self.agent_rules {
+            out.push(Target::AgentRules);
         }
         out.into_iter()
     }
@@ -219,9 +238,18 @@ mod tests {
             claude: true,
             vscode: true,
             opencode: true,
+            agent_rules: true,
         };
         let v: Vec<_> = s.iter().collect();
-        assert_eq!(v, vec![Target::Vscode, Target::Opencode, Target::Claude]);
+        assert_eq!(
+            v,
+            vec![
+                Target::Vscode,
+                Target::Opencode,
+                Target::Claude,
+                Target::AgentRules,
+            ]
+        );
     }
 
     #[test]
@@ -230,6 +258,7 @@ mod tests {
             vscode: false,
             opencode: false,
             claude: false,
+            agent_rules: false,
         };
         assert!(s.is_empty());
         assert_eq!(s.iter().count(), 0);
@@ -239,6 +268,17 @@ mod tests {
     fn target_display_round_trips() {
         for t in Target::ALL {
             assert_eq!(t.to_string().parse::<Target>().unwrap(), *t);
+        }
+    }
+
+    #[test]
+    fn agent_rules_parses_variants_and_aliases() {
+        for s in ["agent-rules", "agent_rules", "rules", "Agent-Rules"] {
+            assert_eq!(
+                Target::from_str(s).unwrap(),
+                Target::AgentRules,
+                "input `{s}` should parse as AgentRules"
+            );
         }
     }
 }

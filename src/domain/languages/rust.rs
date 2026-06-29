@@ -75,4 +75,26 @@ pub static PROFILE: &LanguageProfile = &LanguageProfile {
         "Keep TODO/FIXME/HACK markers for genuine incomplete work, but never in production auth code.",
         "Doc comments (`///`) should describe contracts and edge cases, not repeat function signatures.",
     ],
+
+    // Mirrors `~/Projects/nick.md` (Rust Standards). Opt-in via
+    // `[style] strict = true` in the plan TOML. The goal is to keep the
+    // generated Rust genuinely idiomatic — no panic-shaped code paths, no
+    // silenced clippy lints, and the full pedantic+nursery+perf profile
+    // active.
+    strict_rules: &[
+        "Never use `.expect()` or `.unwrap()` on `Result` or `Option` in production code — propagate with `?` or handle with explicit `match` / `if let` / `.unwrap_or_else(|e| ...)` where the failure mode is genuinely recoverable.",
+        "Never use `.unwrap()` / `.expect()` inside helper closures either — they panic on the first unexpected input and turn recoverable errors into crashes. Use `?` or explicit match.",
+        "Never use `panic!`, `unreachable!`, `todo!`, or `unimplemented!` in production code paths. Reserve them for tests and `match` arms where the invariant has already been statically proven.",
+        "Never use index slicing that can panic (`&vec[i]`, `&s[0..n]`, `arr[0]`, `s[..n]`). Use `.get(i)`, `.get(..n)`, or split-by-pattern APIs and handle `None` explicitly.",
+        "Never add `#[allow(clippy::...)]` suppression attributes on functions, impls, modules, or the crate root — fix the lint instead. Use `#[expect(clippy::lint, reason = \"...\")]` only for genuinely unavoidable cases, and document the reason.",
+        "Prefer `.is_multiple_of(n)` over `% n == 0` and `% n != 0` (Rust 1.87+, suppresses `clippy::manual_is_multiple_of`).",
+        "Prefer `?` propagation over `.unwrap_or_else(|_| default)` chains where the error type carries information; only collapse to a default when the missing value is semantically the same as the default.",
+        "Use the full clippy profile: `-W clippy::all -W clippy::pedantic -W clippy::nursery -W clippy::cargo -W clippy::perf` and `-D warnings`. Hard-deny `clippy::unwrap_used`, `clippy::expect_used`, `clippy::panic`, `clippy::indexing_slicing`, `clippy::cast_ptr_alignment`, `clippy::suspicious`.",
+        "Add a `.cargo/config.toml` alias `l` for `cargo clippy --workspace --all-targets --` followed by the flags above so lint runs are reproducible.",
+        "Library crates use `thiserror` for typed errors; binary / app crates use `anyhow` with `Context` / `with_context` for rich error chains. Never mix the two across the same crate boundary.",
+        "Parse at the boundary (`TryFrom` / `FromStr` / typed DTOs) — never let free-form `String` cross into domain internals once parsed. Don't validate, parse.",
+        "Deterministic domain APIs: pass time / clock / RNG into domain functions explicitly rather than calling `Utc::now()`, `Instant::now()`, or `rand::thread_rng()` inside them.",
+        "Prefer `LazyLock` (stable since 1.80) over `lazy_static!` for static initialisation.",
+        "Doc comments (`///`) on public items must include `# Examples`, `# Errors`, and `# Panics` sections where the function can fail in any of those ways.",
+    ],
 };

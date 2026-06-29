@@ -40,9 +40,9 @@ pub enum Command {
         skip_agents_md: bool,
 
         /// Override the target tool(s) to generate artifacts for.
-        /// `vscode` (default), `opencode`, `claude`, or `all`.
+        /// `vscode` (default), `opencode`, `claude`, `agent-rules`, or `all`.
         /// Overrides the plan-level `[targets]` section.
-        #[arg(long, value_parser = ["vscode", "opencode", "claude", "all"])]
+        #[arg(long, value_parser = ["vscode", "opencode", "claude", "agent-rules", "all"])]
         target: Option<String>,
     },
 

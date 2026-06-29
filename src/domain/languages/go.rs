@@ -73,4 +73,23 @@ pub static PROFILE: &LanguageProfile = &LanguageProfile {
         "Keep TODO/FIXME markers for genuine incomplete work, but never in production auth code.",
         "Doc comments should describe contracts and edge cases, not repeat function signatures.",
     ],
+
+    // Mirrors `docs/strict-lints.md` (Go). Opt-in via `[style] strict = true`
+    // in the plan TOML. golangci-lint v2 + gofumpt + govulncheck, with no
+    // project-wide exclusions — fail-secure by default, no panic-shaped code,
+    // CSPRNG everywhere, parameterised SQL, exhaustive switches.
+    strict_rules: &[
+        "Never discard an error: no `_ = err`. Wrap with `fmt.Errorf(\"...: %w\", err)` and inspect with `errors.Is` / `errors.As`; never string-match an error message (`errorlint`).",
+        "`errcheck` runs with `check-type-assertions: true` and `check-blank: true`; every type assertion uses the comma-ok form (`forcetypeassert`).",
+        "No `panic` in library code; no `os.Exit` outside `main`. The CLI returns typed errors and a non-zero code, never a panic, on bad input.",
+        "Every blocking / IO call takes a `context.Context` (`noctx`, `contextcheck`); never store a context in a struct field.",
+        "Always close HTTP response bodies and `sql.Rows` (`bodyclose`, `rowserrcheck`, `sqlclosecheck`); prefer `defer` placed immediately after the nil-error check.",
+        "`gosec` runs with no project-wide excludes — including G115 integer-overflow conversions. Bounds-check before any narrowing cast and reference the check in any suppression.",
+        "Ban weak / deprecated imports via `depguard`: deny `crypto/md5`, `crypto/sha1`, `crypto/des`, `math/rand` (use `crypto/rand`, or `math/rand/v2` only for non-security use), and `io/ioutil`.",
+        "Use `forbidigo` to ban `fmt.Print*` in favour of structured logging (`log/slog`) and to ban `http.DefaultClient` / `http.Get` (require an `http.Client` with explicit timeouts).",
+        "SQL only through `database/sql` placeholders or a query builder — never `fmt.Sprintf` into a query.",
+        "Exhaustive `switch` over enums and sum types (`exhaustive`); no silent `default` that swallows new variants.",
+        "Treat warnings as errors: golangci-lint runs with `--max-issues-per-linter=0 --max-same-issues=0` and a non-zero exit on any finding.",
+        "No suppression without justification: never blanket-disable a linter; suppress narrowly, inline, with a linter ID and a one-line reason. Prefer fixing.",
+    ],
 };

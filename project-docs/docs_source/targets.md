@@ -11,9 +11,12 @@ shared, but the agent prompts and configuration differ.
 |---|---|---|---|
 | **VSCode** (default) | `vscode` | `.vscode/orchestrator.prompt.md` (and three siblings) | GitHub Copilot `runSubagent` tool |
 | **opencode** | `opencode` | `.opencode/agents/wiggum-orchestrator.md` (and four siblings) | opencode `task` tool with subagent frontmatter |
-| **Claude** | `claude` | `.claude/settings.json` (hooks only) | Claude Code `PreCompact` hook |
+| **Claude** | `claude` | `CLAUDE.md` (project memory) + `.claude/settings.json` (hooks) | Claude Code reads both files on every session; PreCompact hook blocks compaction mid-task |
+| **agent-rules** | `agent-rules` | `.cursorrules` + `.windsurfrules` + `.github/copilot-instructions.md` | The receiving IDE drives its own agent loop; wiggum supplies only rules + project context |
 
 You can enable any combination of targets for a single generate run.
+
+> **Note on the `vscode` target:** it targets GitHub Copilot Chat specifically (the `#tool:agent/runSubagent` tool). Other VSCode forks — Cursor, Windsurf, Antigravity, Trae, Cody, Cline, Roo Code, Continue — do not implement that tool. If you use one of those forks, enable the **`agent-rules`** target instead so its corresponding rules file (`.cursorrules`, `.windsurfrules`, etc.) gets written.
 
 ## Selection
 
@@ -39,11 +42,12 @@ absent fields are treated as `false`.
 
 ```bash
 wiggum generate plan.toml --target opencode          # just opencode
-wiggum generate plan.toml --target all               # all three
+wiggum generate plan.toml --target all               # all four
+wiggum generate plan.toml --target agent-rules       # Cursor / Windsurf / Copilot rules
 wiggum generate plan.toml --target vscode,opencode   # not supported — single value
 ```
 
-`--target` accepts a single value: `vscode`, `opencode`, `claude`, or `all`.
+`--target` accepts a single value: `vscode`, `opencode`, `claude`, `agent-rules`, or `all`.
 
 ### Precedence
 
@@ -92,12 +96,33 @@ If the resolved `TargetSet` is empty (every field explicitly `false`),
 
 ### Claude target
 
-- **Files:** `.claude/settings.json` (hooks).
+- **Files:** `CLAUDE.md` (project memory at repo root) and
+  `.claude/settings.json` (hooks).
+- **`CLAUDE.md`** — Claude Code reads this file on every session. It
+  contains the project persona, preflight commands, architecture rules,
+  user-defined rules, security rules, AI-avoidance guidance (if enabled),
+  and a workflow loop. Claude Code IS its own orchestrator; wiggum just
+  supplies the context + rules it needs.
 - **Hook:** `PreCompact` blocks context compression while any `[~]` task
   exists in `PROGRESS.md`.
-- This is the simplest target — no agent prompts, just the hook. The
-  orchestrator loop itself runs the same way regardless of Claude vs.
-  VSCode/opencode; only the hook differs.
+- Combined, the two files constitute "full Claude Code support" — wiggum
+  drives neither the loop nor the dispatch; Claude Code does.
+
+### agent-rules target
+
+- **Files:** `.cursorrules`, `.windsurfrules`, and
+  `.github/copilot-instructions.md`. All three are emitted from a single
+  shared template, so the rules stay in lockstep across forks.
+- **Use case:** VSCode forks that don't speak the GitHub Copilot
+  `runSubagent` or opencode `task` protocols — Cursor, Windsurf,
+  Antigravity, Trae, Cody, Cline, Roo Code, Continue. Each of those IDEs
+  reads its own format's file as project-level instructions.
+- **No orchestrator loop.** Unlike `vscode` and `opencode`, these files
+  contain rules + project context only. The receiving IDE drives its own
+  agent loop; wiggum never dispatches subagents on its behalf.
+- **GitHub Copilot** reads `.github/copilot-instructions.md` as
+  repository-level instructions — this works in VSCode + Copilot even
+  when the `vscode` target is also enabled (the two are complementary).
 
 ## Universal artifacts
 
@@ -122,7 +147,7 @@ wiggum generate plan.toml
 # → .vscode/evaluator.prompt.md   (if [evaluator] configured)
 # → .vscode/planner.prompt.md
 # → .vscode/background-auditor.prompt.md
-# → .claude/settings.json          (Claude target also enabled by default in 0.13.0)
+# → .claude/settings.json          (when claude = true)
 ```
 
 ### opencode-only
@@ -142,11 +167,29 @@ wiggum generate plan.toml
 # → .opencode/agents/wiggum-auditor.md
 ```
 
+### agent-rules-only (Cursor / Windsurf / Copilot)
+
+```toml
+[targets]
+vscode      = false
+opencode    = false
+claude      = false
+agent-rules = true
+```
+
+```bash
+wiggum generate plan.toml
+# → .cursorrules                    (Cursor)
+# → .windsurfrules                  (Windsurf)
+# → .github/copilot-instructions.md (GitHub Copilot)
+```
+
 ### Multi-target
 
 ```bash
 wiggum generate plan.toml --target all
-# → VSCode files AND opencode files AND .claude/settings.json
+# → VSCode files AND opencode files AND CLAUDE.md + .claude/settings.json
+#   AND .cursorrules + .windsurfrules + .github/copilot-instructions.md
 ```
 
 ## Cleaning up

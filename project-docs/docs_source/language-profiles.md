@@ -1,6 +1,6 @@
 # Language Profiles
 
-Wiggum ships with built-in profiles for 10 programming languages. Each profile provides sensible defaults for build commands, test patterns, documentation style, error handling conventions, security rules, and a vulnerability audit command.
+Wiggum ships with built-in profiles for 11 programming languages. Each profile provides sensible defaults for build commands, test patterns, documentation style, error handling conventions, security rules, and a vulnerability audit command.
 
 ## Supported languages
 
@@ -13,9 +13,10 @@ Wiggum ships with built-in profiles for 10 programming languages. Each profile p
 | Java | `mvn compile` | `mvn test` | `mvn checkstyle:check` | `mvn dependency-check:check` |
 | C# / .NET | `dotnet build --nologo -v q` | `dotnet test --nologo -v q` | `dotnet format --verify-no-changes` | `dotnet list package --vulnerable` |
 | Kotlin | `gradle build` | `gradle test` | `gradle detekt` | `gradle dependencyCheckAnalyze` |
-| Swift | `swift build` | `swift test` | `swiftlint` | _(none)_ |
+| Swift | `swift build` | `swift test` | `swiftlint` | _(none — SwiftPM has no first-party SCA)_ |
 | Ruby | `ruby -c` | `bundle exec rspec` | `bundle exec rubocop` | `bundle exec bundler-audit check --update` |
 | Elixir | `mix compile --warnings-as-errors` | `mix test` | `mix credo --strict` | `mix deps.audit` |
+| PHP | `composer install --no-interaction --no-progress` | `vendor/bin/phpunit` | `vendor/bin/php-cs-fixer fix --dry-run --diff && vendor/bin/phpstan analyse` | `composer audit` |
 
 ## What profiles provide
 
@@ -25,12 +26,13 @@ Each language profile includes:
 - **Test file pattern** — Where test files are typically found (e.g., `tests/` for Rust, `*_test.go` for Go)
 - **Doc style** — Documentation conventions (e.g., `///` doc comments for Rust, GoDoc for Go)
 - **Error handling** — Idiomatic error handling approach (e.g., `Result<T, E>` for Rust, `error` return values for Go)
-- **Security rules** — Language-specific rules covering OWASP categories plus crypto, deserialization, and path traversal (see [Security](./security.md)); profiles currently define 14 or 15 rules depending on the language
+- **Security rules** — Language-specific rules covering OWASP categories plus crypto, deserialization, and path traversal (see [Security](./security.md)); profiles currently define 14–16 rules depending on the language
 - **Audit command** — Supply-chain vulnerability scanner appended to every task's preflight chain
 - **AI avoidance rules** — Guidelines to reduce detectability of AI-generated code (see below)
 - **Comment guidelines** — Best practices for meaningful, non-robotic comments
+- **Strict rules** — A deeper language-specific rule set that is injected only when `[style] strict = true` is set in the plan (see [Strict Standards](./strict-standards.md))
 
-Profile defaults are applied in different places during generation: build/test/audit settings flow into generated task and preflight content, while security, AI-avoidance, and comment guidance are injected through the orchestrator and exit-criteria templates rather than directly into `task.md`.
+Profile defaults are applied in different places during generation: build/test/audit settings flow into generated task and preflight content, while security, AI-avoidance, and strict guidance are injected through the orchestrator and exit-criteria templates rather than directly into `task.md`.
 
 ## AI avoidance rules
 

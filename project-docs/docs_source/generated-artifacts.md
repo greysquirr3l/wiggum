@@ -101,12 +101,42 @@ These prompts use GitHub Copilot's `runSubagent` tool to dispatch subagents.
 
 The agent frontmatter pins the model and declares permissions — for example, the orchestrator allows `task` only for `wiggum-implementer`, `wiggum-evaluator`, and `wiggum-auditor`, and denies `edit` so it can only update `PROGRESS.md` through the implementer.
 
-### Claude target — `.claude/settings.json`
+### Claude target — `CLAUDE.md` + `.claude/settings.json`
 
-A Claude Code `settings.json` file pre-configured with a `PreCompact` hook that blocks
-context compression while any in-progress task marker (`[~]`) exists in `PROGRESS.md`.
-This prevents Claude from compacting away active working state mid-task, preserving the
-full task context until the task is marked complete.
+The Claude target gives Claude Code **full project context** at session start, plus a
+companion hook that protects active work. Two files:
+
+- **`CLAUDE.md`** (repo root) — Claude Code's project memory file, loaded on every
+  session. It contains the project persona, preflight commands, architecture rules,
+  user-defined rules, security rules, AI-avoidance guidance (when
+  `[style] avoid_ai_patterns = true`), and the workflow loop. Claude Code IS its own
+  orchestrator — wiggum supplies context + rules, Claude Code drives dispatch.
+- **`.claude/settings.json`** — A `PreCompact` hook that blocks context compression
+  while any in-progress task marker (`[~]`) exists in `PROGRESS.md`. This prevents
+  Claude from compacting away active working state mid-task, preserving the full task
+  context until the task is marked complete.
+
+### agent-rules target — `.cursorrules`, `.windsurfrules`, `.github/copilot-instructions.md`
+
+The agent-rules target emits three fork-neutral rules files from a single shared
+template, so the rules stay in lockstep across forks. It is designed for VSCode-family
+IDEs that do not speak the GitHub Copilot `runSubagent` or opencode `task` protocols.
+
+| File | Read by |
+|---|---|
+| `.cursorrules` | Cursor (project-level rules) |
+| `.windsurfrules` | Windsurf (project-level rules; same format as `.cursorrules`) |
+| `.github/copilot-instructions.md` | GitHub Copilot (repo-level instructions); also picked up by some VSCode forks |
+
+Each file contains the project metadata, preflight, architecture, user rules, security
+rules, AI-avoidance guidance (when enabled), strict rules (when enabled), strategy,
+and commit conventions — **no orchestrator-loop directives**. The receiving IDE
+drives its own agent loop; wiggum never dispatches subagents on its behalf.
+
+> **Why a separate target?** The `vscode` target emits prompts that call
+> `#tool:agent/runSubagent`, which is GitHub Copilot Chat-specific. Cursor, Windsurf,
+> and other VSCode forks do not implement that tool. Use the `agent-rules` target
+> when targeting those forks.
 
 ## Parallel groups
 

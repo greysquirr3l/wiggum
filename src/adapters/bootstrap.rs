@@ -179,6 +179,8 @@ fn detect_language(path: &Path) -> Option<Language> {
         Some(Language::Python)
     } else if path.join("Gemfile").is_file() {
         Some(Language::Ruby)
+    } else if path.join("composer.json").is_file() {
+        Some(Language::Php)
     } else if has_file_matching(path, ".", ".csproj") {
         Some(Language::CSharp)
     } else if path.join("package.json").is_file() {
@@ -200,7 +202,8 @@ fn extract_manifest_info(path: &Path, language: Language) -> (String, String) {
         | Language::Kotlin
         | Language::Swift
         | Language::Ruby
-        | Language::Elixir => (dir_name_fallback(path), String::new()),
+        | Language::Elixir
+        | Language::Php => (dir_name_fallback(path), String::new()),
     }
 }
 
@@ -348,6 +351,7 @@ fn detect_tests(path: &Path, language: Language) -> bool {
         Language::Swift => path.join("Tests").is_dir(),
         Language::Ruby => path.join("spec").is_dir() || path.join("test").is_dir(),
         Language::Elixir => path.join("test").is_dir(),
+        Language::Php => path.join("tests").is_dir(),
     }
 }
 

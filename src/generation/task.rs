@@ -49,6 +49,14 @@ pub fn render_with(tera: &Tera, plan: &Plan, task: &ResolvedTask) -> Result<Stri
     let audit_cmd = plan.preflight.audit.as_deref().unwrap_or("");
     ctx.insert("audit_cmd", &audit_cmd);
 
+    // Strict language rules — only injected when `[style] strict = true`.
+    // Each per-task file carries the rules because the implementer reads
+    // the task file in isolation when dispatched.
+    ctx.insert("strict", &plan.style.strict);
+    if plan.style.strict {
+        ctx.insert("strict_rules", &profile.strict_rules);
+    }
+
     // Dependency description
     let depends_on_desc = if task.depends_on.is_empty() {
         "None".to_string()
@@ -71,4 +79,60 @@ pub fn render_with(tera: &Tera, plan: &Plan, task: &ResolvedTask) -> Result<Stri
 
     tera.render("task.md", &ctx)
         .map_err(|e| WiggumError::Template(e.to_string()))
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use super::*;
+    use crate::domain::plan::Plan;
+
+    fn plan_with(strict: bool) -> Plan {
+        let toml = format!(
+            r#"
+[project]
+name = "strict-test"
+path = "./strict-test"
+description = "strict mode test"
+language = "rust"
+
+[style]
+strict = {strict}
+
+[[phases]]
+name = "Phase 1"
+order = 1
+
+[[phases.tasks]]
+slug = "t01-init"
+title = "T01 Init"
+goal = "Set up the project."
+"#
+        );
+        Plan::from_toml(&toml).unwrap()
+    }
+
+    #[test]
+    fn task_omits_strict_rules_by_default() {
+        let plan = plan_with(false);
+        let resolved = plan.resolve_tasks().unwrap();
+        let rendered = render(&plan, resolved.first().unwrap()).unwrap();
+        assert!(
+            !rendered.contains("Strict Standards"),
+            "task must NOT include strict block by default"
+        );
+    }
+
+    #[test]
+    fn task_includes_strict_rules_when_opted_in() {
+        let plan = plan_with(true);
+        let resolved = plan.resolve_tasks().unwrap();
+        let rendered = render(&plan, resolved.first().unwrap()).unwrap();
+        assert!(
+            rendered.contains("Strict Standards"),
+            "task must include the strict block header when `[style] strict = true`"
+        );
+        assert!(rendered.contains(".unwrap()"));
+        assert!(rendered.contains(".is_multiple_of"));
+    }
 }

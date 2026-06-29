@@ -75,4 +75,20 @@ pub static PROFILE: &LanguageProfile = &LanguageProfile {
         "Keep TODO/FIXME markers for genuine incomplete work, but never in production auth code.",
         "JSDoc/TSDoc should describe contracts and edge cases, not repeat function signatures.",
     ],
+
+    // Mirrors `docs/strict-lints.md` (TypeScript). Opt-in via
+    // `[style] strict = true` in the plan TOML. typescript-eslint v8 flat
+    // config + `tsc --noEmit` with `noUncheckedIndexedAccess` + `npm audit`.
+    strict_rules: &[
+        "`noUncheckedIndexedAccess` is non-negotiable — it is the single highest-impact safety flag; handle the `undefined` from every array and record access.",
+        "No `any` (`no-explicit-any`); reach for `unknown` and narrow. No non-null assertions (`!`) and no unchecked casts (`no-non-null-assertion`, `no-unnecessary-type-assertion`).",
+        "No floating or misused promises (`no-floating-promises`, `no-misused-promises`) — every promise is awaited, returned, or explicitly `void`-ed.",
+        "Parse all external input (HTTP bodies, env, JSON, query params) at the boundary with a runtime schema validator (e.g. Zod) before it enters typed code — types alone do not validate at runtime.",
+        "`eqeqeq` strict; `no-unnecessary-condition`; exhaustive `switch` with a `never` default for discriminated unions.",
+        "No `eval`, no `Function` constructor, no `child_process` with interpolated user input; no `dangerouslySetInnerHTML` without sanitization.",
+        "Prefer `readonly` and `as const`; no parameter reassignment; functions have explicit return types at module boundaries.",
+        "Crypto and randomness from `node:crypto` (`webcrypto`), never `Math.random()` for anything security-relevant.",
+        "Treat warnings as errors: `tsc --noEmit` and ESLint run with `treatWarningsAsErrors` / `--max-warnings 0`; a warning fails the build.",
+        "No suppression without justification: never blanket-disable an ESLint rule; suppress narrowly, inline, with a rule ID and a one-line reason. Prefer fixing.",
+    ],
 };

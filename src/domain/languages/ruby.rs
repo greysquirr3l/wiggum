@@ -73,4 +73,22 @@ pub static PROFILE: &LanguageProfile = &LanguageProfile {
         "Keep TODO/FIXME markers for genuine incomplete work, but never in production auth code.",
         "YARD comments should describe contracts and edge cases, not repeat method signatures.",
     ],
+
+    // Mirrors `docs/strict-lints.md` (Ruby). Opt-in via
+    // `[style] strict = true` in the plan TOML. RuboCop (with Security and
+    // Lint departments as errors) + Brakeman (with `-z` to fail on Rails
+    // surface) + Sorbet (`# typed: strict`) + bundler-audit for SCA — all
+    // on Ruby 3.2+.
+    strict_rules: &[
+        "`# frozen_string_literal: true` at the top of every file; RuboCop `Style/FrozenStringLiteralComment` enforced.",
+        "The `Security/*` and `Lint/*` cop departments are build-breaking — `Security/Eval`, `Security/Open` (no `Kernel#open` / `URI.open` on user input), `Security/YAMLLoad`, `Security/MarshalLoad`.",
+        "Brakeman runs with `-z` (fail on findings) on Rails surface — catches SQL injection, XSS, command injection, mass assignment, and unsafe redirects directly from source.",
+        "Adopt Sorbet (`# typed: strict`) on domain and boundary files; `srb tc` is part of preflight; sig every public method.",
+        "Strong-parameter allow-lists for all controller input (mass-assignment defense); Ecto / AR changesets cast only permitted attributes.",
+        "Parameterised queries / ActiveRecord placeholders only; never interpolate into `where(\"...\")` or raw SQL.",
+        "`SecureRandom` for tokens; strong crypto only; no `eval` / `send` on user-controlled strings.",
+        "No swallowed exceptions (`rescue => e; end`); rescue specific classes and re-raise or log.",
+        "Treat warnings as errors: `rubocop --no-color --force-exclusion` exits non-zero on any finding; Brakeman `-z` blocks the commit.",
+        "No suppression without justification: never `# rubocop:disable` at file scope; suppress narrowly, inline, with a cop name and a one-line reason. Prefer fixing.",
+    ],
 };

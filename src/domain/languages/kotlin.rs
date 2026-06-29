@@ -73,4 +73,21 @@ pub static PROFILE: &LanguageProfile = &LanguageProfile {
         "Keep TODO/FIXME markers for genuine incomplete work, but never in production auth code.",
         "KDoc should describe contracts and edge cases, not repeat function signatures.",
     ],
+
+    // Mirrors `docs/strict-lints.md` (Kotlin). Opt-in via
+    // `[style] strict = true` in the plan TOML. detekt (`allRules = true`)
+    // + ktlint formatting + explicit-API mode + all-warnings-as-errors +
+    // OWASP dependency-check — all on JDK 21+.
+    strict_rules: &[
+        "No `!!` (not-null assertion) — handle nullability with `?.`, `?:`, `requireNotNull` with a message, or a smart-cast; detekt's `UnsafeCallOnNullableType` is an error.",
+        "Explicit API mode (`explicitApi()`) — every public declaration states visibility and an explicit return type; no inferred public surface.",
+        "No `lateinit` for externally-supplied state; prefer constructor injection and immutable `val`.",
+        "detekt `allRules = true` with the formatting rule set; the potential-bugs and exceptions rule groups are build-breaking (no swallowed exceptions, no generic `catch (e: Exception)` that hides failures).",
+        "Coroutines: never `GlobalScope`; use structured concurrency with an injected scope and dispatcher; no `runBlocking` in production paths.",
+        "Parameterised queries / prepared statements only; no string-built SQL.",
+        "`SecureRandom` for security values; strong crypto only; validate TLS.",
+        "Sealed hierarchies with exhaustive `when` (no `else` that swallows new subtypes).",
+        "Treat warnings as errors: `compileKotlin` runs with `allWarningsAsErrors = true`; detekt findings fail the build.",
+        "No suppression without justification: never `@Suppress(\"DetektRule\")` at file or project scope; suppress narrowly, inline, with a rule ID and a one-line reason. Prefer fixing.",
+    ],
 };

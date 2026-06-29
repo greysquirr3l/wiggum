@@ -73,6 +73,14 @@ fn render_evaluator(
     };
     ctx.insert("evaluator_mode", mode_str);
 
+    // Strict rules mirror to the evaluator so it can flag code that
+    // violates the project-level language standards during the PASS/FAIL call.
+    ctx.insert("strict", &plan.style.strict);
+    if plan.style.strict {
+        let profile = plan.project.language.profile();
+        ctx.insert("strict_rules", &profile.strict_rules);
+    }
+
     tera.render("evaluator.md", &ctx)
         .map_err(|e| WiggumError::Template(e.to_string()))
 }
@@ -128,6 +136,12 @@ pub fn render_opencode_with(
         EvalMode::Advisor => "advisor",
     };
     ctx.insert("evaluator_mode", mode_str);
+
+    ctx.insert("strict", &plan.style.strict);
+    if plan.style.strict {
+        let profile = plan.project.language.profile();
+        ctx.insert("strict_rules", &profile.strict_rules);
+    }
 
     let rendered = tera
         .render("evaluator_opencode.md", &ctx)

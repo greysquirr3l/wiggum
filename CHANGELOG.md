@@ -4,7 +4,56 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [0.13.0] - 2026-06-17
+## [0.16.0] - 2026-06-29
+
+### Added
+
+- **Full Claude Code support** — the `claude` target now emits `CLAUDE.md` at the repository root alongside the existing `.claude/settings.json` hooks. `CLAUDE.md` is Claude Code's project memory file (loaded on every session) and contains the project persona, preflight commands, architecture rules, user-defined rules, security rules, AI-avoidance guidance (when `[style] avoid_ai_patterns = true`), and a workflow loop. Claude Code IS its own orchestrator — wiggum supplies context + rules, Claude Code drives dispatch. New `src/generation/claude.rs` module + `claude.md` Tera template.
+- **`agent-rules` target** — fork-neutral rules files for VSCode forks that don't speak the GitHub Copilot `runSubagent` or opencode `task` protocols (Cursor, Windsurf, Antigravity, Trae, Cody, Cline, Roo Code, Continue). Emits three artifacts from one shared template so the rules stay in lockstep: `.cursorrules` (Cursor), `.windsurfrules` (Windsurf), and `.github/copilot-instructions.md` (GitHub Copilot + forks that read it). Unlike the `vscode` and `opencode` targets, these files contain rules + project context only — no orchestrator loop directives. New `src/generation/agent_rules.rs` module + `agent_rules.md` Tera template. CLI accepts `--target agent-rules` (aliases: `agent_rules`, `rules`).
+- **Cross-fork reach** — the previously GitHub-Copilot-only `vscode` target's reach is now explicit: the docs page (`docs/targets.md`) calls out that other VSCode forks need the `agent-rules` target, and the target table reflects the new 4-target model.
+
+### Changed
+
+- **`Target` enum gains a fourth variant:** `AgentRules`. `TargetSet` gains an `agent_rules: bool` field. `TargetConfig` in plan TOML gains an `[targets] agent_rules = true|false` option (default `false`).
+- **CLI value parser** extended: `--target` now accepts `vscode`, `opencode`, `claude`, `agent-rules`, or `all`.
+- **Claude target is no longer "hooks only"** — wiggum now also writes `CLAUDE.md` whenever `claude = true`. Existing plans with `claude = true` will get the extra file on next generate; existing plans with `claude = false` (the default) are unaffected.
+- **`wiggum clean`** now removes `CLAUDE.md`, `.cursorrules`, `.windsurfrules`, and `.github/copilot-instructions.md`. The empty `.github/` directory is cleaned up only when it contains no other files (a hand-written `.github/workflows/ci.yml` is preserved).
+- **Template override support extended:** `claude.md` and `agent_rules.md` are now in the override-discovery list, so user templates in `.wiggum/templates/claude.md` or `.wiggum/templates/agent_rules.md` take effect.
+- **Generated artifact struct** gains `claude_md`, `agent_rules_cursorrules`, `agent_rules_windsurfrules`, `agent_rules_copilot_instructions` fields.
+- **`print_wiggle_out` and `print_dry_run` output** now lists the new files under their respective targets.
+
+### Migration
+
+- Plans with `claude = true` will now produce a `CLAUDE.md` at the repo root in addition to `.claude/settings.json`. If you have a hand-written `CLAUDE.md` and don't want wiggum overwriting it, set `[targets] claude = false`.
+- Plans targeting only `vscode` or `opencode` need no changes — the new `agent-rules` target is opt-in.
+- Library consumers of `GeneratedArtifacts` must initialise the four new fields when constructing test fixtures (covered by the `tokens.rs` test fixture update in this PR).
+
+## [0.15.0] - 2026-06-29
+
+### Added
+
+- **PHP language profile** — `Language::Php` variant, `composer.json` detection in `wiggum bootstrap`, `tests/` directory convention in `wiggum clean`. Default build (`composer install --no-interaction --no-progress`), test (`vendor/bin/phpunit`), lint (`vendor/bin/php-cs-fixer fix --dry-run --diff && vendor/bin/phpstan analyse`), and audit (`composer audit`) commands. PHP gets 16 OWASP-derived security rules (secrets, prepared statements, security headers, rate limiting, upload validation, SSRF, weak crypto, TLS validation, CSPRNG via `random_bytes` / `random_int`, no `unserialize` on untrusted data, no `eval`, path traversal, logging, auth TODOs, IV uniqueness, cookie attributes) plus the security-hardening, integration-wiring, and stub-cleanup auto-injected tasks on the same thresholds as every other supported language.
+- **Strict rules for every supported language** — the `strict_rules` field on `LanguageProfile` (previously populated only for Rust) now contains a full imperative ruleset for all 11 languages, transcribed from `docs/strict-lints.md`:
+  - **Go** (12 rules) — `golangci-lint v2` + `gofumpt` + `govulncheck`; never discard errors, no `panic` in library code, every blocking call takes `context.Context`, close HTTP bodies and `sql.Rows`, `gosec` G115 integer-overflow conversion rules, `depguard` bans on `crypto/md5` / `crypto/sha1` / `crypto/des` / `math/rand` / `io/ioutil`, `forbidigo` bans on `fmt.Print*` / `http.DefaultClient`, parameterised SQL only, exhaustive `switch`.
+  - **TypeScript** (10 rules) — `typescript-eslint v8` flat config with `strictTypeChecked` + `stylisticTypeChecked`; `noUncheckedIndexedAccess` non-negotiable, no `any` / `!` / unchecked casts, no floating promises, Zod at every input boundary, `eqeqeq` + `never` defaults, no `eval` / `Function` / `child_process` interpolation, `readonly` + `as const`, `node:crypto` for randomness.
+  - **Python** (10 rules) — Ruff with the `S` (bandit) group on, `mypy --strict`, `pip-audit`; no `pickle.loads` / `yaml.load` on untrusted data, no `subprocess(shell=True)`, `secrets` for tokens, parameterised SQL, no `Any` leaks, no bare `except:`, no `eval` / `exec`, explicit `requests` timeouts.
+  - **Java** (10 rules) — `Error Prone` + `NullAway` + `SpotBugs` with `findsecbugs` at `effort:max` + `dependency-check`; non-null-by-default, no `Runtime.exec` with user input, prepared statements only, no `ObjectInputStream` on untrusted data, `SecureRandom` / AES-GCM / SHA-256+, try-with-resources, log through the framework.
+  - **C# / .NET** (10 rules) — Roslyn `AnalysisMode=All` + `Nullable=enable` + `TreatWarningsAsErrors` + Security Code Scan; no `!` null-forgiving operator, CA2100 / CA3xxx / CA5350 / CA5351 / CA5359 / CA5360+ build-breaking, no `FromSqlRaw` interpolation, no `BinaryFormatter` / `TypeNameHandling`, `RandomNumberGenerator` for tokens, reused `HttpClient` with explicit timeouts, no `#nullable disable`.
+  - **Kotlin** (10 rules) — `detekt allRules = true` + `explicitApi()` + `allWarningsAsErrors`; no `!!`, no `lateinit` on external state, no `GlobalScope` / `runBlocking` in production paths, parameterised queries, sealed hierarchies with exhaustive `when`.
+  - **Swift** (9 rules) — Swift 6 language mode with complete strict concurrency + SwiftLint `--strict` + `warnings-as-errors`; data-race safety at compile time, no `@unchecked Sendable`, `@MainActor`-isolated UI mutations, no force-unwrap / force-try / force-cast outside tests, Keychain for secrets, `SystemRandomNumberGenerator` / CryptoKit.
+  - **Ruby** (10 rules) — RuboCop with `Security/*` and `Lint/*` as build-breaking + Brakeman `-z` + Sorbet `# typed: strict` + bundler-audit; frozen-string-literal comment enforced, strong-parameter allow-lists, Sorbet sigs on every public method, `SecureRandom`, no `eval` / `send` on user input.
+  - **Elixir** (10 rules) — `mix compile --warnings-as-errors` + `mix credo --strict` + Dialyzer via Dialyxir + Sobelow `--exit` + `mix deps.audit`; never `String.to_atom/1` on user input (atom-table exhaustion), never `:erlang.binary_to_term` on untrusted data, Ecto `cast` allow-lists, `:crypto.strong_rand_bytes`, verify TLS.
+  - **PHP** (13 rules) — PHPStan 2.x at `level max` with `phpstan-strict-rules` + `phpstan-deprecation-rules` + Psalm `--taint-analysis` + `roave/security-advisories`; `declare(strict_types=1)` in every file, baseline quarantines legacy debt without weakening the level, banned functions (`eval` / `exec` / `system` / `passthru` / `shell_exec` / `assert`-on-strings / `extract` / `phpinfo`), prepared statements with bound parameters only, `password_hash` (Argon2id / bcrypt), `random_bytes` / `random_int` for security values, output encoding per context, `Secure` / `HttpOnly` / `SameSite` cookies, no `@` error suppression, parse at the boundary into typed value objects.
+  - All non-Rust profiles add a closing pair of cross-language rules from the baseline: **Treat warnings as errors** (the language's "warnings-as-errors" switch stays on; a warning fails the build) and **No suppression without justification** (never blanket-disable a rule; suppress narrowly, inline, with a rule ID and a one-line reason).
+- **Strict-mode test coverage** — `php_profile_values` and `all_languages_have_strict_rules` tests in `src/domain/languages/mod.rs` assert every `Language::ALL` entry has a non-empty `strict_rules` array; prevents silent drift when a new language profile is added.
+- **New docs page** — `docs/strict-lints.md` documents the cross-language baseline (fail-secure default, parse-don't-validate, CSPRNG only, no weak crypto, parameterised queries, no untrusted deserialisation, path traversal guarded, supply-chain audit in CI) plus the per-language toolchain version pins (golangci-lint v2, typescript-eslint v8, Ruff + mypy strict, Swift 6 mode, Error Prone / NullAway, Roslyn `AnalysisMode=All`, detekt all-rules, RuboCop + Brakeman + Sorbet, Credo + Dialyzer + Sobelow, PHPStan max + Psalm taint) and per-task opt-out pattern (`strict = false` on a `[[phases.tasks]]` for spikes/prototypes).
+
+### Changed
+
+- **`[style] strict_rust` → `[style] strict`** — the opt-in toggle in `StyleConfig` is renamed and generalised. The Rust profile still loads the `~/Projects/nick.md`-aligned ruleset; every other supported language now loads its own profile from `docs/strict-lints.md`. Schema, templates, evaluator, task generator, and orchestrator prompt all updated to the new field name. The context variable injected into Tera templates is renamed from `strict_rust` / `strict_rust_rules` to `strict` / `strict_rules`; template section headers are generalised (`## Strict project standards`, `## Strict Standards (Project-wide)`, `## Strict standards verification`).
+- **`LanguageProfile.strict_rules` doc comment** updated to point at both `~/Projects/nick.md` (Rust) and `docs/strict-lints.md` (every other language) and to summarise the per-language toolchain versions.
+
+## [0.14.0] - 2026-06-19
 
 ### Added
 
@@ -36,7 +85,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - To enable opencode: add `[targets] opencode = true` to the plan TOML, or pass `--target opencode` (or `--target all`) on the CLI.
 - Library consumers of `GeneratedArtifacts` must update field names: `orchestrator` → `orchestrator_vscode` (and friends). `write_artifacts`/`generate_all` callers must pass a `&TargetSet`.
 
-## [0.14.0] - 2026-06-19
+## [0.13.0] - 2026-06-17
 
 ### Added
 
@@ -359,6 +408,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - VCS-aware reporting with git timeline
 - mdBook documentation site
 
+[0.16.0]: https://github.com/greysquirr3l/wiggum/compare/v0.15.0...v0.16.0
+[0.15.0]: https://github.com/greysquirr3l/wiggum/compare/v0.14.0...v0.15.0
+[0.14.0]: https://github.com/greysquirr3l/wiggum/compare/v0.13.0...v0.14.0
+[0.13.0]: https://github.com/greysquirr3l/wiggum/compare/v0.12.0...v0.13.0
+[0.12.0]: https://github.com/greysquirr3l/wiggum/compare/v0.11.0...v0.12.0
+[0.11.0]: https://github.com/greysquirr3l/wiggum/compare/v0.10.1...v0.11.0
 [0.10.1]: https://github.com/greysquirr3l/wiggum/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/greysquirr3l/wiggum/compare/v0.9.1...v0.10.0
 [0.9.1]: https://github.com/greysquirr3l/wiggum/compare/v0.9.0...v0.9.1

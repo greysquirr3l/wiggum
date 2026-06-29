@@ -28,6 +28,10 @@ static TEMPLATES: LazyLock<Tera> = LazyLock::new(|| {
             "background_auditor_opencode.md",
             BACKGROUND_AUDITOR_OPENCODE_TEMPLATE,
         ),
+        // Claude target — full Claude Code support.
+        ("claude.md", CLAUDE_MD_TEMPLATE),
+        // agent-rules target — fork-neutral rules files.
+        ("agent_rules.md", AGENT_RULES_TEMPLATE),
     ];
 
     for (name, content) in templates {
@@ -78,6 +82,8 @@ pub fn get_tera_with_overrides(project_path: &Path) -> Result<Tera> {
         "evaluator_opencode.md",
         "planner_opencode.md",
         "background_auditor_opencode.md",
+        "claude.md",
+        "agent_rules.md",
     ];
 
     // Subdir layout — overrides grouped by target. The flat name is the
@@ -446,6 +452,15 @@ Complete the real fix in one pass. No workaround when the root fix is in scope.
 {% for rule in security_rules %}
 - {{ rule }}
 {% endfor %}
+{% if strict %}
+## Strict project standards
+
+This plan opts in to `[style] strict = true`. Every rule below is a hard
+requirement — `preflight` will block any commit that violates them.
+{% for rule in strict_rules %}
+- {{ rule }}
+{% endfor %}
+{% endif %}
 {% if avoid_ai_patterns %}
 ## Writing style (non-negotiable)
 
@@ -667,6 +682,16 @@ Audit rules:
 - Do not expand `utils`, `helpers`, or `common` into multi-purpose dumping grounds.
 - If a file is already overloaded, extract cohesive pieces before adding new behavior.
 {% if architecture == "hexagonal" %}- In hexagonal code, introduce or refine the port trait first, then move implementation into adapters/domain boundaries as needed.{% endif %}
+{% endif %}
+{% if strict %}
+## Strict Standards (Project-wide)
+
+This task is part of a project that opts in to `[style] strict = true`.
+Generated code must comply with every rule below — `preflight` will block
+the commit otherwise.
+{% for rule in strict_rules %}
+- {{ rule }}
+{% endfor %}
 {% endif %}
 
 ## Housekeeping: TODO / FIXME Sweep
@@ -946,6 +971,18 @@ After checking all criteria:
 - <specific fix with file + line reference>
 ```
 
+{% if strict %}
+## Strict standards verification
+
+This project enables `[style] strict = true`. Independently verify each
+generated file against the rules below and flag any violation as a
+separate `HOLLOW` criterion with the file path + line numbers in the
+evidence column.
+{% for rule in strict_rules %}
+- {{ rule }}
+{% endfor %}
+{% endif %}
+
 ## After evaluation
 
 **If PASS:**
@@ -1103,7 +1140,6 @@ const ORCHESTRATOR_OPENCODE_TEMPLATE: &str = r#"---
 description: Orchestrator for {{ project_name }} — drives wiggum subagents through all tasks
 mode: primary
 {% if orchestrator_model %}model: {{ orchestrator_model }}
-{% else %}model: anthropic/claude-sonnet-4-20250514
 {% endif %}permission:
   edit: deny
   bash:
@@ -1257,13 +1293,24 @@ When a context window ends mid-task (compaction or interrupt), before surrenderi
    - Next concrete action needed
 2. Do **not** mark the task `[x]` until all exit criteria are verified.
 3. On resume, read `## Session handoff` and the task file before writing any code.
+{% if strict %}
+## Strict project standards
+
+This project enables `[style] strict = true`. When you dispatch the
+implementer, **prepend** the rule list to the task prompt so the
+subagent writes code that complies:
+
+```
+{% for rule in strict_rules %}- {{ rule }}
+{% endfor %}
+```
+{% endif %}
 "#;
 
 const IMPLEMENTER_TEMPLATE: &str = r#"---
 description: Wiggum implementer — executes a single task file for {{ project_name }}
 mode: subagent
 {% if subagent_model %}model: {{ subagent_model }}
-{% else %}model: anthropic/claude-sonnet-4-20250514
 {% endif %}permission:
   task: deny
   bash:
@@ -1285,6 +1332,16 @@ The orchestrator has already injected the **Accumulated Learnings** and **Codeba
 sections from `PROGRESS.md` at the top of your dispatch message. Apply them before writing any code.
 
 > The task file path is included in the orchestrator's prompt via `@{{ project_path }}/tasks/T{NN}-{slug}.md`. Read that file first — it contains the goal, hints, test hints, and exit criteria.
+{% if strict %}
+## Strict project standards
+
+This project enables `[style] strict = true`. The generated code must
+comply with every rule below. Treat them as hard requirements, not
+suggestions — `preflight` will block any commit that violates them.
+{% for rule in strict_rules %}
+- {{ rule }}
+{% endfor %}
+{% endif %}
 {% if strategy == "tdd" %}
 ## Strategy: Test-Driven Development (TDD)
 
@@ -1407,6 +1464,15 @@ Complete the real fix in one pass. No workaround when the root fix is in scope.
 {% for rule in security_rules %}
 - {{ rule }}
 {% endfor %}
+{% if strict %}
+## Strict project standards
+
+This plan opts in to `[style] strict = true`. Every rule below is a hard
+requirement — `preflight` will block any commit that violates them.
+{% for rule in strict_rules %}
+- {{ rule }}
+{% endfor %}
+{% endif %}
 {% if avoid_ai_patterns %}
 ## Writing style (non-negotiable)
 
@@ -1455,7 +1521,6 @@ const EVALUATOR_OPENCODE_TEMPLATE: &str = r#"---
 description: Wiggum evaluator — independently verifies task completion for {{ project_name }}
 mode: subagent
 {% if evaluator_model %}model: {{ evaluator_model }}
-{% else %}model: anthropic/claude-sonnet-4-20250514
 {% endif %}permission:
   task: deny
   edit: deny
@@ -1582,6 +1647,18 @@ After checking all criteria:
 - <specific fix with file + line reference>
 ```
 
+{% if strict %}
+## Strict standards verification
+
+This project enables `[style] strict = true`. Independently verify each
+generated file against the rules below and flag any violation as a
+separate `HOLLOW` criterion with the file path + line numbers in the
+evidence column.
+{% for rule in strict_rules %}
+- {{ rule }}
+{% endfor %}
+{% endif %}
+
 ## After evaluation
 
 **If PASS:**
@@ -1606,7 +1683,6 @@ _Generated by [wiggum](https://github.com/greysquirr3l/wiggum)._
 const PLANNER_OPENCODE_TEMPLATE: &str = r"---
 description: Wiggum planner — decomposes goals into wiggum tasks for {{ project_name }}
 mode: subagent
-model: anthropic/claude-sonnet-4-20250514
 permission:
   task: deny
   edit: deny
@@ -1664,7 +1740,6 @@ _Generated by [wiggum](https://github.com/greysquirr3l/wiggum)._
 const BACKGROUND_AUDITOR_OPENCODE_TEMPLATE: &str = r#"---
 description: Wiggum background auditor — continuously monitors implementation quality for {{ project_name }}
 mode: subagent
-model: anthropic/claude-sonnet-4-20250514
 permission:
   task: deny
   edit: deny
@@ -1736,4 +1811,237 @@ injection point with no validation), set the task status to `[!]` in `PROGRESS.m
 and report to the orchestrator immediately.
 
 _Generated by [wiggum](https://github.com/greysquirr3l/wiggum)._
+"#;
+
+/// `CLAUDE.md` — Claude Code's project memory file. Loaded by Claude Code on
+/// every session for the repository. Carries the project persona, security
+/// rules, architecture guidance, and style settings so a human-in-the-loop
+/// Claude Code session stays aligned with the plan without re-reading every
+/// task file.
+const CLAUDE_MD_TEMPLATE: &str = r#"# CLAUDE.md
+
+You are working on **{{ project_name }}** — {{ project_description }}
+
+{{ persona }}
+
+## Preflight
+
+Run before every commit. A preflight failure blocks the commit.
+
+```bash
+{{ preflight_build }} && {{ preflight_test }} && {{ preflight_lint }}{% if audit_cmd %} && {{ audit_cmd }}{% endif %}
+```
+{% if architecture == "hexagonal" %}
+## Architecture: Hexagonal
+
+- Domain layer has zero I/O dependencies; all external interactions go through port traits; adapters implement port traits and live in `adapters/`; new capabilities require a new port trait before an adapter.
+- Depend inward: adapters → ports ← domain.
+{% if avoid_god_files %}- When splitting an overloaded file, introduce the port trait first, then move the implementation — never invent the interface and migrate code in the same step.{% endif %}
+{% elif architecture == "layered" %}
+## Architecture: Layered
+
+- Respect layer boundaries: presentation → application → domain → infrastructure.
+- Domain entities must not reference application or infrastructure types.
+- Use DTOs at layer boundaries — don't leak domain types to presentation.
+- Each layer depends only on the layer below it.
+{% elif architecture == "modular" %}
+## Architecture: Modular
+
+- Each module is self-contained with its own models, handlers, and storage.
+- Modules communicate through well-defined public interfaces.
+- Shared code goes in a `common/` or `shared/` module.
+- Prefer module-level encapsulation over cross-cutting layers.
+{% elif architecture == "flat" %}
+## Architecture: Flat
+
+- Simple project structure without deep nesting; all source files at the top level of `src/`.
+{% endif %}
+## Rules
+{% if rules | length > 0 %}
+{% for rule in rules %}- {{ rule }}
+{% endfor %}{% else %}
+- (no project-specific rules defined in the plan)
+{% endif %}
+## Security (non-negotiable)
+
+These rules apply to every file you touch — no exceptions.
+{% for rule in security_rules %}- {{ rule }}
+{% endfor %}
+{% if strict %}
+## Strict project standards
+
+This project enables `[style] strict = true`. The generated code must comply with every rule below. Treat them as hard requirements, not suggestions — `preflight` will block any commit that violates them.
+{% for rule in strict_rules %}- {{ rule }}
+{% endfor %}
+{% endif %}
+{% if avoid_ai_patterns %}
+## Writing style (non-negotiable)
+
+Avoid patterns that reveal AI authorship.
+{% for rule in ai_avoidance_rules %}- {{ rule }}
+{% endfor %}
+### Commenting guidelines
+{% for guideline in comment_guidelines %}- {{ guideline }}
+{% endfor %}
+{% endif %}
+{% if avoid_god_files %}
+## File structure (non-negotiable)
+
+- Do not create or expand "God" files. Keep each file focused on one primary responsibility.
+- If a change introduces a new concern, create a focused module/file instead of extending an unrelated one.
+- Avoid catch-all files (`utils`, `helpers`, `common`) containing unrelated logic.
+- Keep domain logic, adapters, and orchestration in separate files that mirror the selected architecture.
+- If an existing file is already overloaded, prefer extracting cohesive pieces into new files before adding more behavior.
+{% endif %}
+## Workflow
+
+1. Read `IMPLEMENTATION_PLAN.md` and `PROGRESS.md` to understand current state.
+2. Find the next task marked `[ ]` (or `[!]` retry) whose dependencies are all `[x]`.
+3. Mark it `[~]` (in-progress) before any code changes.
+4. Read the task file `tasks/T{NN}-{slug}.md` for goal, hints, test hints, must-haves, and exit criteria.
+5. Implement the task end-to-end. Touch only files within the task's scope.
+6. Run preflight. Fix every error and warning until preflight passes.
+7. Update `PROGRESS.md`: change `[~]` to `[x]`; append any learnings to "Accumulated Learnings"; update "Codebase State" with what now exists.
+8. Commit with a conventional-commits message focused on user impact.
+9. Repeat from step 1.
+
+{% if max_retries > 0 %}
+On a preflight failure or `[!]` outcome, the task resets to `[ ]` for up to **{{ max_retries }}** retries before escalation.
+{% else %}
+No retries are configured; treat the first failure as the only chance.
+{% endif %}
+## Strategy
+
+{% if strategy == "tdd" %}
+**TDD** — write a failing test first, then the minimum implementation to pass it, then refactor. Don't add code without a corresponding test.
+{% elif strategy == "gsd" %}
+**GSD** — focus on must-haves. No gold-plating, no speculative scope. If it isn't required by the task's exit criteria, skip it.
+{% elif strategy == "complete" %}
+**Complete** — ship root fix end-to-end with tests and docs in the same task. No workarounds; no "follow-up" stubs.
+{% else %}
+Standard execution — implement the task to its exit criteria, run preflight, commit.
+{% endif %}
+## Claude hooks companion
+
+A `.claude/settings.json` is generated alongside this file. It registers a `PreCompact` hook that blocks context compression while any task is in the `[~]` (in-progress) state.
+
+- Do **not** delete or edit `.claude/settings.json` manually
+- The hook exit-code controls: `0` = safe to compact, `1` = blocked
+- To force a compact, close the `[~]` task first (mark it `[x]` or `[!]`)
+
+## Commit conventions
+
+- Conventional commits: `feat:`, `fix:`, `refactor:`, `test:`, `docs:`
+- Focus commit messages on user impact, not file counts or line numbers
+- Co-author the commit with the active Claude Code session if requested
+
+---
+
+_Generated by [wiggum](https://github.com/greysquirr3l/wiggum)._
+"#;
+
+/// Fork-neutral rules content emitted to `.cursorrules` (Cursor),
+/// `.windsurfrules` (Windsurf), and `.github/copilot-instructions.md`
+/// (GitHub Copilot / forks that read it). One template, three destinations;
+/// the receiving IDE drives its own agent loop — wiggum supplies only the
+/// rules and project context.
+const AGENT_RULES_TEMPLATE: &str = r#"# Agent rules — {{ project_name }}
+
+{{ project_description }}
+
+Language: **{{ language }}**.
+{% if architecture %}
+Architecture: **{{ architecture }}** (see rules below).
+{% endif %}
+## Preflight
+
+A preflight failure blocks the commit.
+
+```bash
+{{ preflight_build }} && {{ preflight_test }} && {{ preflight_lint }}{% if audit_cmd %} && {{ audit_cmd }}{% endif %}
+```
+
+{% if architecture == "hexagonal" %}
+## Architecture: Hexagonal
+
+- Domain layer has zero I/O dependencies; all external interactions go through port traits; adapters implement port traits and live in `adapters/`; new capabilities require a new port trait before an adapter.
+- Depend inward: adapters → ports ← domain.
+{% if avoid_god_files %}- When splitting an overloaded file, introduce the port trait first, then move the implementation — never invent the interface and migrate code in the same step.{% endif %}
+{% elif architecture == "layered" %}
+## Architecture: Layered
+
+- Respect layer boundaries: presentation → application → domain → infrastructure.
+- Domain entities must not reference application or infrastructure types.
+- Use DTOs at layer boundaries — don't leak domain types to presentation.
+- Each layer depends only on the layer below it.
+{% elif architecture == "modular" %}
+## Architecture: Modular
+
+- Each module is self-contained with its own models, handlers, and storage.
+- Modules communicate through well-defined public interfaces.
+- Shared code goes in a `common/` or `shared/` module.
+- Prefer module-level encapsulation over cross-cutting layers.
+{% elif architecture == "flat" %}
+## Architecture: Flat
+
+- Simple project structure without deep nesting; all source files at the top level of `src/`.
+{% endif %}
+## Rules
+{% if rules | length > 0 %}
+{% for rule in rules %}- {{ rule }}
+{% endfor %}{% else %}
+- (no project-specific rules defined in the plan)
+{% endif %}
+## Security (non-negotiable)
+
+These rules apply to every file you touch — no exceptions.
+
+These rules apply to every file you touch — no exceptions.
+{% for rule in security_rules %}- {{ rule }}
+{% endfor %}
+{% if strict %}
+## Strict project standards
+
+This project enables `[style] strict = true`. The generated code must comply with every rule below. Treat them as hard requirements, not suggestions — `preflight` will block any commit that violates them.
+{% for rule in strict_rules %}- {{ rule }}
+{% endfor %}
+{% endif %}
+{% if avoid_ai_patterns %}
+## Writing style (non-negotiable)
+
+Avoid patterns that reveal AI authorship.
+{% for rule in ai_avoidance_rules %}- {{ rule }}
+{% endfor %}
+### Commenting guidelines
+{% for guideline in comment_guidelines %}- {{ guideline }}
+{% endfor %}
+{% endif %}
+{% if avoid_god_files %}
+## File structure (non-negotiable)
+
+- Do not create or expand "God" files. Keep each file focused on one primary responsibility.
+- If a change introduces a new concern, create a focused module/file instead of extending an unrelated one.
+- Avoid catch-all files (`utils`, `helpers`, `common`) containing unrelated logic.
+- Keep domain logic, adapters, and orchestration in separate files that mirror the selected architecture.
+- If an existing file is already overloaded, prefer extracting cohesive pieces into new files before adding more behavior.
+{% endif %}
+## Strategy
+
+{% if strategy == "tdd" %}
+**TDD** — write a failing test first, then the minimum implementation to pass it, then refactor. Don't add code without a corresponding test.
+{% elif strategy == "gsd" %}
+**GSD** — focus on must-haves. No gold-plating, no speculative scope. If it isn't required by the task's exit criteria, skip it.
+{% elif strategy == "complete" %}
+**Complete** — ship root fix end-to-end with tests and docs in the same task. No workarounds; no "follow-up" stubs.
+{% else %}
+Standard execution — implement the task to its exit criteria, run preflight, commit.
+{% endif %}
+## Commit conventions
+
+- Conventional commits: `feat:`, `fix:`, `refactor:`, `test:`, `docs:`
+- Focus commit messages on user impact, not file counts or line numbers
+
+---
+
+_Generated by [wiggum](https://github.com/greysquirr3l/wiggum). This file is a rules document for IDE-side agents; it contains no orchestrator-loop directives. The receiving IDE drives its own agent loop._
 "#;

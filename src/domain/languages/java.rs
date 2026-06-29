@@ -73,4 +73,21 @@ pub static PROFILE: &LanguageProfile = &LanguageProfile {
         "Keep TODO/FIXME markers for genuine incomplete work, but never in production auth code.",
         "Javadoc should describe contracts and edge cases, not repeat method signatures.",
     ],
+
+    // Mirrors `docs/strict-lints.md` (Java). Opt-in via
+    // `[style] strict = true` in the plan TOML. Error Prone + NullAway at
+    // compile time, SpotBugs + Find Security Bugs on bytecode, Checkstyle
+    // + PMD for style, OWASP dependency-check for SCA — all on JDK 21+.
+    strict_rules: &[
+        "NullAway makes non-null the default — every parameter, field, and return is non-null unless annotated `@Nullable`; no unchecked dereference of a possibly-null value.",
+        "Error Prone runs at `ERROR` severity; the Google bug-pattern set is treated as build-breaking, not advisory.",
+        "SpotBugs runs with the Find Security Bugs plugin at `effort:max` — covers injection, crypto weakness, path traversal, and unsafe deserialization (CWE-mapped).",
+        "Never `Runtime.exec` / `ProcessBuilder` with user-built strings; use a fixed allow-list of commands mapped from an enum.",
+        "`PreparedStatement` with bound parameters only; never concatenate into JDBC SQL or HQL / JPQL.",
+        "No Java native serialisation of untrusted data (`ObjectInputStream`); prefer a schema'd format with validation.",
+        "Strong crypto only (AES-GCM, SHA-256+); no `Random` for security — use `SecureRandom`; validate TLS, never a trust-all `TrustManager`.",
+        "Close resources with try-with-resources; no swallowed exceptions; no `printStackTrace` — log through the framework.",
+        "Treat warnings as errors: javac runs with `-Werror` and the Error Prone / NullAway compiler plugins enabled; a warning fails the build.",
+        "No suppression without justification: never `@SuppressWarnings(\"all\")`; suppress narrowly, with a warning ID and a one-line reason. Prefer fixing.",
+    ],
 };

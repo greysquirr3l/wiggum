@@ -40,12 +40,16 @@ This produces the task files, `PROGRESS.md`, `IMPLEMENTATION_PLAN.md`, and the
 target-specific agent prompts in your project directory.
 
 By default, Wiggum emits VSCode + Copilot prompt files (`.vscode/*.prompt.md`).
-To target opencode instead, pass `--target opencode` or add `[targets] opencode = true` to your plan. Run `wiggum generate plan.toml --target all` to emit both:
+Other targets are opt-in via `--target` or the plan's `[targets]` section:
 
-- `.vscode/orchestrator.prompt.md` (VSCode + Copilot)
-- `.opencode/agents/wiggum-orchestrator.md` (opencode)
+| Target | CLI / plan field | What gets emitted |
+|---|---|---|
+| VSCode + Copilot (default) | `--target vscode` | `.vscode/orchestrator.prompt.md` + three siblings |
+| opencode | `--target opencode` | `.opencode/agents/wiggum-*.md` (five files) |
+| Claude Code | `--target claude` | `CLAUDE.md` (project memory) + `.claude/settings.json` (hooks) |
+| Cursor / Windsurf / GitHub Copilot | `--target agent-rules` | `.cursorrules` + `.windsurfrules` + `.github/copilot-instructions.md` |
 
-See [Targets](./targets.md) for the full reference.
+Run `wiggum generate plan.toml --target all` to emit everything at once. See [Targets](./targets.md) for the full reference.
 
 ## 6. Run the loop
 
@@ -56,3 +60,7 @@ prompt, and let it work through the tasks.
   `.vscode/orchestrator.prompt.md` as the user message.
 - **opencode:** open the project — the `wiggum-orchestrator` agent is
   auto-discovered from `.opencode/agents/`. Select it from the agent picker.
+- **Claude Code:** open the project — `CLAUDE.md` is auto-loaded and the
+  `PreCompact` hook is auto-registered. Run `claude` in the terminal.
+- **Cursor / Windsurf / Copilot:** open the project — the IDE reads its
+  corresponding rules file automatically.

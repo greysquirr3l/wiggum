@@ -111,6 +111,11 @@ How each field is applied depends on the active [target](./targets.md):
     frontmatter. opencode does not support per-dispatch `model:` arguments —
     the subagent's model is pinned by the agent definition itself.
   - `[evaluator] model` — written into the evaluator agent's frontmatter.
+- **Claude target:**
+  - `[orchestrator] model`, `[orchestrator] subagent_model`, and `[evaluator] model`
+    are not currently rendered into `CLAUDE.md` — Claude Code uses the model
+    selected in its own picker at session start. The fields are preserved on the
+    plan for future use and for consistency with other targets.
 
 Equivalent ChatGPT or Gemini model identifiers work the same way — the string is
 passed through to `runSubagent` verbatim, so whatever the picker accepts is valid
@@ -255,6 +260,7 @@ avoid_god_files = true
 |-------|----------|---------|-------------|
 | `avoid_ai_patterns` | No | `true` | When enabled, prompts receive hints to avoid common AI writing patterns |
 | `avoid_god_files` | No | `true` | When enabled, prompts include file-structure guidance that discourages creating "God" files |
+| `strict` | No | `false` | When `true`, injects the language-specific strict rule set (full pedantic clippy for Rust, golangci-lint v2 for Go, PHPStan `level max` for PHP, etc.) into every prompt. See [Strict Standards](./strict-standards.md). |
 
 When `avoid_ai_patterns` is enabled, generated prompts include guidance to:
 

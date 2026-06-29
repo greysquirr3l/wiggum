@@ -58,6 +58,12 @@ pub fn render_with(tera: &Tera, plan: &Plan, tasks: &[ResolvedTask]) -> Result<S
     // File-structure guidance, conditionally injected.
     ctx.insert("avoid_god_files", &plan.style.avoid_god_files);
 
+    // Strict language rules, conditionally injected via `[style] strict = true`.
+    ctx.insert("strict", &plan.style.strict);
+    if plan.style.strict {
+        ctx.insert("strict_rules", &profile.strict_rules);
+    }
+
     // Parallel execution groups for concurrent subagent dispatch.
     let groups = dag::parallel_groups(tasks)?;
     let groups_value =
@@ -105,6 +111,14 @@ pub fn render_opencode_with(tera: &Tera, plan: &Plan, tasks: &[ResolvedTask]) ->
     );
     ctx.insert("has_evaluator", &plan.evaluator.is_some());
 
+    // Strict rules are mirrored into the opencode orchestrator so it can
+    // repeat the high-level expectations when briefing subagents.
+    ctx.insert("strict", &plan.style.strict);
+    if plan.style.strict {
+        let profile = plan.project.language.profile();
+        ctx.insert("strict_rules", &profile.strict_rules);
+    }
+
     let groups = dag::parallel_groups(tasks)?;
     let groups_value =
         serde_json::to_value(&groups).unwrap_or(serde_json::Value::Array(Vec::new()));
@@ -151,6 +165,14 @@ pub fn render_implementer_with(tera: &Tera, plan: &Plan) -> Result<String> {
     if plan.style.avoid_ai_patterns {
         ctx.insert("ai_avoidance_rules", &profile.ai_avoidance_rules);
         ctx.insert("comment_guidelines", &profile.comment_guidelines);
+    }
+
+    // Strict language rules — only injected into the implementer (where code
+    // is generated) and only when the plan opts in. The implementer must
+    // see the full list because it is the surface that writes the code.
+    ctx.insert("strict", &plan.style.strict);
+    if plan.style.strict {
+        ctx.insert("strict_rules", &profile.strict_rules);
     }
 
     let contract_review = plan.evaluator.as_ref().is_some_and(|e| e.contract_review);
@@ -324,6 +346,197 @@ goal = "Set up the project."
         assert!(
             rendered.contains("Strategy: ") || rendered.contains("## Your job"),
             "must include strategy body or default job block"
+        );
+    }
+
+    // ── strict opt-in ───────────────────────────────────────────────
+
+    fn strict_plan() -> Plan {
+        let mut plan = opencode_plan();
+        plan.style.strict = true;
+        plan
+    }
+
+    #[test]
+    fn strict_off_omits_strict_rules_block_from_implementer() {
+        let plan = opencode_plan();
+        let rendered = render_implementer(&plan).unwrap();
+        assert!(
+            !rendered.contains("Strict project standards"),
+            "default implementer must NOT include strict block"
+        );
+    }
+
+    #[test]
+    fn strict_on_injects_full_rule_list_into_implementer() {
+        let plan = strict_plan();
+        let rendered = render_implementer(&plan).unwrap();
+        assert!(
+            rendered.contains("Strict project standards"),
+            "implementer must include the strict block header"
+        );
+        // Spot-check the most important rules from nick.md (Rust profile).
+        assert!(rendered.contains(".unwrap()"));
+        assert!(rendered.contains(".expect()"));
+        assert!(rendered.contains("panic!"));
+        assert!(rendered.contains("index slicing"));
+        assert!(rendered.contains("#[allow(clippy::"));
+        assert!(rendered.contains(".is_multiple_of"));
+    }
+
+    #[test]
+    fn strict_on_injects_rules_into_vscode_orchestrator_subagent_prompt() {
+        let mut plan = opencode_plan();
+        plan.style.strict = true;
+        let rendered = render(&plan, &[]).unwrap();
+        // The vscode orchestrator embeds the subagent prompt inline.
+        assert!(
+            rendered.contains("Strict project standards"),
+            "vscode orchestrator subagent prompt must include strict block"
+        );
+    }
+
+    #[test]
+    fn strict_on_injects_rules_into_opencode_orchestrator() {
+        let plan = strict_plan();
+        let resolved = plan.resolve_tasks().unwrap();
+        let rendered = render_opencode(&plan, &resolved).unwrap();
+        assert!(
+            rendered.contains("Strict project standards"),
+            "opencode orchestrator must surface strict rules when dispatching subagents"
+        );
+    }
+
+    // ── model omission (opencode picker fall-through) ───────────────
+
+    #[test]
+    fn opencode_orchestrator_omits_model_line_when_unset() {
+        // opencode has no model configured on the plan — the picker should
+        // fall through to the opencode-configured default, so the frontmatter
+        // must not contain a hardcoded `model:` line.
+        let plan = Plan::from_toml(MINIMAL_PLAN).unwrap();
+        let resolved = plan.resolve_tasks().unwrap();
+        let rendered = render_opencode(&plan, &resolved).unwrap();
+        let frontmatter = rendered
+            .split_once("---")
+            .and_then(|(_, rest)| rest.split_once("---"))
+            .map_or("", |(fm, _)| fm);
+        assert!(
+            !frontmatter
+                .lines()
+                .any(|l| l.trim_start().starts_with("model:")),
+            "opencode orchestrator must NOT emit `model:` when orchestrator_model is None; got:\n{frontmatter}",
+        );
+    }
+
+    #[test]
+    fn opencode_orchestrator_omits_model_line_for_subagent_when_unset() {
+        let plan = Plan::from_toml(MINIMAL_PLAN).unwrap();
+        let rendered = render_implementer(&plan).unwrap();
+        let frontmatter = rendered
+            .split_once("---")
+            .and_then(|(_, rest)| rest.split_once("---"))
+            .map_or("", |(fm, _)| fm);
+        assert!(
+            !frontmatter
+                .lines()
+                .any(|l| l.trim_start().starts_with("model:")),
+            "opencode implementer must NOT emit `model:` when subagent_model is None; got:\n{frontmatter}",
+        );
+    }
+
+    #[test]
+    fn opencode_orchestrator_emits_model_line_when_explicitly_set() {
+        // When the user opts in by setting `model = "..."`, the line MUST appear.
+        let plan = opencode_plan();
+        let resolved = plan.resolve_tasks().unwrap();
+        let rendered = render_opencode(&plan, &resolved).unwrap();
+        assert!(
+            rendered.contains("model: anthropic/claude-sonnet-4-20250514"),
+            "explicit orchestrator_model must be rendered"
+        );
+    }
+
+    #[test]
+    fn opencode_evaluator_omits_model_line_when_unset() {
+        let toml = r#"
+[project]
+name = "test"
+path = "./test"
+description = "test"
+language = "rust"
+
+[evaluator]
+model = ""
+pass_threshold = 8
+
+[[phases]]
+name = "Phase 1"
+order = 1
+
+[[phases.tasks]]
+slug = "t01"
+title = "T01"
+goal = "Goal"
+"#;
+        let plan = Plan::from_toml(toml).unwrap();
+        let resolved = plan.resolve_tasks().unwrap();
+        let rendered = crate::generation::evaluator::render_opencode(&plan, &resolved)
+            .unwrap()
+            .unwrap();
+        let frontmatter = rendered
+            .split_once("---")
+            .and_then(|(_, rest)| rest.split_once("---"))
+            .map_or("", |(fm, _)| fm);
+        assert!(
+            !frontmatter
+                .lines()
+                .any(|l| l.trim_start().starts_with("model:")),
+            "opencode evaluator must NOT emit `model:` when model is empty; got:\n{frontmatter}",
+        );
+    }
+
+    #[test]
+    fn opencode_evaluator_omits_model_line_when_field_omitted() {
+        // Same intent as the empty-string test, but with the `model` key
+        // entirely absent from `[evaluator]`. serde + #[serde(default)] should
+        // produce `None` here, and Tera's `{% if evaluator_model %}` must
+        // treat that as falsy so opencode falls through to its configured
+        // default. If TOML deserialisation or Tera ever changed how missing
+        // vs empty values are handled, this test catches the regression.
+        let toml = r#"
+[project]
+name = "test"
+path = "./test"
+description = "test"
+language = "rust"
+
+[evaluator]
+pass_threshold = 8
+
+[[phases]]
+name = "Phase 1"
+order = 1
+
+[[phases.tasks]]
+slug = "t01"
+title = "T01"
+goal = "Goal"
+"#;
+        let plan = Plan::from_toml(toml).unwrap();
+        let resolved = plan.resolve_tasks().unwrap();
+        let rendered = crate::generation::evaluator::render_opencode(&plan, &resolved)
+            .unwrap()
+            .unwrap();
+        let frontmatter = rendered
+            .split_once("---")
+            .and_then(|(_, rest)| rest.split_once("---"))
+            .map_or("", |(fm, _)| fm);
+        assert!(
+            !frontmatter
+                .lines()
+                .any(|l| l.trim_start().starts_with("model:")),
+            "opencode evaluator must NOT emit `model:` when model key is absent; got:\n{frontmatter}",
         );
     }
 }

@@ -11,6 +11,10 @@ const GENERATED_FILES: &[&str] = &[
     "PROGRESS.md",
     "IMPLEMENTATION_PLAN.md",
     "AGENTS.md",
+    // opencode root alias — symlink (or copy on non-unix) to the
+    // orchestrator agent for clients that scan the working directory
+    // instead of `.opencode/agents/`.
+    "ORCHESTRATOR.md",
     // VSCode target
     ".vscode/orchestrator.prompt.md",
     ".vscode/evaluator.prompt.md",
@@ -24,6 +28,11 @@ const GENERATED_FILES: &[&str] = &[
     ".opencode/agents/wiggum-auditor.md",
     // Claude target
     ".claude/settings.json",
+    "CLAUDE.md",
+    // agent-rules target — fork-neutral rules files
+    ".cursorrules",
+    ".windsurfrules",
+    ".github/copilot-instructions.md",
 ];
 
 /// Collect all wiggum-generated paths that exist on disk.
@@ -119,6 +128,17 @@ pub fn remove_artifacts(plan: &Plan, project_path: &Path) -> Result<Vec<PathBuf>
         fs::remove_dir(&claude_dir)?;
         info!("Removed empty directory: {}", claude_dir.display());
         removed.push(claude_dir);
+    }
+
+    // Clean up .github/ if empty after removing copilot-instructions.md.
+    // We only remove .github/ when it's empty AND the user is running wiggum
+    // clean — we don't want to nuke a hand-written workflows/ directory
+    // if it happens to coexist.
+    let github_dir = project_path.join(".github");
+    if github_dir.is_dir() && is_dir_empty(&github_dir) {
+        fs::remove_dir(&github_dir)?;
+        info!("Removed empty directory: {}", github_dir.display());
+        removed.push(github_dir);
     }
 
     Ok(removed)
@@ -338,5 +358,103 @@ depends_on = ["setup"]
         // they're empty.
         assert!(!root.join(".opencode/agents").exists());
         assert!(!root.join(".opencode").exists());
+    }
+
+    #[test]
+    fn remove_artifacts_deletes_root_orchestrator_md_alias() {
+        // The root-level ORCHESTRATOR.md (real file or symlink) must also
+        // be removed by clean.
+        let tmp = TempDir::new().unwrap();
+        let root = tmp.path();
+        fs::create_dir_all(root.join(".opencode/agents")).unwrap();
+        fs::write(root.join(".opencode/agents/wiggum-orchestrator.md"), "orch").unwrap();
+        // Simulate the symlink alias written by wiggum generate.
+        std::os::unix::fs::symlink(
+            ".opencode/agents/wiggum-orchestrator.md",
+            root.join("ORCHESTRATOR.md"),
+        )
+        .unwrap();
+
+        let plan = sample_plan(&root.to_string_lossy());
+        remove_artifacts(&plan, root).unwrap();
+
+        assert!(!root.join("ORCHESTRATOR.md").exists());
+        assert!(
+            !root
+                .join(".opencode/agents/wiggum-orchestrator.md")
+                .exists()
+        );
+    }
+
+    #[test]
+    fn remove_artifacts_deletes_claude_md_and_empty_github_dir() {
+        let tmp = TempDir::new().unwrap();
+        let root = tmp.path();
+
+        // CLAUDE.md at repo root.
+        fs::write(root.join("CLAUDE.md"), "# CLAUDE.md\n").unwrap();
+        // .claude/settings.json.
+        fs::create_dir_all(root.join(".claude")).unwrap();
+        fs::write(root.join(".claude/settings.json"), "{}").unwrap();
+        // agent-rules files.
+        fs::write(root.join(".cursorrules"), "rules").unwrap();
+        fs::write(root.join(".windsurfrules"), "rules").unwrap();
+        fs::create_dir_all(root.join(".github")).unwrap();
+        fs::write(
+            root.join(".github/copilot-instructions.md"),
+            "copilot rules",
+        )
+        .unwrap();
+
+        let plan = sample_plan(&root.to_string_lossy());
+        remove_artifacts(&plan, root).unwrap();
+
+        assert!(!root.join("CLAUDE.md").exists());
+        assert!(!root.join(".claude/settings.json").exists());
+        assert!(
+            !root.join(".claude").exists(),
+            ".claude/ should be cleaned up when empty"
+        );
+        assert!(!root.join(".cursorrules").exists());
+        assert!(!root.join(".windsurfrules").exists());
+        assert!(
+            !root.join(".github/copilot-instructions.md").exists(),
+            ".github/copilot-instructions.md must be removed"
+        );
+        assert!(
+            !root.join(".github").exists(),
+            ".github/ should be cleaned up when empty (no other contents)"
+        );
+    }
+
+    #[test]
+    fn remove_artifacts_preserves_non_wiggum_github_files() {
+        // If the user has hand-written files in .github/ (e.g. workflows/
+        // or CODEOWNERS), we must NOT nuke the .github/ directory just
+        // because we removed copilot-instructions.md.
+        let tmp = TempDir::new().unwrap();
+        let root = tmp.path();
+
+        fs::create_dir_all(root.join(".github")).unwrap();
+        fs::write(
+            root.join(".github/copilot-instructions.md"),
+            "copilot rules",
+        )
+        .unwrap();
+        fs::create_dir_all(root.join(".github/workflows")).unwrap();
+        fs::write(root.join(".github/workflows/ci.yml"), "name: CI\n").unwrap();
+
+        let plan = sample_plan(&root.to_string_lossy());
+        remove_artifacts(&plan, root).unwrap();
+
+        assert!(!root.join(".github/copilot-instructions.md").exists());
+        assert!(
+            root.join(".github/workflows/ci.yml").exists(),
+            "non-wiggum .github/ contents must survive clean"
+        );
+        assert!(
+            root.join(".github").is_dir(),
+            ".github/ must survive because it still has workflows/"
+        );
     }
 }

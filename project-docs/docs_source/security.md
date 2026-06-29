@@ -6,6 +6,8 @@ Wiggum bakes security into every generated plan at three levels: rules embedded 
 
 Independent security research consistently finds that AI-generated code introduces OWASP Top 10 vulnerabilities at high rates — particularly hardcoded secrets, SQL injection, missing HTTP security headers, disconnected rate limiting, unsafe file uploads, and SSRF. Wiggum treats these as structural concerns that belong in every plan by default, not optional additions the user must remember to include.
 
+For projects that need an even stricter baseline — every commit must satisfy the verified-modern toolchain baseline for the target language (full pedantic clippy for Rust, golangci-lint v2 + `govulncheck` for Go, PHPStan `level max` + Psalm `--taint-analysis` for PHP, etc.) — enable `[style] strict = true`. See [Strict Standards](./strict-standards.md) for the full rule sets per language.
+
 ## Level 1 — Security rules in every subagent prompt
 
 Every generated task file and orchestrator prompt includes a `## Security (non-negotiable)` section populated from the language profile. These six rules are always injected:
