@@ -361,6 +361,7 @@ depends_on = ["setup"]
     }
 
     #[test]
+    #[cfg(unix)]
     fn remove_artifacts_deletes_root_orchestrator_md_alias() {
         // The root-level ORCHESTRATOR.md (real file or symlink) must also
         // be removed by clean.

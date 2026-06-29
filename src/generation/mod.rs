@@ -334,6 +334,7 @@ pub fn write_artifacts(
 /// first so the two paths always share content. If symlinks are not
 /// supported on this platform (or symlinking fails for any other reason),
 /// falls back to a regular file copy.
+#[cfg_attr(not(unix), allow(unused_variables))]
 fn write_root_orchestrator_link(root_link: &Path, target_rel: &Path, content: &str) -> Result<()> {
     use std::fs;
     use std::io::Write;
