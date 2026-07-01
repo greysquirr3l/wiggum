@@ -164,6 +164,7 @@ jobs:
 
       - uses: ./.github/actions/rust-setup
         with:
+          ref: ${{ needs.resolve-tag.outputs.tag }}
           toolchain: ${{ env.RUST_VERSION }}
           targets: ${{ matrix.target }}
           cache-prefix: cargo-release-${{ matrix.target }}
