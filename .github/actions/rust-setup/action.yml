@@ -20,7 +20,7 @@ inputs:
   fetch-depth:
     description: Git fetch depth for checkout. Use "0" to fetch all branches and tags.
     required: false
-    default: "0"
+    default: "1"
 
 runs:
   using: composite
