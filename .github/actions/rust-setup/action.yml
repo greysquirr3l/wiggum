@@ -1,0 +1,40 @@
+name: Rust setup
+description: Install Rust toolchain and restore the shared cargo cache. Unifies cache keys across jobs to maximize cache reuse. Callers must run actions/checkout before this action.
+
+inputs:
+  toolchain:
+    description: Rust toolchain version (e.g. 1.95.0, stable, nightly-YYYY-MM-DD).
+    required: true
+  components:
+    description: Space-separated rustup components to install (e.g. "clippy rustfmt").
+    required: false
+    default: ""
+  targets:
+    description: Comma-separated target triples to add via rustup.
+    required: false
+    default: ""
+  cache-prefix:
+    description: Cache namespace. Jobs sharing the same prefix share a cache; different prefixes isolate.
+    required: false
+    default: "cargo"
+
+runs:
+  using: composite
+  steps:
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # v1
+      with:
+        toolchain: ${{ inputs.toolchain }}
+        components: ${{ inputs.components }}
+        targets: ${{ inputs.targets }}
+
+    - name: Restore cargo cache
+      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-${{ inputs['cache-prefix'] }}-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-${{ inputs['cache-prefix'] }}-
