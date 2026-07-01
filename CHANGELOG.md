@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.16.1] - 2026-06-30
+
+### Fixed
+
+- **CI: local composite action checkout ordering** — all workflow jobs now run `actions/checkout` as an explicit first step before invoking `.github/actions/rust-setup`. GitHub Actions resolves local composite action paths from the working directory before any steps execute, so checkout must precede the local action reference. Previously every job failed immediately with "Can't find 'action.yml'".
+- **CI: dead `workflow_run` branch in release tag resolution** — removed unreachable `elif` branch referencing `github.event.workflow_run.head_sha` from the release workflow's tag-resolution script. The workflow is only triggered by `push` and `workflow_dispatch`, never by `workflow_run`, so the branch could never execute and the context access was flagged as invalid.
+
+### Security
+
+- **`anyhow` updated `1.0.102` → `1.0.103`** — patches [RUSTSEC-2026-0190](https://rustsec.org/advisories/RUSTSEC-2026-0190): unsound `Error::downcast_mut()` when called after `Error::context()` violated borrow rules and produced undefined behaviour under Miri.
+
 ## [0.16.0] - 2026-06-29
 
 ### Added
