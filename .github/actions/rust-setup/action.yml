@@ -1,5 +1,5 @@
 name: Rust setup
-description: Checkout, install Rust toolchain, and restore the shared cargo cache. Unifies cache keys across jobs to maximize cache reuse.
+description: Install Rust toolchain and restore the shared cargo cache. Unifies cache keys across jobs to maximize cache reuse. Callers must run actions/checkout before this action.
 
 inputs:
   toolchain:
@@ -17,33 +17,10 @@ inputs:
     description: Cache namespace. Jobs sharing the same prefix share a cache; different prefixes isolate.
     required: false
     default: "cargo"
-  fetch-depth:
-    description: Git fetch depth for checkout. Use "0" to fetch all branches and tags.
-    required: false
-    default: "1"
-  ref:
-    description: Git ref to checkout. Leave empty to use the workflow ref.
-    required: false
-    default: ""
 
 runs:
   using: composite
   steps:
-    - name: Checkout repository
-      if: ${{ inputs.ref == '' }}
-      uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
-      with:
-        fetch-depth: ${{ inputs['fetch-depth'] }}
-        persist-credentials: false
-
-    - name: Checkout repository (ref)
-      if: ${{ inputs.ref != '' }}
-      uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
-      with:
-        ref: ${{ inputs.ref }}
-        fetch-depth: ${{ inputs['fetch-depth'] }}
-        persist-credentials: false
-
     - name: Install Rust toolchain
       uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # v1
       with:
