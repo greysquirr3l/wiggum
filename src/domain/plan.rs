@@ -42,24 +42,36 @@ pub struct TargetConfig {
     /// Emit `.opencode/agents/wiggum-*.md` agent files. Defaults to `false`.
     #[serde(default)]
     pub opencode: Option<bool>,
-    /// Emit `.claude/settings.json` hooks. Defaults to `false`.
+    /// Emit `.claude/settings.json` hooks plus `CLAUDE.md` project memory.
+    /// Defaults to `false`.
     #[serde(default)]
     pub claude: Option<bool>,
+    /// Emit fork-neutral rules files (`.cursorrules`, `.windsurfrules`,
+    /// `.github/copilot-instructions.md`) for VSCode-family forks that
+    /// don't speak the Copilot `runSubagent` or opencode `task` protocols
+    /// (Cursor, Windsurf, etc.). Defaults to `false`.
+    #[serde(default, alias = "agent-rules")]
+    pub agent_rules: Option<bool>,
 }
 
 impl TargetConfig {
-    /// Resolve to a `TargetSet`. When all three options are `None`, returns
-    /// the back-compat default (`vscode` only) via `TargetSet::vscode_only()`.
+    /// Resolve to a `TargetSet`. When all options are `None`, returns the
+    /// back-compat default (`vscode` only) via `TargetSet::vscode_only()`.
     /// Otherwise, the absent fields are treated as `false`.
     #[must_use]
     pub fn resolve(self) -> TargetSet {
-        if self.vscode.is_none() && self.opencode.is_none() && self.claude.is_none() {
+        if self.vscode.is_none()
+            && self.opencode.is_none()
+            && self.claude.is_none()
+            && self.agent_rules.is_none()
+        {
             return TargetSet::vscode_only();
         }
         TargetSet {
             vscode: self.vscode.unwrap_or(false),
             opencode: self.opencode.unwrap_or(false),
             claude: self.claude.unwrap_or(false),
+            agent_rules: self.agent_rules.unwrap_or(false),
         }
     }
 }
@@ -376,6 +388,8 @@ pub enum Language {
     Swift,
     Ruby,
     Elixir,
+    #[serde(rename = "php")]
+    Php,
 }
 
 impl std::fmt::Display for Language {
@@ -391,6 +405,7 @@ impl std::fmt::Display for Language {
             Self::Swift => write!(f, "swift"),
             Self::Ruby => write!(f, "ruby"),
             Self::Elixir => write!(f, "elixir"),
+            Self::Php => write!(f, "php"),
         }
     }
 }
@@ -408,6 +423,7 @@ impl Language {
         Self::Swift,
         Self::Ruby,
         Self::Elixir,
+        Self::Php,
     ];
 
     /// Get the language profile containing best practices and tool defaults.
@@ -500,6 +516,29 @@ pub struct StyleConfig {
     /// Encourages focused modules and splitting by concern.
     #[serde(default = "default_avoid_god_files")]
     pub avoid_god_files: bool,
+
+    /// When `true`, inject the active language's strict rule set into the
+    /// orchestrator, implementer, evaluator, and per-task prompts. Rules are
+    /// language-specific — for Rust they mirror `docs/nick.md` (no
+    /// `.unwrap()` / `.expect()` / `panic!` in non-test code, no index
+    /// slicing, no `#[allow(clippy::...)]` suppressions, prefer
+    /// `.is_multiple_of(n)`, etc.); for Go, TypeScript, Python, Java, C#,
+    /// Kotlin, Swift, Ruby, Elixir, and PHP they follow the profiles in
+    /// `docs/strict-lints.md`. Cross-language baselines (fail-secure,
+    /// parse-don't-validate, CSPRNG, no weak crypto, parameterised queries,
+    /// no untrusted deserialisation, etc.) are folded into each language's
+    /// profile.
+    ///
+    /// Defaults to `false` — back-compat for existing plans that may rely
+    /// on ordinary lint passes without the pedantic / strict profile. Set
+    /// to `true` in the plan TOML:
+    ///
+    /// ```toml
+    /// [style]
+    /// strict = true
+    /// ```
+    #[serde(default)]
+    pub strict: bool,
 }
 
 const fn default_avoid_ai_patterns() -> bool {
@@ -515,6 +554,7 @@ impl Default for StyleConfig {
         Self {
             avoid_ai_patterns: default_avoid_ai_patterns(),
             avoid_god_files: default_avoid_god_files(),
+            strict: false,
         }
     }
 }

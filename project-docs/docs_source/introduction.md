@@ -12,6 +12,11 @@ Given a structured plan definition (TOML), Wiggum produces:
 - **Implementation plan** (`IMPLEMENTATION_PLAN.md`) — Architecture overview for subagent context
 - **Agents manifest** (`AGENTS.md`) — Agent role definitions
 
+You can also opt in to:
+
+- **Strict mode** (`[style] strict = true`) — Injects language-specific rule sets beyond the baseline security rules, mirroring the verified-modern toolchain baseline (full pedantic clippy for Rust, golangci-lint v2 for Go, PHPStan `level max` for PHP, etc.). See [Strict Standards](./strict-standards.md).
+- **Four output targets** — VSCode + Copilot (default), opencode, Claude Code (full support via `CLAUDE.md` + hooks), and `agent-rules` for Cursor / Windsurf / GitHub Copilot users. See [Targets](./targets.md).
+
 ## Why it exists
 
 Setting up an AI orchestration loop currently requires hand-authoring all of these artifacts. The structural and mechanical parts — numbering, dependency wiring, progress tables, preflight commands, orchestrator boilerplate — should be generated. The creative parts — what to build, architecture decisions, implementation details — come from the user.
@@ -20,5 +25,6 @@ Setting up an AI orchestration loop currently requires hand-authoring all of the
 
 - **Agent-agnostic** — Wiggum generates artifacts, not agent invocations. Works with any AI coding tool that can read markdown.
 - **Scaffold, don't execute** — Wiggum produces plans and task files. Execution is someone else's job.
-- **Language-aware** — Ships with profiles for Rust, Go, TypeScript, Python, Java, C#, Kotlin, Swift, Ruby, and Elixir, providing sensible defaults for build, test, lint, and security audit commands.
+- **Language-aware** — Ships with profiles for Rust, Go, TypeScript, Python, Java, C#, Kotlin, Swift, Ruby, Elixir, and PHP — providing sensible defaults for build, test, lint, and security audit commands.
 - **Security by default** — Six OWASP-derived rules are injected into every task and orchestrator prompt automatically. Supply-chain audits run on every task completion. Plans with web-facing surface get an auto-appended security hardening task with verifiable exit criteria. None of this requires configuration.
+- **Multi-target** — A single plan can emit artifacts for VSCode + Copilot, opencode, Claude Code, and Cursor / Windsurf / GitHub Copilot simultaneously. Each target gets the file format and agent conventions that IDE expects.

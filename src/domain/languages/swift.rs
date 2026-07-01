@@ -73,4 +73,21 @@ pub static PROFILE: &LanguageProfile = &LanguageProfile {
         "Keep TODO/FIXME markers for genuine incomplete work, but never in production auth code.",
         "Doc comments should describe contracts and edge cases, not repeat function signatures.",
     ],
+
+    // Mirrors `docs/strict-lints.md` (Swift). Opt-in via
+    // `[style] strict = true` in the plan TOML. Swift 6 language mode with
+    // complete strict concurrency, SwiftLint `--strict`, `swift-format`,
+    // and `warnings-as-errors`. SwiftPM has no first-party SCA — surface
+    // depends on `Package.resolved` for OSV / dependency-check.
+    strict_rules: &[
+        "Swift 6 language mode on — data-race safety is enforced at compile time; cross-actor sharing of non-`Sendable` state is an error, not a warning.",
+        "Never silence concurrency errors with `@unchecked Sendable` — refactor the type into an `actor`, a value type (`struct`), or a properly-`Sendable` design. `@unchecked` reintroduces the exact memory-corruption races the checker prevents.",
+        "UI / state mutation is `@MainActor`-isolated explicitly; no implicit main-thread assumptions.",
+        "No force unwrap (`!`), force try (`try!`), or force cast (`as!`) outside tests — SwiftLint `force_unwrapping` / `force_try` / `force_cast` are errors; use `guard let` / `if let` / `try?` with handling.",
+        "Secrets in the Keychain, never `UserDefaults` or source; certificate validation never disabled (no permissive `URLSession` delegate).",
+        "`SystemRandomNumberGenerator` / `SecRandomCopyBytes` for security values; strong crypto via CryptoKit.",
+        "Prefer `let` and value types; structured concurrency (`async let`, task groups) over detached tasks; no unstructured `Task {}` that escapes its scope.",
+        "Treat warnings as errors: `swift build -Xswiftc -warnings-as-errors` is the preflight gate; SwiftLint `--strict` blocks the commit.",
+        "No suppression without justification: never blanket-`@unchecked Sendable`; never file-scope lint waivers. Suppress narrowly, inline, with a lint ID and a one-line reason. Prefer fixing.",
+    ],
 };

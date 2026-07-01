@@ -72,4 +72,21 @@ pub static PROFILE: &LanguageProfile = &LanguageProfile {
         "Keep TODO/FIXME markers for genuine incomplete work, but never in production auth code.",
         "XML doc comments should describe contracts and edge cases, not repeat method signatures.",
     ],
+
+    // Mirrors `docs/strict-lints.md` (C# / .NET). Opt-in via
+    // `[style] strict = true` in the plan TOML. Roslyn analyzers at full
+    // strength (`AnalysisMode=All`, `Nullable=enable`, `TreatWarningsAsErrors`)
+    // plus Security Code Scan — all on .NET 8+.
+    strict_rules: &[
+        "Nullable reference types enabled everywhere; null-state warnings (CS86xx) are errors — no `!` null-forgiving operator to silence them.",
+        "`AnalysisMode=All` makes the CA security rules build-breaking: CA2100 (SQL injection), CA3xxx (injection / XSS / XXE), CA5350 / CA5351 (weak crypto MD5 / SHA-1 / DES), CA5359 (disabled cert validation), CA5360+ (unsafe deserialisation).",
+        "Add the Security Code Scan analyzer package for taint-style coverage beyond the built-in CA set.",
+        "Parameterised ADO.NET / EF Core LINQ only; never string-interpolate into `FromSqlRaw` or a `SqlCommand`.",
+        "No `BinaryFormatter` (removed / insecure) and no `JsonSerializer` with `TypeNameHandling` / polymorphic type resolution on untrusted input.",
+        "`RandomNumberGenerator` for security tokens, never `System.Random`; AES-GCM / SHA-256+ only.",
+        "`HttpClient` reused (not per-request) with explicit timeouts; validate server certificates.",
+        "No swallowed exceptions; no `catch {}`; nullable analysis must not be defeated by `#nullable disable`.",
+        "Treat warnings as errors: `dotnet build -warnaserror` is the preflight gate; `dotnet format --verify-no-changes` blocks drift.",
+        "No suppression without justification: never `#pragma warning disable` at file or project scope; suppress narrowly, with a warning ID and a one-line reason. Prefer fixing.",
+    ],
 };

@@ -282,6 +282,14 @@ fn print_success(
     if targets.contains(Target::Claude) {
         println!("   Claude:");
         println!("     🪝 .claude/settings.json");
+        println!("     📝 CLAUDE.md");
+    }
+
+    if targets.contains(Target::AgentRules) {
+        println!("   Agent rules:");
+        println!("     📝 .cursorrules");
+        println!("     📝 .windsurfrules");
+        println!("     📝 .github/copilot-instructions.md");
     }
 
     println!();
@@ -301,11 +309,18 @@ fn print_success(
         println!("     Run `wiggum watch` in a separate terminal to monitor progress.");
     }
     if targets.contains(Target::Claude) {
-        println!("  2. In Claude Code: open the folder — the PreCompact hook is auto-registered");
+        println!(
+            "  2. In Claude Code: open the folder — CLAUDE.md is auto-loaded and the PreCompact hook is auto-registered"
+        );
+    }
+    if targets.contains(Target::AgentRules) {
+        println!(
+            "  2. The rules files (.cursorrules / .windsurfrules / .github/copilot-instructions.md) are auto-loaded by the receiving IDE — no further setup"
+        );
     }
 }
 
-#[allow(clippy::cast_precision_loss)]
+#[allow(clippy::cast_precision_loss, clippy::too_many_lines)]
 fn print_dry_run(
     artifacts: &generation::GeneratedArtifacts,
     project_path: &Path,
@@ -373,6 +388,25 @@ fn print_dry_run(
         println!(
             "  .claude/settings.json           ({:.1} KB)",
             artifacts.hooks_json.len() as f64 / 1024.0
+        );
+        println!(
+            "  CLAUDE.md                       ({:.1} KB)",
+            artifacts.claude_md.len() as f64 / 1024.0
+        );
+    }
+
+    if targets.contains(Target::AgentRules) {
+        println!(
+            "  .cursorrules                    ({:.1} KB)",
+            artifacts.agent_rules_cursorrules.len() as f64 / 1024.0
+        );
+        println!(
+            "  .windsurfrules                  ({:.1} KB)",
+            artifacts.agent_rules_windsurfrules.len() as f64 / 1024.0
+        );
+        println!(
+            "  .github/copilot-instructions.md ({:.1} KB)",
+            artifacts.agent_rules_copilot_instructions.len() as f64 / 1024.0
         );
     }
 
@@ -444,8 +478,14 @@ fn artifact_totals(
         files += 4 + usize::from(artifacts.evaluator_opencode.is_some());
     }
     if targets.contains(Target::Claude) {
-        size += artifacts.hooks_json.len();
-        files += 1;
+        size += artifacts.hooks_json.len() + artifacts.claude_md.len();
+        files += 2;
+    }
+    if targets.contains(Target::AgentRules) {
+        size += artifacts.agent_rules_cursorrules.len()
+            + artifacts.agent_rules_windsurfrules.len()
+            + artifacts.agent_rules_copilot_instructions.len();
+        files += 3;
     }
 
     (size, files)

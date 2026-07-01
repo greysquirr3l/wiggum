@@ -52,12 +52,13 @@ Wiggum can emit artifacts for one or more AI coding tools at once. Add a `[targe
 
 ```toml
 [targets]
-vscode   = true   # default when [targets] is absent
-opencode = true   # .opencode/agents/wiggum-*.md
-claude   = false  # .claude/settings.json (PreCompact hook)
+vscode      = true   # default when [targets] is absent — GitHub Copilot prompt files
+opencode    = false  # .opencode/agents/wiggum-*.md
+claude      = false  # CLAUDE.md + .claude/settings.json (full Claude Code support)
+agent-rules = false  # .cursorrules + .windsurfrules + .github/copilot-instructions.md
 ```
 
-When the `[targets]` section is absent, Wiggum defaults to `vscode = true` and the other targets `false` — this matches the pre-`[targets]` behavior exactly. The CLI flag `--target <vscode|opencode|claude|all>` overrides the plan.
+When the `[targets]` section is absent, Wiggum defaults to `vscode = true` and the other targets `false` — this matches the pre-`[targets]` behavior exactly. The CLI flag `--target <vscode|opencode|claude|agent-rules|all>` overrides the plan.
 
 ## Sections
 

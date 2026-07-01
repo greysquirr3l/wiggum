@@ -10,7 +10,7 @@ Pure business logic with no I/O dependencies:
 
 - **Plan model** — The `Plan` struct parsed from TOML, with phases, tasks, and project metadata
 - **DAG validation** — Topological sort and cycle detection on the task dependency graph
-- **Language profiles** — Built-in profiles for 10 programming languages
+- **Language profiles** — Built-in profiles for 11 programming languages (Rust, Go, TypeScript, Python, Java, C#, Kotlin, Swift, Ruby, Elixir, PHP)
 - **Lint rules** — Plan quality checks (e.g., missing descriptions, unreachable tasks)
 
 ### Ports (`src/ports.rs`)

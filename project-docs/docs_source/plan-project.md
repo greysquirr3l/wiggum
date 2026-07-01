@@ -27,7 +27,7 @@ architecture = "hexagonal"
 
 The `language` field determines which [language profile](./language-profiles.md) is used for default build, test, and lint commands, as well as template hints like file patterns and documentation style.
 
-Supported values: `rust`, `go`, `typescript`, `python`, `java`, `csharp`, `kotlin`, `swift`, `ruby`, `elixir`.
+Supported values: `rust`, `go`, `typescript`, `python`, `java`, `csharp`, `kotlin`, `swift`, `ruby`, `elixir`, `php`.
 
 > **Note for .NET projects:** use `language = "csharp"` — this covers all .NET SDK project types (ASP.NET Core, console, class library, etc.) regardless of whether you write C#, F#, or VB.NET.
 

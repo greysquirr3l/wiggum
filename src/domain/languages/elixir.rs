@@ -73,4 +73,21 @@ pub static PROFILE: &LanguageProfile = &LanguageProfile {
         "Keep TODO/FIXME markers for genuine incomplete work, but never in production auth code.",
         "@doc should describe contracts and edge cases, not repeat function signatures.",
     ],
+
+    // Mirrors `docs/strict-lints.md` (Elixir). Opt-in via
+    // `[style] strict = true` in the plan TOML. Credo `--strict`, Dialyzer
+    // via Dialyxir, Sobelow for Phoenix SAST, MixAudit for SCA — all on
+    // Elixir 1.16+ / OTP 26+.
+    strict_rules: &[
+        "`--warnings-as-errors` stays on; an unused var, unreachable clause, or deprecation fails the build.",
+        "Credo runs `--strict` — consistency, readability, and refactoring checks are all gating, not advisory.",
+        "Dialyzer (via Dialyxir) passes clean; add `@spec` to public functions so success typing has contracts to check.",
+        "Sobelow scans Phoenix surface (`mix sobelow --exit`) — SQL injection, XSS, CSRF, insecure config, directory traversal, and command injection.",
+        "Never `String.to_atom/1` on user input (atom-table exhaustion) — use `String.to_existing_atom/1`; never `Code.eval_string` / `:erlang.binary_to_term` on untrusted data.",
+        "Ecto changesets `cast` an explicit field allow-list (mass-assignment defense); parameterised Ecto queries only — no string-built SQL into `Repo.query`.",
+        "`:crypto.strong_rand_bytes` for security values; strong crypto only; verify TLS (`:verify_peer`, never `:verify_none`).",
+        "Let-it-crash for unexpected faults under a supervisor — but validate and handle expected bad input at the boundary with tagged `{:ok, _} | {:error, _}` tuples; don't catch-all to mask failures.",
+        "Treat warnings as errors: `mix compile --warnings-as-errors` is the preflight gate; Credo `--strict` and Sobelow `--exit` block the commit.",
+        "No suppression without justification: never `@compile {:no_warn_undefined, _}` or `# credo:disable-for-*` at module scope; suppress narrowly, with a check ID and a one-line reason. Prefer fixing.",
+    ],
 };

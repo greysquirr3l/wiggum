@@ -13,6 +13,7 @@
   - [Preflight and Orchestrator](./plan-preflight.md)
   - [Workspaces](./workspace.md)
 - [Security](./security.md)
+- [Strict Standards](./strict-standards.md)
 - [CLI Reference](./cli-reference.md)
 - [MCP Server](./mcp-server.md)
 

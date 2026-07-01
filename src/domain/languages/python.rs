@@ -74,4 +74,21 @@ pub static PROFILE: &LanguageProfile = &LanguageProfile {
         "Keep TODO/FIXME markers for genuine incomplete work, but never in production auth code.",
         "Docstrings should describe contracts and edge cases, not repeat function signatures.",
     ],
+
+    // Mirrors `docs/strict-lints.md` (Python). Opt-in via
+    // `[style] strict = true` in the plan TOML. Ruff (with `S`/bandit rule
+    // group on), `mypy --strict`, `pip-audit` — kept honest even though Go
+    // and Rust are preferred.
+    strict_rules: &[
+        "Enable the `S` (bandit) group with no global ignores — it catches hardcoded secrets (S105/106/107), SQL injection (S608), shell injection (S602/603/604/605), insecure hashing, and unsafe YAML.",
+        "Never `pickle.loads` / `yaml.load` / `marshal` on untrusted data (S301 / S506) — use `json` or `yaml.safe_load`.",
+        "Never `subprocess(..., shell=True)` or `os.system` with interpolated input; pass an argument list and never build a shell string.",
+        "Randomness for tokens / keys from `secrets`, never `random` (S311).",
+        "Parameterised DB queries only; never `%` / f-string / `.format` into SQL (S608).",
+        "`mypy --strict` passes with no `Any` leaks and no untyped defs; treat a `# type: ignore` like a suppression — narrow, with a code and reason.",
+        "No bare `except:`; catch specific exceptions; never `except: pass` that hides failures.",
+        "No `eval` / `exec` / `compile` on dynamic input; no `requests` without an explicit `timeout`.",
+        "Treat warnings as errors: `ruff check .` runs with `--no-fix` and a non-zero exit on any finding; `mypy --strict --warn-unused-ignores --warn-return-any` blocks the commit.",
+        "No suppression without justification: never blanket-disable a Ruff rule or a `mypy` check; suppress narrowly, inline, with a rule code and a one-line reason. Prefer fixing.",
+    ],
 };

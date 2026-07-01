@@ -3,6 +3,7 @@ mod elixir;
 mod go;
 mod java;
 mod kotlin;
+mod php;
 mod python;
 mod ruby;
 mod rust;
@@ -83,6 +84,21 @@ pub struct LanguageProfile {
     /// Guidelines for writing non-obvious, useful comments rather than
     /// tutorial-style narration that restates what code obviously does.
     pub comment_guidelines: &'static [&'static str],
+
+    // ── Strict mode (opt-in via `[style] strict = true`) ────────────
+    /// Language-specific rules injected only when the plan opts in to
+    /// `strict`. For Rust these are the nick.md-aligned linter rules
+    /// (no `.unwrap()` / `.expect()` / `panic!` / indexing-slicing, no
+    /// `#[allow(clippy::...)]` suppressions (use `#[expect(...)]`),
+    /// prefer `.is_multiple_of(n)`, prefer `?` / explicit match over
+    /// chained `.unwrap_or_else`, full pedantic + nursery + perf clippy
+    /// profile with hard denials). For every other supported language the
+    /// ruleset is taken from `docs/strict-lints.md` (golangci-lint v2 +
+    /// govulncheck, typescript-eslint v8 + tsc strict, Ruff + mypy
+    /// `--strict` + pip-audit, `Error Prone` + `NullAway` + `SpotBugs`, Roslyn
+    /// `AnalysisMode=All`, detekt `allRules`, `RuboCop` + `Brakeman` + `Sorbet`,
+    /// `Credo` + `Dialyzer` + `Sobelow`, `PHPStan` max + Psalm taint).
+    pub strict_rules: &'static [&'static str],
 }
 
 /// Get the profile for a language.
@@ -99,6 +115,7 @@ pub fn profile(language: Language) -> &'static LanguageProfile {
         Language::Swift => swift::PROFILE,
         Language::Ruby => ruby::PROFILE,
         Language::Elixir => elixir::PROFILE,
+        Language::Php => php::PROFILE,
     }
 }
 
@@ -129,6 +146,10 @@ mod tests {
         assert!(p.lint_cmd.contains("clippy"));
         assert_eq!(p.file_extension, "rs");
         assert_eq!(p.manifest_file, "Cargo.toml");
+        assert!(
+            !p.strict_rules.is_empty(),
+            "Rust profile must define strict rules for `[style] strict = true`"
+        );
     }
 
     #[test]
@@ -144,6 +165,30 @@ mod tests {
         let p = profile(Language::Go);
         assert_eq!(p.file_extension, "go");
         assert_eq!(p.manifest_file, "go.mod");
+    }
+
+    #[test]
+    fn php_profile_values() {
+        let p = profile(Language::Php);
+        assert_eq!(p.file_extension, "php");
+        assert_eq!(p.manifest_file, "composer.json");
+        assert!(p.test_cmd.contains("phpunit") || p.test_cmd.contains("pest"));
+        assert!(p.audit_cmd.contains("composer audit"));
+        assert!(
+            !p.strict_rules.is_empty(),
+            "PHP profile must define strict rules for `[style] strict = true`"
+        );
+    }
+
+    #[test]
+    fn all_languages_have_strict_rules() {
+        for lang in Language::ALL {
+            let p = profile(*lang);
+            assert!(
+                !p.strict_rules.is_empty(),
+                "{lang} profile is missing strict rules — populate strict_rules from `docs/strict-lints.md`"
+            );
+        }
     }
 
     #[test]

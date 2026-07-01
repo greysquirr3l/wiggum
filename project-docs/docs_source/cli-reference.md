@@ -28,7 +28,7 @@ wiggum generate <plan> [OPTIONS]
 | `--dry-run` | Preview what would be generated without writing files |
 | `--estimate-tokens` | Show estimated token counts for generated artifacts |
 | `--skip-agents-md` | Skip `AGENTS.md` generation |
-| `--target <vscode\|opencode\|claude\|all>` | Override the target tool selection. Overrides the plan's `[targets]` section. See [Targets](./targets.md). |
+| `--target <vscode\|opencode\|claude\|agent-rules\|all>` | Override the target tool selection. Overrides the plan's `[targets]` section. See [Targets](./targets.md). |
 
 ## `wiggum check`
 

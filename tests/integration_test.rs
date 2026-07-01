@@ -138,6 +138,7 @@ fn write_artifacts_opencode_target_writes_opencode_agents() {
         vscode: false,
         opencode: true,
         claude: false,
+        agent_rules: false,
     };
     generation::write_artifacts(&fs, &project_path, &artifacts, &targets)
         .expect("Failed to write artifacts");
@@ -165,10 +166,22 @@ fn write_artifacts_opencode_target_writes_opencode_agents() {
             .join(".opencode/agents/wiggum-auditor.md")
             .exists()
     );
+
+    // opencode-compatible clients (e.g. minimax-m3) scan the working
+    // directory for ORCHESTRATOR.md. Verify the root-level alias is emitted
+    // alongside the canonical `.opencode/agents/wiggum-orchestrator.md`.
+    let root_orch = project_path.join("ORCHESTRATOR.md");
+    assert!(
+        root_orch.exists()
+            || root_orch
+                .symlink_metadata()
+                .is_ok_and(|m| m.file_type().is_symlink()),
+        "opencode target must emit a root-level ORCHESTRATOR.md alias"
+    );
 }
 
 #[test]
-fn write_artifacts_claude_target_writes_hooks_only() {
+fn write_artifacts_claude_target_writes_hooks_and_claude_md() {
     let mut plan = load_example_plan();
     let tmp = TempDir::new().expect("Failed to create temp dir");
     let project_path = tmp.path().to_path_buf();
@@ -180,13 +193,108 @@ fn write_artifacts_claude_target_writes_hooks_only() {
         vscode: false,
         opencode: false,
         claude: true,
+        agent_rules: false,
     };
     generation::write_artifacts(&fs, &project_path, &artifacts, &targets)
         .expect("Failed to write artifacts");
 
-    assert!(project_path.join(".claude/settings.json").exists());
+    assert!(
+        project_path.join(".claude/settings.json").exists(),
+        "Claude target must emit the hooks JSON"
+    );
+    assert!(
+        project_path.join("CLAUDE.md").exists(),
+        "Claude target must emit CLAUDE.md at the repo root for Claude Code project memory"
+    );
+    let claude_md =
+        std::fs::read_to_string(project_path.join("CLAUDE.md")).expect("read CLAUDE.md");
+    assert!(
+        claude_md.starts_with("# CLAUDE.md"),
+        "CLAUDE.md must start with the `# CLAUDE.md` header so Claude Code recognises it"
+    );
     assert!(!project_path.join(".vscode").exists());
     assert!(!project_path.join(".opencode").exists());
+    assert!(!project_path.join(".cursorrules").exists());
+    assert!(!project_path.join(".windsurfrules").exists());
+}
+
+#[test]
+fn write_artifacts_agent_rules_target_writes_three_rules_files() {
+    let mut plan = load_example_plan();
+    let tmp = TempDir::new().expect("Failed to create temp dir");
+    let project_path = tmp.path().to_path_buf();
+    plan.project.path = project_path.to_string_lossy().to_string();
+
+    let artifacts = generation::generate_all(&plan).expect("Generation failed");
+    let fs = FsAdapter;
+    let targets = TargetSet {
+        vscode: false,
+        opencode: false,
+        claude: false,
+        agent_rules: true,
+    };
+    generation::write_artifacts(&fs, &project_path, &artifacts, &targets)
+        .expect("Failed to write artifacts");
+
+    assert!(
+        project_path.join(".cursorrules").exists(),
+        "agent-rules target must emit .cursorrules (Cursor)"
+    );
+    assert!(
+        project_path.join(".windsurfrules").exists(),
+        "agent-rules target must emit .windsurfrules (Windsurf)"
+    );
+    assert!(
+        project_path
+            .join(".github/copilot-instructions.md")
+            .exists(),
+        "agent-rules target must emit .github/copilot-instructions.md (GitHub Copilot)"
+    );
+    assert!(
+        project_path.join(".github").is_dir(),
+        ".github/ directory must exist after writing copilot-instructions.md"
+    );
+    assert!(
+        !project_path.join(".vscode").exists(),
+        "agent-rules target must NOT emit VSCode artifacts"
+    );
+    assert!(
+        !project_path.join(".opencode").exists(),
+        "agent-rules target must NOT emit opencode artifacts"
+    );
+    assert!(
+        !project_path.join(".claude").exists(),
+        "agent-rules target must NOT emit Claude artifacts"
+    );
+    assert!(
+        !project_path.join("CLAUDE.md").exists(),
+        "agent-rules target must NOT emit CLAUDE.md (that's part of the `claude` target)"
+    );
+
+    // The three rules files should have identical content (one template, three destinations).
+    let cursorrules =
+        std::fs::read_to_string(project_path.join(".cursorrules")).expect("read .cursorrules");
+    let windsurfrules =
+        std::fs::read_to_string(project_path.join(".windsurfrules")).expect("read .windsurfrules");
+    let copilot_instructions =
+        std::fs::read_to_string(project_path.join(".github/copilot-instructions.md"))
+            .expect("read copilot-instructions.md");
+    assert_eq!(
+        cursorrules, windsurfrules,
+        ".cursorrules and .windsurfrules must have identical content"
+    );
+    assert_eq!(
+        cursorrules, copilot_instructions,
+        ".cursorrules and .github/copilot-instructions.md must have identical content"
+    );
+    // Sanity: the rules content must reference the project name and language.
+    assert!(cursorrules.contains("example-project"));
+    assert!(cursorrules.contains("rust"));
+    // And it must NOT reference the orchestrator loop — the receiving IDE drives that.
+    assert!(
+        !cursorrules.contains("runSubagent"),
+        "agent rules must not reference runSubagent"
+    );
 }
 
 #[test]

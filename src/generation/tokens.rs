@@ -174,6 +174,10 @@ mod tests {
             planner_opencode: String::new(),
             background_auditor_opencode: String::new(),
             hooks_json: String::new(),
+            claude_md: String::new(),
+            agent_rules_cursorrules: String::new(),
+            agent_rules_windsurfrules: String::new(),
+            agent_rules_copilot_instructions: String::new(),
         }
     }
 
