@@ -225,6 +225,7 @@ jobs:
         with:
           toolchain: ${{ env.RUST_VERSION }}
           cache-prefix: cargo-publish
+          ref: ${{ needs.resolve-tag.outputs.tag }}
 
       - name: Verify version matches tag
         env:
