@@ -21,7 +21,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5 (Node 24)
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v5 (Node 24)
 
       - name: Install mdBook
         uses: peaceiris/actions-mdbook@a6f333f62c4b46ed5190d00cab3b7f9a6996274c # main HEAD (Node 24; v2.0.0 tag is Node 20)
