@@ -252,6 +252,13 @@ The optional `[style]` section controls writing style guidance to reduce detecta
 [style]
 avoid_ai_patterns = true
 avoid_god_files = true
+strict = false
+completion_standard = """
+Every task ships when all of the following hold:
+- Preflight (build + test + lint) passes with zero errors and zero warnings.
+- No placeholder implementations remain in production code.
+- No lint suppressions have been added to silence errors — the issue was fixed in code.
+"""
 ```
 
 ### Fields
@@ -261,6 +268,7 @@ avoid_god_files = true
 | `avoid_ai_patterns` | No | `true` | When enabled, prompts receive hints to avoid common AI writing patterns |
 | `avoid_god_files` | No | `true` | When enabled, prompts include file-structure guidance that discourages creating "God" files |
 | `strict` | No | `false` | When `true`, injects the language-specific strict rule set (full pedantic clippy for Rust, golangci-lint v2 for Go, PHPStan `level max` for PHP, etc.) into every prompt. See [Strict Standards](./strict-standards.md). |
+| `completion_standard` | No | generic default | The standing directive on the bar for shipped work. Rendered as a `<COMPLETION_STANDARD>` reference block at the top of the opencode orchestrator prompt and in the root `ORCHESTRATOR.md`, and injected verbatim into every subagent dispatch alongside `Accumulated Learnings` and `Codebase State`. Override per project to narrow the bar with project-specific requirements (e.g. "no `unwrap()` outside tests", "balance math must use checked arithmetic"). |
 
 When `avoid_ai_patterns` is enabled, generated prompts include guidance to:
 

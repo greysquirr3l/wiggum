@@ -10,7 +10,7 @@ shared, but the agent prompts and configuration differ.
 | Target | Stable identifier | Agent file(s) | Dispatch mechanism |
 |---|---|---|---|
 | **VSCode** (default) | `vscode` | `.vscode/orchestrator.prompt.md` (and three siblings) | GitHub Copilot `runSubagent` tool |
-| **opencode** | `opencode` | `.opencode/agents/wiggum-orchestrator.md` (and four siblings) | opencode `task` tool with subagent frontmatter |
+| **opencode** | `opencode` | `.opencode/agents/orchestrator.md` (and three siblings) + `.opencode/package.json` + `.opencode/.gitignore` + `ORCHESTRATOR.md` | opencode `task` tool with `subagent_type: "general"` and inline subagent body |
 | **Claude** | `claude` | `CLAUDE.md` (project memory) + `.claude/settings.json` (hooks) | Claude Code reads both files on every session; PreCompact hook blocks compaction mid-task |
 | **agent-rules** | `agent-rules` | `.cursorrules` + `.windsurfrules` + `.github/copilot-instructions.md` | The receiving IDE drives its own agent loop; wiggum supplies only rules + project context |
 
@@ -76,23 +76,44 @@ If the resolved `TargetSet` is empty (every field explicitly `false`),
 
 ### opencode target
 
-- **Files:** `.opencode/agents/wiggum-orchestrator.md`,
-  `.opencode/agents/wiggum-implementer.md`,
-  `.opencode/agents/wiggum-evaluator.md`,
-  `.opencode/agents/wiggum-planner.md`,
-  `.opencode/agents/wiggum-auditor.md`.
-- **Format:** Each file is an opencode agent with full YAML frontmatter
-  (`description:`, `mode: primary|subagent`, `model: provider/model-id`,
-  `permission:`, `prompt:`).
-- **Subagent dispatch:** the orchestrator uses the `task` tool with
-  `subagent_type: "wiggum-implementer"`. There is no per-dispatch `model:`
-  argument — the model is pinned in the implementer agent's own frontmatter.
-- **Permissions:** the orchestrator frontmatter allows `task` only for
-  `wiggum-implementer`, `wiggum-evaluator`, and `wiggum-auditor`; subagents
-  deny `task` entirely.
-- **Implementer body** is shared across all dispatches — the orchestrator
-  passes the task file path as an `@path` reference at dispatch time.
+- **Files:**
+  - `.opencode/agents/orchestrator.md` — single-file orchestrator. Contains
+    both `<ORCHESTRATOR_INSTRUCTIONS>` and `<SUBAGENT_PROMPT>` blocks; the
+    orchestrator dispatches the built-in `general` subagent via the `task`
+    tool with `subagent_type: "general"`.
+  - `.opencode/agents/evaluator.md` — QA evaluator. Only generated when
+    `[evaluator]` is configured.
+  - `.opencode/agents/planner.md` — task-decomposition planner.
+  - `.opencode/agents/background-auditor.md` — continuous cross-task auditor.
+  - `.opencode/package.json` — pins `@opencode-ai/plugin` so the opencode
+    runtime can install the plugin when the project is opened.
+  - `.opencode/.gitignore` — excludes `node_modules` and Node/JS package
+    manager lockfiles from the opencode plugin workspace.
+  - `ORCHESTRATOR.md` (project root) — long-form workflow reference document
+    with the task state machine, agents table, per-agent tooling matrix,
+    evaluator rubric, completion standard, gates, session handoff protocol,
+    and failure-mode recovery. Useful for any human or fresh LLM joining
+    mid-stream.
+- **Format:** Each agent file is an opencode agent with full YAML
+  frontmatter (`description:`, `mode: primary|subagent`,
+  `model: provider/model-id`, `permission:`) followed by `<PLAN>`, `<TASKS>`,
+  `<PROGRESS>`, `<FEATURES>`, `<COMPLETION_STANDARD>` reference blocks.
+- **Single-file orchestrator:** unlike the VSCode target (which has
+  separate orchestrator + subagent files), the opencode orchestrator
+  embeds the subagent body inline as a `<SUBAGENT_PROMPT>` block. The
+  orchestrator passes that block as the `prompt` argument when invoking
+  `task(subagent_type="general", prompt=<SUBAGENT_PROMPT>)`. There is no
+  separate `wiggum-implementer` agent file to maintain.
+- **Permissions:** the orchestrator runs with permissive defaults
+  (`edit: allow`, `bash: allow`, `task: allow`, `todowrite: allow`,
+  `webfetch: ask`) so it can independently run preflight and dispatch
+  subagents. Subagents run as the built-in `general` subagent, which
+  inherits the dispatcher's permissions.
 - **Evaluator agent** is generated only when `[evaluator]` is configured.
+- **Plan TOML path:** the orchestrator prompt and `ORCHESTRATOR.md`
+  reference the plan file as `<your-plan>.toml` — a placeholder the
+  reader substitutes with their actual filename. wiggum doesn't guess the
+  filename from the project name.
 
 ### Claude target
 
@@ -160,11 +181,13 @@ opencode = true
 
 ```bash
 wiggum generate plan.toml
-# → .opencode/agents/wiggum-orchestrator.md
-# → .opencode/agents/wiggum-implementer.md
-# → .opencode/agents/wiggum-evaluator.md   (if [evaluator] configured)
-# → .opencode/agents/wiggum-planner.md
-# → .opencode/agents/wiggum-auditor.md
+# → .opencode/agents/orchestrator.md          (single-file, embedded SUBAGENT_PROMPT)
+# → .opencode/agents/evaluator.md             (if [evaluator] configured)
+# → .opencode/agents/planner.md
+# → .opencode/agents/background-auditor.md
+# → .opencode/package.json
+# → .opencode/.gitignore
+# → ORCHESTRATOR.md
 ```
 
 ### agent-rules-only (Cursor / Windsurf / Copilot)
@@ -194,8 +217,9 @@ wiggum generate plan.toml --target all
 
 ## Cleaning up
 
-`wiggum clean` removes generated files for all targets. To clean only one
-target's files, delete the relevant directory by hand
+`wiggum clean` removes generated files for all targets, including the
+deprecated `wiggum-*.md` filenames from older wiggum versions. To clean
+only one target's files, delete the relevant directory by hand
 (e.g. `rm -rf .opencode`).
 
 ## Custom templates
@@ -203,7 +227,7 @@ target's files, delete the relevant directory by hand
 `.wiggum/templates/` overrides still work, with two layouts:
 
 - **Flat (legacy):** `.wiggum/templates/orchestrator.opencode.md` overrides
-  the opencode orchestrator only.
+  the opencode variant.
 - **Subdir (new):** `.wiggum/templates/opencode/orchestrator.md` is also
   discovered and takes priority over the flat layout. Subdirs map to target
   names: `vscode`, `opencode`.
@@ -215,9 +239,12 @@ Custom template names that match the opencode variants:
 | `.wiggum/templates/vscode/orchestrator.md` | `.wiggum/templates/orchestrator.md` |
 | `.wiggum/templates/vscode/evaluator.md` | `.wiggum/templates/evaluator.md` |
 | `.wiggum/templates/vscode/planner.md` | `.wiggum/templates/planner.md` |
-| `.wiggum/templates/vscode/background-auditor.md` | `.wiggum/templates/background-auditor.md` |
+| `.wiggum/templates/vscode/background-auditor.md` | `.wiggum/templates/background_auditor.md` |
 | `.wiggum/templates/opencode/orchestrator.md` | `.wiggum/templates/orchestrator_opencode.md` |
-| `.wiggum/templates/opencode/implementer.md` | `.wiggum/templates/implementer.md` |
 | `.wiggum/templates/opencode/evaluator.md` | `.wiggum/templates/evaluator_opencode.md` |
 | `.wiggum/templates/opencode/planner.md` | `.wiggum/templates/planner_opencode.md` |
 | `.wiggum/templates/opencode/background-auditor.md` | `.wiggum/templates/background_auditor_opencode.md` |
+
+Note: there is no `opencode/implementer.md` template override — the opencode
+target uses a single-file orchestrator with the subagent body embedded
+inline. The legacy flat name `implementer.md` is no longer recognized.

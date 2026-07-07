@@ -53,7 +53,7 @@ Wiggum can emit artifacts for one or more AI coding tools at once. Add a `[targe
 ```toml
 [targets]
 vscode      = true   # default when [targets] is absent — GitHub Copilot prompt files
-opencode    = false  # .opencode/agents/wiggum-*.md
+opencode    = false  # .opencode/agents/*.md + .opencode/package.json + ORCHESTRATOR.md
 claude      = false  # CLAUDE.md + .claude/settings.json (full Claude Code support)
 agent-rules = false  # .cursorrules + .windsurfrules + .github/copilot-instructions.md
 ```
