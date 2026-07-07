@@ -212,10 +212,10 @@ pub fn render_orchestrator_root_with(
         ctx.insert("criteria", &Vec::<String>::new());
     }
 
-// The plan TOML path is intentionally NOT substituted — the
-        // template uses `<your-plan>.toml` as a placeholder so readers
-        // know to substitute their own filename. Guessing and rendering
-        // a wrong path would send people to a non-existent file.
+    // The plan TOML path is intentionally NOT substituted — the
+    // template uses `<your-plan>.toml` as a placeholder so readers
+    // know to substitute their own filename. Guessing and rendering
+    // a wrong path would send people to a non-existent file.
 
     tera.render("orchestrator_root.md", &ctx).map_err(|e| {
         WiggumError::Template(format!("Failed to render 'orchestrator_root.md': {e:?}"))
