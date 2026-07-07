@@ -486,7 +486,7 @@ fn artifact_totals(
             + artifacts.opencode_package_json.len()
             + artifacts.opencode_gitignore.len()
             + artifacts.orchestrator_root.len();
-        files += 7 + usize::from(artifacts.evaluator_opencode.is_some());
+        files += 6 + usize::from(artifacts.evaluator_opencode.is_some());
     }
     if targets.contains(Target::Claude) {
         size += artifacts.hooks_json.len() + artifacts.claude_md.len();

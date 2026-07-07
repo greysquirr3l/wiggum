@@ -1387,7 +1387,7 @@ This document describes the workflow, the agents, the state machine, and the
 invariants. It is the canonical entry point for anyone — human or LLM —
 joining mid-stream.
 
-> **TL;DR.** `wiggum generate {{ plan_toml_path }}` materialises the plan into
+> **TL;DR.** `wiggum generate <your-plan>.toml` materialises the plan into
 > `IMPLEMENTATION_PLAN.md`, `PROGRESS.md`, `tasks/`, and `features.json`. The
 > orchestrator agent reads `PROGRESS.md`, dispatches work to subagents,
 > independently verifies each task, and loops until T01–T{{ task_count_padded }} are all `[x]`.
@@ -1396,7 +1396,7 @@ joining mid-stream.
 
 | File | Role |
 |---|---|
-| `{{ plan_toml_path }}` | Single source of truth — phases, tasks, hints, criteria, evaluator weights, completion standard. Edit this, never `IMPLEMENTATION_PLAN.md` directly. |
+| `<your-plan>.toml` | Single source of truth — phases, tasks, hints, criteria, evaluator weights, completion standard. Edit this, never `IMPLEMENTATION_PLAN.md` directly. |
 | `IMPLEMENTATION_PLAN.md` | Human-readable plan rendered from the TOML by `wiggum generate`. |
 | `tasks/T{NN}-{slug}.md` | One file per task. Exit criteria, hints, evaluation rules. Materialised by `wiggum generate`. |
 | `PROGRESS.md` | Live state — what is `[ ]`, `[~]`, `[x]`, `[!]`. Plus the **Accumulated Learnings**, **Codebase State**, and **Completion Standard** sections that travel with every subagent dispatch. |
@@ -1486,9 +1486,8 @@ banner.
 The preflight is a single command, called out verbatim in every agent prompt:
 
 ```bash
-{{ preflight_build }} && {{ preflight_test }} && {{ preflight_lint }}
-{% if preflight_audit %}&& {{ preflight_audit }}
-{% endif %}```
+{{ preflight_build }} && {{ preflight_test }} && {{ preflight_lint }}{% if preflight_audit %} && {{ preflight_audit }}{% endif %}
+```
 
 The full command lives in `[preflight]` of the plan TOML. **Never loosen any flag
 to make a task pass — fix the code.**
@@ -1584,11 +1583,11 @@ the dual of the opencode agent set; both implement the same workflow.
 ### From the CLI (no agent)
 
 ```bash
-# Validate the plan
-wiggum validate {{ plan_toml_path }}
+# Validate the plan (substitute your plan's filename)
+wiggum validate <your-plan>.toml
 
 # Regenerate PROGRESS.md, IMPLEMENTATION_PLAN.md, tasks/, and the agent prompts
-wiggum generate {{ plan_toml_path }}
+wiggum generate <your-plan>.toml
 ```
 
 ## Failure modes and recovery
@@ -1604,7 +1603,7 @@ wiggum generate {{ plan_toml_path }}
 ## See also
 
 - `AGENTS.md` — project rules, lint profile, workspace layout.
-- `{{ plan_toml_path }}` — the plan.
+- `<your-plan>.toml` — the plan source of truth.
 - `.opencode/agents/` — agent prompts (opencode).
 - `.vscode/*.prompt.md` — equivalent prompts (VS Code Copilot).
 - `IMPLEMENTATION_PLAN.md` — human-readable plan derived from the TOML.
@@ -1624,7 +1623,10 @@ const OPENCODE_PACKAGE_JSON_TEMPLATE: &str = r#"{
 
 const OPENCODE_GITIGNORE_TEMPLATE: &str = r"node_modules
 package-lock.json
+yarn.lock
+pnpm-lock.yaml
 bun.lock
+bun.lockb
 ";
 
 const EVALUATOR_OPENCODE_TEMPLATE: &str = r#"---
