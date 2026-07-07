@@ -71,14 +71,28 @@ fn generate_all_artifacts() {
     assert!(artifacts.orchestrator_vscode.contains("example-project"));
     assert!(artifacts.orchestrator_vscode.contains("runSubagent"));
 
-    // Check opencode orchestrator
+    // Check opencode orchestrator (single-file pattern: embeds SUBAGENT_PROMPT)
     assert!(artifacts.orchestrator_opencode.contains("example-project"));
     assert!(artifacts.orchestrator_opencode.contains("subagent_type"));
     assert!(!artifacts.orchestrator_opencode.contains("runSubagent"));
+    assert!(
+        artifacts
+            .orchestrator_opencode
+            .contains("<SUBAGENT_PROMPT>"),
+        "opencode orchestrator must embed SUBAGENT_PROMPT"
+    );
 
-    // Check implementer
-    assert!(artifacts.implementer.contains("mode: subagent"));
-    assert!(!artifacts.implementer.contains("wiggum-implementer"));
+    // Check ORCHESTRATOR.md root workflow doc
+    assert!(artifacts.orchestrator_root.starts_with("# ORCHESTRATOR"));
+    assert!(artifacts.orchestrator_root.contains("Task state machine"));
+
+    // Check opencode package.json
+    assert!(
+        artifacts
+            .opencode_package_json
+            .contains("@opencode-ai/plugin")
+    );
+    assert!(artifacts.opencode_gitignore.contains("node_modules"));
 
     // Check plan doc
     assert!(artifacts.plan_doc.contains("example-project"));
@@ -148,35 +162,28 @@ fn write_artifacts_opencode_target_writes_opencode_agents() {
     assert!(!project_path.join(".vscode").exists());
     assert!(
         project_path
-            .join(".opencode/agents/wiggum-orchestrator.md")
+            .join(".opencode/agents/orchestrator.md")
             .exists()
     );
+    assert!(project_path.join(".opencode/agents/planner.md").exists());
     assert!(
         project_path
-            .join(".opencode/agents/wiggum-implementer.md")
+            .join(".opencode/agents/background-auditor.md")
             .exists()
     );
-    assert!(
-        project_path
-            .join(".opencode/agents/wiggum-planner.md")
-            .exists()
-    );
-    assert!(
-        project_path
-            .join(".opencode/agents/wiggum-auditor.md")
-            .exists()
-    );
+    assert!(project_path.join(".opencode/package.json").exists());
+    assert!(project_path.join(".opencode/.gitignore").exists());
 
-    // opencode-compatible clients (e.g. minimax-m3) scan the working
-    // directory for ORCHESTRATOR.md. Verify the root-level alias is emitted
-    // alongside the canonical `.opencode/agents/wiggum-orchestrator.md`.
+    // ORCHESTRATOR.md at the root is a real workflow reference doc.
     let root_orch = project_path.join("ORCHESTRATOR.md");
     assert!(
-        root_orch.exists()
-            || root_orch
-                .symlink_metadata()
-                .is_ok_and(|m| m.file_type().is_symlink()),
-        "opencode target must emit a root-level ORCHESTRATOR.md alias"
+        root_orch.exists(),
+        "opencode target must emit a real ORCHESTRATOR.md (not a symlink)"
+    );
+    let body = std::fs::read_to_string(&root_orch).expect("read ORCHESTRATOR.md");
+    assert!(
+        body.starts_with("# ORCHESTRATOR"),
+        "ORCHESTRATOR.md must be the workflow reference doc"
     );
 }
 
@@ -312,7 +319,7 @@ fn write_artifacts_all_targets_writes_everything() {
     assert!(project_path.join(".vscode/orchestrator.prompt.md").exists());
     assert!(
         project_path
-            .join(".opencode/agents/wiggum-orchestrator.md")
+            .join(".opencode/agents/orchestrator.md")
             .exists()
     );
     assert!(project_path.join(".claude/settings.json").exists());
@@ -327,7 +334,7 @@ fn opencode_orchestrator_does_not_contain_runsubagent() {
         "opencode orchestrator must not contain runSubagent"
     );
     assert!(
-        artifacts.orchestrator_opencode.contains("task tool"),
+        artifacts.orchestrator_opencode.contains("`task` tool"),
         "opencode orchestrator should reference the `task` tool"
     );
 }

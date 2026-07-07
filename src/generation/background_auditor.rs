@@ -1,5 +1,5 @@
 //! Generate `.vscode/background-auditor.prompt.md` and
-//! `.opencode/agents/wiggum-auditor.md` — the continuous quality auditor
+//! `.opencode/agents/background-auditor.md` — the continuous quality auditor
 //! agent prompt.
 
 use tera::{Context, Tera};
@@ -37,7 +37,7 @@ pub fn render_with(tera: &Tera, plan: &Plan) -> Result<String> {
         .map_err(|e| WiggumError::Template(e.to_string()))
 }
 
-/// Render the opencode background auditor subagent prompt (`wiggum-auditor.md`).
+/// Render the opencode background auditor subagent prompt (`background-auditor.md`).
 ///
 /// # Errors
 ///
