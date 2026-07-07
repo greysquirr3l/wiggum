@@ -1622,10 +1622,10 @@ const OPENCODE_PACKAGE_JSON_TEMPLATE: &str = r#"{
 }
 "#;
 
-const OPENCODE_GITIGNORE_TEMPLATE: &str = r#"node_modules
+const OPENCODE_GITIGNORE_TEMPLATE: &str = r"node_modules
 package-lock.json
 bun.lock
-"#;
+";
 
 const EVALUATOR_OPENCODE_TEMPLATE: &str = r#"---
 description: Evaluator — independently verifies task completion for {{ project_name }}
