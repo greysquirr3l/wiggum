@@ -78,7 +78,7 @@ pub fn render_with(tera: &Tera, plan: &Plan, tasks: &[ResolvedTask]) -> Result<S
         .map_err(|e| WiggumError::Template(e.to_string()))
 }
 
-/// Render the opencode orchestrator agent prompt (`wiggum-orchestrator.md`).
+/// Render the opencode orchestrator agent prompt (`orchestrator.md`).
 ///
 /// # Errors
 ///
@@ -88,6 +88,13 @@ pub fn render_opencode(plan: &Plan, tasks: &[ResolvedTask]) -> Result<String> {
 }
 
 /// Render the opencode orchestrator agent prompt using a custom Tera instance.
+///
+/// The opencode orchestrator is a **single-file** prompt: it embeds both the
+/// orchestrator instructions (`<ORCHESTRATOR_INSTRUCTIONS>`) and the
+/// subagent body (`<SUBAGENT_PROMPT>`). At dispatch time the orchestrator
+/// passes the subagent body to the built-in `general` subagent via the
+/// `task` tool with `subagent_type: "general"`. No separate implementer
+/// file is needed.
 ///
 /// # Errors
 ///
@@ -111,52 +118,15 @@ pub fn render_opencode_with(tera: &Tera, plan: &Plan, tasks: &[ResolvedTask]) ->
     );
     ctx.insert("has_evaluator", &plan.evaluator.is_some());
 
-    // Strict rules are mirrored into the opencode orchestrator so it can
-    // repeat the high-level expectations when briefing subagents.
-    ctx.insert("strict", &plan.style.strict);
-    if plan.style.strict {
-        let profile = plan.project.language.profile();
-        ctx.insert("strict_rules", &profile.strict_rules);
-    }
+    // Completion standard — travels verbatim with every subagent dispatch
+    // alongside Accumulated Learnings and Codebase State.
+    let completion_standard = plan.style.resolved_completion_standard();
+    ctx.insert("completion_standard", &completion_standard);
 
-    let groups = dag::parallel_groups(tasks)?;
-    let groups_value =
-        serde_json::to_value(&groups).unwrap_or(serde_json::Value::Array(Vec::new()));
-    ctx.insert("parallel_groups", &groups_value);
-
-    tera.render("orchestrator_opencode.md", &ctx)
-        .map_err(|e| WiggumError::Template(e.to_string()))
-}
-
-/// Render the opencode implementer subagent prompt (`wiggum-implementer.md`).
-/// The implementer is a single shared body — the orchestrator references the
-/// specific task file via `@path` at dispatch time.
-///
-/// # Errors
-///
-/// Returns an error if template rendering fails.
-pub fn render_implementer(plan: &Plan) -> Result<String> {
-    render_implementer_with(get_tera(), plan)
-}
-
-/// Render the opencode implementer subagent prompt using a custom Tera instance.
-///
-/// # Errors
-///
-/// Returns an error if template rendering fails.
-pub fn render_implementer_with(tera: &Tera, plan: &Plan) -> Result<String> {
-    let mut ctx = Context::new();
-
-    ctx.insert("project_name", &plan.project.name);
-    ctx.insert("project_path", &plan.project.path);
-    ctx.insert("persona", &plan.orchestrator.persona);
-    ctx.insert("preflight_build", &plan.preflight.build);
-    ctx.insert("preflight_test", &plan.preflight.test);
-    ctx.insert("preflight_lint", &plan.preflight.lint);
+    // Rules injected into the SUBAGENT_PROMPT body (the implementation
+    // subagent is the surface that writes the code).
     ctx.insert("rules", &plan.orchestrator.rules);
     ctx.insert("architecture", &plan.project.architecture);
-    ctx.insert("strategy", &plan.orchestrator.strategy.to_string());
-    ctx.insert("subagent_model", &plan.orchestrator.subagent_model);
     ctx.insert("avoid_ai_patterns", &plan.style.avoid_ai_patterns);
     ctx.insert("avoid_god_files", &plan.style.avoid_god_files);
 
@@ -167,9 +137,8 @@ pub fn render_implementer_with(tera: &Tera, plan: &Plan) -> Result<String> {
         ctx.insert("comment_guidelines", &profile.comment_guidelines);
     }
 
-    // Strict language rules — only injected into the implementer (where code
-    // is generated) and only when the plan opts in. The implementer must
-    // see the full list because it is the surface that writes the code.
+    // Strict rules mirror to both the orchestrator (for the briefing it
+    // gives subagents) and the subagent body (where code is generated).
     ctx.insert("strict", &plan.style.strict);
     if plan.style.strict {
         ctx.insert("strict_rules", &profile.strict_rules);
@@ -178,8 +147,79 @@ pub fn render_implementer_with(tera: &Tera, plan: &Plan) -> Result<String> {
     let contract_review = plan.evaluator.as_ref().is_some_and(|e| e.contract_review);
     ctx.insert("contract_review", &contract_review);
 
-    tera.render("implementer.md", &ctx)
+    let groups = dag::parallel_groups(tasks)?;
+    let groups_value =
+        serde_json::to_value(&groups).unwrap_or(serde_json::Value::Array(Vec::new()));
+    ctx.insert("parallel_groups", &groups_value);
+
+    tera.render("orchestrator_opencode.md", &ctx)
         .map_err(|e| WiggumError::Template(e.to_string()))
+}
+
+/// Render the root-level `ORCHESTRATOR.md` workflow reference document.
+///
+/// This is the long-form, human-readable document at the project root
+/// that explains the orchestration loop, the agents, the state machine,
+/// the preflight, the evaluator rubric, and failure recovery. It is what
+/// a human or a fresh LLM reads to orient themselves mid-stream.
+///
+/// # Errors
+///
+/// Returns an error if template rendering fails.
+pub fn render_orchestrator_root(plan: &Plan, tasks: &[ResolvedTask]) -> Result<String> {
+    render_orchestrator_root_with(get_tera(), plan, tasks)
+}
+
+/// Render the root-level `ORCHESTRATOR.md` using a custom Tera instance.
+///
+/// # Errors
+///
+/// Returns an error if template rendering fails.
+pub fn render_orchestrator_root_with(
+    tera: &Tera,
+    plan: &Plan,
+    tasks: &[ResolvedTask],
+) -> Result<String> {
+    let mut ctx = Context::new();
+
+    ctx.insert("project_name", &plan.project.name);
+    ctx.insert("project_path", &plan.project.path);
+    ctx.insert("task_count_padded", &format!("{:02}", tasks.len()));
+    ctx.insert("preflight_build", &plan.preflight.build);
+    ctx.insert("preflight_test", &plan.preflight.test);
+    ctx.insert("preflight_lint", &plan.preflight.lint);
+    ctx.insert("preflight_audit", &plan.preflight.audit);
+    ctx.insert("max_retries", &plan.orchestrator.max_retries);
+    ctx.insert("on_failure", &plan.orchestrator.on_failure.to_string());
+    ctx.insert("has_evaluator", &plan.evaluator.is_some());
+
+    let completion_standard = plan.style.resolved_completion_standard();
+    ctx.insert("completion_standard", &completion_standard);
+
+    if let Some(eval) = &plan.evaluator {
+        ctx.insert("pass_threshold", &eval.pass_threshold);
+        let criteria_value =
+            serde_json::to_value(&eval.criteria).unwrap_or(serde_json::Value::Array(Vec::new()));
+        ctx.insert("criteria", &criteria_value);
+    } else {
+        // Template always reads `pass_threshold` — provide a sensible
+        // default when no evaluator is configured so the rubric section
+        // renders cleanly. (The "no evaluator" branch is rendered by
+        // the template via `{% if has_evaluator %}`, but Tera still
+        // evaluates `{{ pass_threshold }}` if any other part of the
+        // template references it.)
+        ctx.insert("pass_threshold", &7u8);
+        ctx.insert("criteria", &Vec::<String>::new());
+    }
+
+// The plan TOML path is intentionally NOT substituted — the
+        // template uses `<your-plan>.toml` as a placeholder so readers
+        // know to substitute their own filename. Guessing and rendering
+        // a wrong path would send people to a non-existent file.
+
+    tera.render("orchestrator_root.md", &ctx).map_err(|e| {
+        WiggumError::Template(format!("Failed to render 'orchestrator_root.md': {e:?}"))
+    })
 }
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
@@ -303,7 +343,10 @@ goal = "Set up the project."
             rendered.contains("`task` tool"),
             "must reference the `task` tool"
         );
-        assert!(rendered.contains("subagent_type: \"wiggum-implementer\""));
+        assert!(
+            rendered.contains("subagent_type: \"general\""),
+            "opencode orchestrator must dispatch to the built-in general subagent"
+        );
         assert!(
             !rendered.contains("runSubagent"),
             "must NOT use VSCode runSubagent"
@@ -317,7 +360,8 @@ goal = "Set up the project."
         let resolved = plan.resolve_tasks().unwrap();
         let rendered = render_opencode(&plan, &resolved).unwrap();
         // The orchestrator's own model goes in its frontmatter; the subagent
-        // model is only mentioned in the implementer frontmatter.
+        // runs on the orchestrator's session model since `general` doesn't
+        // accept a model argument.
         assert!(
             !rendered.contains("pass `model:"),
             "opencode has no per-dispatch model arg"
@@ -325,28 +369,150 @@ goal = "Set up the project."
     }
 
     #[test]
-    fn opencode_orchestrator_gates_task_dispatch_behind_permissions() {
+    fn opencode_orchestrator_has_permissive_permissions_for_preflight() {
+        // The orchestrator must independently run preflight (cargo build/test/clippy)
+        // and dispatch subagents — both require permissive perms, NOT the restrictive
+        // allowlist that the old template had.
         let plan = opencode_plan();
         let resolved = plan.resolve_tasks().unwrap();
         let rendered = render_opencode(&plan, &resolved).unwrap();
-        // Frontmatter must include permission.task gating so the orchestrator
-        // can only dispatch wiggum-* subagents.
-        assert!(rendered.contains("permission:"));
-        assert!(rendered.contains("task:"));
-        assert!(rendered.contains("\"wiggum-implementer\": allow"));
+        let frontmatter = rendered
+            .split_once("---")
+            .and_then(|(_, rest)| rest.split_once("---"))
+            .map_or("", |(fm, _)| fm);
+        assert!(
+            frontmatter.contains("edit: allow"),
+            "orchestrator must be allowed to edit PROGRESS.md; got:\n{frontmatter}"
+        );
+        assert!(
+            frontmatter.contains("bash: allow"),
+            "orchestrator must be allowed to run preflight commands; got:\n{frontmatter}"
+        );
+        assert!(
+            frontmatter.contains("task: allow"),
+            "orchestrator must be allowed to dispatch subagents; got:\n{frontmatter}"
+        );
     }
 
     #[test]
-    fn opencode_implementer_contains_security_and_strategy_body() {
+    fn opencode_orchestrator_embeds_subagent_prompt_inline() {
+        // Single-file pattern: the orchestrator must contain BOTH the
+        // orchestrator instructions and the subagent body in the same file,
+        // separated by <ORCHESTRATOR_INSTRUCTIONS> / <SUBAGENT_PROMPT> tags.
         let plan = opencode_plan();
-        let rendered = render_implementer(&plan).unwrap();
-        assert!(rendered.contains("mode: subagent"));
-        assert!(rendered.contains("Security (non-negotiable)"));
-        // Strategy block is one of the four variants.
+        let resolved = plan.resolve_tasks().unwrap();
+        let rendered = render_opencode(&plan, &resolved).unwrap();
         assert!(
-            rendered.contains("Strategy: ") || rendered.contains("## Your job"),
-            "must include strategy body or default job block"
+            rendered.contains("<ORCHESTRATOR_INSTRUCTIONS>"),
+            "must contain <ORCHESTRATOR_INSTRUCTIONS> tag"
         );
+        assert!(
+            rendered.contains("<SUBAGENT_PROMPT>"),
+            "must contain <SUBAGENT_PROMPT> tag"
+        );
+        assert!(
+            rendered.contains("Security (non-negotiable)"),
+            "subagent body must include the security block"
+        );
+    }
+
+    #[test]
+    fn opencode_orchestrator_injects_default_completion_standard() {
+        // The default completion standard (no override in plan) must still
+        // appear in the rendered output so every dispatch carries the bar.
+        let plan = Plan::from_toml(MINIMAL_PLAN).unwrap();
+        let resolved = plan.resolve_tasks().unwrap();
+        let rendered = render_opencode(&plan, &resolved).unwrap();
+        assert!(
+            rendered.contains("<COMPLETION_STANDARD>"),
+            "must contain <COMPLETION_STANDARD> reference block"
+        );
+        assert!(
+            rendered.contains("todo!()"),
+            "default completion standard must reference placeholder patterns"
+        );
+        assert!(
+            rendered.contains("placeholder implementations"),
+            "default completion standard must mention placeholder implementations"
+        );
+    }
+
+    #[test]
+    fn opencode_orchestrator_injects_custom_completion_standard() {
+        let toml = r#"
+[project]
+name = "test"
+path = "./test"
+description = "test"
+language = "rust"
+
+[style]
+completion_standard = "MY-CUSTOM-BAR-STRING"
+
+[[phases]]
+name = "Phase 1"
+order = 1
+
+[[phases.tasks]]
+slug = "t01"
+title = "T01"
+goal = "Goal"
+"#;
+        let plan = Plan::from_toml(toml).unwrap();
+        let resolved = plan.resolve_tasks().unwrap();
+        let rendered = render_opencode(&plan, &resolved).unwrap();
+        assert!(
+            rendered.contains("MY-CUSTOM-BAR-STRING"),
+            "custom completion_standard must be injected verbatim"
+        );
+        assert!(
+            !rendered.contains("placeholder implementations"),
+            "default completion standard body must be replaced when overridden"
+        );
+    }
+
+    #[test]
+    fn orchestrator_root_doc_includes_state_machine_and_rubric() {
+        // The root-level ORCHESTRATOR.md is the long-form reference doc.
+        // It must include the state machine, the preflight, and the evaluator
+        // rubric so a human or fresh LLM can orient mid-stream.
+        let toml = r#"
+[project]
+name = "test"
+path = "./test"
+description = "test"
+language = "rust"
+
+[preflight]
+build = "cargo build"
+test = "cargo test"
+lint = "cargo clippy"
+
+[evaluator]
+pass_threshold = 8
+
+[[phases]]
+name = "Phase 1"
+order = 1
+
+[[phases.tasks]]
+slug = "t01"
+title = "T01"
+goal = "Goal"
+"#;
+        let plan = Plan::from_toml(toml).unwrap();
+        let resolved = plan.resolve_tasks().unwrap();
+        let rendered = render_orchestrator_root(&plan, &resolved).unwrap();
+        assert!(rendered.starts_with("# ORCHESTRATOR"));
+        assert!(rendered.contains("Task state machine"));
+        assert!(rendered.contains("┌──────┐"));
+        assert!(rendered.contains("Preflight"));
+        assert!(rendered.contains("cargo test &&"));
+        assert!(rendered.contains("Evaluator rubric"));
+        assert!(rendered.contains("8/10"));
+        assert!(rendered.contains("Completion Standard"));
+        assert!(rendered.contains("Accumulated Learnings"));
+        assert!(rendered.contains("Codebase State"));
     }
 
     // ── strict opt-in ───────────────────────────────────────────────
@@ -358,22 +524,24 @@ goal = "Set up the project."
     }
 
     #[test]
-    fn strict_off_omits_strict_rules_block_from_implementer() {
+    fn strict_off_omits_strict_rules_block_from_orchestrator() {
         let plan = opencode_plan();
-        let rendered = render_implementer(&plan).unwrap();
+        let resolved = plan.resolve_tasks().unwrap();
+        let rendered = render_opencode(&plan, &resolved).unwrap();
         assert!(
             !rendered.contains("Strict project standards"),
-            "default implementer must NOT include strict block"
+            "default opencode orchestrator must NOT include strict block"
         );
     }
 
     #[test]
-    fn strict_on_injects_full_rule_list_into_implementer() {
+    fn strict_on_injects_full_rule_list_into_orchestrator_subagent_body() {
         let plan = strict_plan();
-        let rendered = render_implementer(&plan).unwrap();
+        let resolved = plan.resolve_tasks().unwrap();
+        let rendered = render_opencode(&plan, &resolved).unwrap();
         assert!(
             rendered.contains("Strict project standards"),
-            "implementer must include the strict block header"
+            "orchestrator must include the strict block in the embedded subagent body"
         );
         // Spot-check the most important rules from nick.md (Rust profile).
         assert!(rendered.contains(".unwrap()"));
@@ -430,9 +598,12 @@ goal = "Set up the project."
     }
 
     #[test]
-    fn opencode_orchestrator_omits_model_line_for_subagent_when_unset() {
+    fn opencode_orchestrator_omits_model_line_when_subagent_model_unset() {
+        // The `general` subagent doesn't accept a model argument, so the
+        // orchestrator frontmatter must not surface subagent_model either.
         let plan = Plan::from_toml(MINIMAL_PLAN).unwrap();
-        let rendered = render_implementer(&plan).unwrap();
+        let resolved = plan.resolve_tasks().unwrap();
+        let rendered = render_opencode(&plan, &resolved).unwrap();
         let frontmatter = rendered
             .split_once("---")
             .and_then(|(_, rest)| rest.split_once("---"))
@@ -441,7 +612,7 @@ goal = "Set up the project."
             !frontmatter
                 .lines()
                 .any(|l| l.trim_start().starts_with("model:")),
-            "opencode implementer must NOT emit `model:` when subagent_model is None; got:\n{frontmatter}",
+            "opencode orchestrator must NOT emit `model:` when no model is set; got:\n{frontmatter}",
         );
     }
 

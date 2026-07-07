@@ -59,7 +59,7 @@ These hold regardless of language and are injected alongside the language-specif
 When `strict = true`, every generated artifact that contains prompt content gets the strict block:
 
 - **VSCode target** — `orchestrator.prompt.md`, each `tasks/T{NN}-{slug}.md`, `evaluator.prompt.md` (when `[evaluator]` is configured)
-- **opencode target** — `wiggum-orchestrator.md`, `wiggum-implementer.md`, `wiggum-evaluator.md`
+- **opencode target** — `orchestrator.md` (the embedded subagent body inherits the rules), `evaluator.md` (when `[evaluator]` is configured)
 - **Claude target** — `CLAUDE.md` (so Claude Code sees the rules on every session)
 - **agent-rules target** — `.cursorrules`, `.windsurfrules`, `.github/copilot-instructions.md` (so Cursor / Windsurf / Copilot users see them too)
 

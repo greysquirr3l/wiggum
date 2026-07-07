@@ -32,6 +32,8 @@ A markdown table tracking all phases and tasks with status columns:
 
 Includes a **Codebase State** section where subagents record which files were created or modified. This gives each subsequent subagent accurate context about what the previous one actually changed.
 
+Includes a **Completion Standard** section that travels verbatim with every subagent dispatch. By default this is a generic bar (no placeholders, no lint suppressions, preflight clean, tests added, progress doc updated) — override per project with `[style] completion_standard`.
+
 Includes a learnings column where the orchestrator records insights from each completed task.
 
 ### Implementation plan — `IMPLEMENTATION_PLAN.md`
@@ -89,17 +91,21 @@ Wiggum emits tool-specific agent prompts and configuration based on the active `
 
 These prompts use GitHub Copilot's `runSubagent` tool to dispatch subagents.
 
-### opencode target — `.opencode/agents/wiggum-*.md`
+### opencode target — `.opencode/agents/*.md`
 
 | File | Role |
 |---|---|
-| `.opencode/agents/wiggum-orchestrator.md` | Primary agent (`mode: primary`) that drives the loop. Dispatches the implementer via the `task` tool with the per-task context. |
-| `.opencode/agents/wiggum-implementer.md` | Subagent (`mode: subagent`) that executes a single task file. The orchestrator references the specific task file via `@path` at dispatch time. |
-| `.opencode/agents/wiggum-evaluator.md` | Subagent. Only generated when `[evaluator]` is configured. |
-| `.opencode/agents/wiggum-planner.md` | Subagent for the planning phase. |
-| `.opencode/agents/wiggum-auditor.md` | Subagent for continuous cross-task regression watching. |
+| `.opencode/agents/orchestrator.md` | Single-file primary agent (`mode: primary`). Contains both `<ORCHESTRATOR_INSTRUCTIONS>` and `<SUBAGENT_PROMPT>` blocks. Dispatches the built-in `general` subagent via the `task` tool with `subagent_type: "general"` and the inline subagent body as `prompt`. |
+| `.opencode/agents/evaluator.md` | QA subagent (`mode: subagent`). Only generated when `[evaluator]` is configured. |
+| `.opencode/agents/planner.md` | Subagent for the planning phase. |
+| `.opencode/agents/background-auditor.md` | Subagent for continuous cross-task regression watching. |
+| `.opencode/package.json` | Pins `@opencode-ai/plugin` so the opencode runtime can install the plugin when the project is opened. |
+| `.opencode/.gitignore` | Excludes `node_modules` and Node/JS package manager lockfiles from the opencode plugin workspace. |
+| `ORCHESTRATOR.md` (project root) | Long-form workflow reference document with the task state machine, agents table, evaluator rubric, completion standard, and failure-mode recovery. Anyone (human or fresh LLM) joining mid-stream reads this to orient. |
 
-The agent frontmatter pins the model and declares permissions — for example, the orchestrator allows `task` only for `wiggum-implementer`, `wiggum-evaluator`, and `wiggum-auditor`, and denies `edit` so it can only update `PROGRESS.md` through the implementer.
+The orchestrator prompt is single-file: it embeds the subagent body inline as a `<SUBAGENT_PROMPT>` block and dispatches `subagent_type: "general"`. There is no separate `wiggum-implementer.md` agent to maintain.
+
+The agent frontmatter declares permissions — the orchestrator runs with permissive defaults (`edit: allow`, `bash: allow`, `task: allow`, `todowrite: allow`, `webfetch: ask`) so it can independently run preflight and dispatch subagents. The planner and background-auditor carry their own narrow permissions. See [Targets](./targets.md) for the full permissions matrix.
 
 ### Claude target — `CLAUDE.md` + `.claude/settings.json`
 

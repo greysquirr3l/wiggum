@@ -1,5 +1,5 @@
 //! Generate `.vscode/planner.prompt.md` and
-//! `.opencode/agents/wiggum-planner.md` — the task-decomposition planner
+//! `.opencode/agents/planner.md` — the task-decomposition planner
 //! agent prompt.
 
 use tera::{Context, Tera};
@@ -37,7 +37,7 @@ pub fn render_with(tera: &Tera, plan: &Plan) -> Result<String> {
         .map_err(|e| WiggumError::Template(e.to_string()))
 }
 
-/// Render the opencode planner subagent prompt (`wiggum-planner.md`).
+/// Render the opencode planner subagent prompt (`planner.md`).
 ///
 /// # Errors
 ///
@@ -117,6 +117,7 @@ goal = "Set up the project."
             "must start with YAML frontmatter"
         );
         assert!(output.contains("mode: subagent"));
+        assert!(output.contains("edit: allow"));
         assert!(output.contains("bash: deny"));
     }
 }

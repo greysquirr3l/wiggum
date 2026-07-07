@@ -4,6 +4,28 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Changed
+
+- **opencode: single-file orchestrator with embedded `<SUBAGENT_PROMPT>`** — `.opencode/agents/orchestrator.md` now contains both `<ORCHESTRATOR_INSTRUCTIONS>` and `<SUBAGENT_PROMPT>` blocks. The orchestrator dispatches the built-in `general` subagent via `task(subagent_type: "general", prompt=<SUBAGENT_PROMPT>)`. The separate `wiggum-implementer.md` agent file has been removed.
+- **opencode: bare agent filenames, no `wiggum-` prefix** — `.opencode/agents/orchestrator.md`, `planner.md`, `background-auditor.md`, `evaluator.md` instead of `wiggum-orchestrator.md`, `wiggum-planner.md`, etc. Invocation name drops from `wiggum-orchestrator` to `orchestrator`.
+- **opencode: orchestrator permissions are permissive** — `edit: allow`, `bash: allow`, `task: allow`, `todowrite: allow`, `webfetch: ask`. The previous `edit: deny` plus git-only `bash:` allowlist blocked the orchestrator's own preflight-verification step (`cargo build && cargo test && cargo clippy`) in the loop.
+- **opencode: `<PLAN>`/`<TASKS>`/`<PROGRESS>`/`<FEATURES>` reference blocks** — declarative metadata at the top of the orchestrator agent makes the file self-contained as a project map.
+- **opencode: new `<COMPLETION_STANDARD>` reference block** — a standing directive on the bar for shipped work that travels verbatim with every subagent dispatch, alongside `Accumulated Learnings` and `Codebase State`.
+- **`ORCHESTRATOR.md` at the project root is now a real workflow reference document** — replaces the previous symlink/copy of the agent file. Contains the task state machine (ASCII diagram), agents table, per-agent tooling matrix, evaluator rubric, preflight command, gates, session handoff protocol, and failure-mode recovery. Anyone (human or fresh LLM) joining mid-stream reads this to orient.
+- **opencode: planner and background-auditor permissions loosened** — planner gains `edit: allow`, `read: allow`, `glob: allow`, `grep: allow` (was `edit: deny`); auditor keeps `edit: deny` but gains explicit `read`/`glob`/`grep` allow and `bash: allow` (was a tight git-only allowlist).
+
+### Added
+
+- **`@opencode-ai/plugin` is now installed automatically** — `wiggum generate --target opencode` writes `.opencode/package.json` (pins `@opencode-ai/plugin@1.17.12`) and `.opencode/.gitignore` (excludes `node_modules`, lockfiles) so the opencode runtime can install the plugin when the project is opened.
+- **`[style] completion_standard` TOML field** — optional override of the standing completion directive. Defaults to a language-agnostic standard covering preflight, exit criteria, placeholder detection, lint-suppression ban, dependency justification, test coverage, and progress-doc updates. The default is rendered into the orchestrator prompt and the root `ORCHESTRATOR.md` so even unset plans get the bar.
+- **`StyleConfig::resolved_completion_standard()`** — public helper that returns the effective standard (override or default). Reused by both the opencode orchestrator and the root doc templates.
+
+### Deprecated
+
+- **`wiggum-*.md` filenames under `.opencode/agents/`** — the deprecated filenames are still removed by `wiggum clean` (so existing projects upgrade cleanly) but are no longer emitted by `wiggum generate`. Users on the old prefix will see the new bare names after re-running `generate`.
+
 ## [0.16.1] - 2026-06-30
 
 ### Fixed

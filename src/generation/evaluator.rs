@@ -85,7 +85,7 @@ fn render_evaluator(
         .map_err(|e| WiggumError::Template(e.to_string()))
 }
 
-/// Render the opencode evaluator subagent prompt (`wiggum-evaluator.md`).
+/// Render the opencode evaluator subagent prompt (`evaluator.md`).
 ///
 /// # Errors
 ///
@@ -273,7 +273,8 @@ mod tests {
         );
         assert!(output.contains("mode: subagent"));
         assert!(output.contains("permission:"));
-        assert!(output.contains("edit: deny"));
+        assert!(output.contains("edit: allow"));
+        assert!(output.contains("bash: allow"));
         assert!(!output.contains("runSubagent"));
         Ok(())
     }

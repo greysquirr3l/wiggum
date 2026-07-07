@@ -45,7 +45,7 @@ Other targets are opt-in via `--target` or the plan's `[targets]` section:
 | Target | CLI / plan field | What gets emitted |
 |---|---|---|
 | VSCode + Copilot (default) | `--target vscode` | `.vscode/orchestrator.prompt.md` + three siblings |
-| opencode | `--target opencode` | `.opencode/agents/wiggum-*.md` (five files) |
+| opencode | `--target opencode` | `.opencode/agents/orchestrator.md` (single-file, embedded subagent) + planner + background-auditor + (optional) evaluator + `.opencode/package.json` + `.opencode/.gitignore` + `ORCHESTRATOR.md` |
 | Claude Code | `--target claude` | `CLAUDE.md` (project memory) + `.claude/settings.json` (hooks) |
 | Cursor / Windsurf / GitHub Copilot | `--target agent-rules` | `.cursorrules` + `.windsurfrules` + `.github/copilot-instructions.md` |
 
@@ -58,8 +58,10 @@ prompt, and let it work through the tasks.
 
 - **VSCode + Copilot:** open the project, switch to agent mode, paste
   `.vscode/orchestrator.prompt.md` as the user message.
-- **opencode:** open the project — the `wiggum-orchestrator` agent is
-  auto-discovered from `.opencode/agents/`. Select it from the agent picker.
+- **opencode:** open the project — the `orchestrator` agent is
+  auto-discovered from `.opencode/agents/`. Select it from the agent picker
+  (or invoke `/orchestrator`). Read `ORCHESTRATOR.md` at the project root
+  for the full workflow reference.
 - **Claude Code:** open the project — `CLAUDE.md` is auto-loaded and the
   `PreCompact` hook is auto-registered. Run `claude` in the terminal.
 - **Cursor / Windsurf / Copilot:** open the project — the IDE reads its
