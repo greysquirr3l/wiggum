@@ -27,8 +27,6 @@ const GENERATED_FILES: &[&str] = &[
     ".opencode/agents/evaluator.md",
     ".opencode/agents/planner.md",
     ".opencode/agents/background-auditor.md",
-    ".opencode/package.json",
-    ".opencode/.gitignore",
     // opencode target — deprecated `wiggum-`-prefixed filenames, kept here
     // so `wiggum clean` removes stale files from older generations.
     ".opencode/agents/wiggum-orchestrator.md",

@@ -10,7 +10,7 @@ shared, but the agent prompts and configuration differ.
 | Target | Stable identifier | Agent file(s) | Dispatch mechanism |
 |---|---|---|---|
 | **VSCode** (default) | `vscode` | `.vscode/orchestrator.prompt.md` (and three siblings) | GitHub Copilot `runSubagent` tool |
-| **opencode** | `opencode` | `.opencode/agents/orchestrator.md` (and three siblings) + `.opencode/package.json` + `.opencode/.gitignore` + `ORCHESTRATOR.md` | opencode `task` tool with `subagent_type: "general"` and inline subagent body |
+| **opencode** | `opencode` | `.opencode/agents/orchestrator.md` (and three siblings) + `ORCHESTRATOR.md` | opencode `task` tool with `subagent_type: "general"` and inline subagent body |
 | **Claude** | `claude` | `CLAUDE.md` (project memory) + `.claude/settings.json` (hooks) | Claude Code reads both files on every session; PreCompact hook blocks compaction mid-task |
 | **agent-rules** | `agent-rules` | `.cursorrules` + `.windsurfrules` + `.github/copilot-instructions.md` | The receiving IDE drives its own agent loop; wiggum supplies only rules + project context |
 
@@ -85,10 +85,6 @@ If the resolved `TargetSet` is empty (every field explicitly `false`),
     `[evaluator]` is configured.
   - `.opencode/agents/planner.md` — task-decomposition planner.
   - `.opencode/agents/background-auditor.md` — continuous cross-task auditor.
-  - `.opencode/package.json` — pins `@opencode-ai/plugin` so the opencode
-    runtime can install the plugin when the project is opened.
-  - `.opencode/.gitignore` — excludes `node_modules` and Node/JS package
-    manager lockfiles from the opencode plugin workspace.
   - `ORCHESTRATOR.md` (project root) — long-form workflow reference document
     with the task state machine, agents table, per-agent tooling matrix,
     evaluator rubric, completion standard, gates, session handoff protocol,
@@ -185,8 +181,6 @@ wiggum generate plan.toml
 # → .opencode/agents/evaluator.md             (if [evaluator] configured)
 # → .opencode/agents/planner.md
 # → .opencode/agents/background-auditor.md
-# → .opencode/package.json
-# → .opencode/.gitignore
 # → ORCHESTRATOR.md
 ```
 
@@ -239,11 +233,11 @@ Custom template names that match the opencode variants:
 | `.wiggum/templates/vscode/orchestrator.md` | `.wiggum/templates/orchestrator.md` |
 | `.wiggum/templates/vscode/evaluator.md` | `.wiggum/templates/evaluator.md` |
 | `.wiggum/templates/vscode/planner.md` | `.wiggum/templates/planner.md` |
-| `.wiggum/templates/vscode/background-auditor.md` | `.wiggum/templates/background_auditor.md` |
+| `.wiggum/templates/vscode/background_auditor.md` | `.wiggum/templates/background_auditor.md` |
 | `.wiggum/templates/opencode/orchestrator.md` | `.wiggum/templates/orchestrator_opencode.md` |
 | `.wiggum/templates/opencode/evaluator.md` | `.wiggum/templates/evaluator_opencode.md` |
 | `.wiggum/templates/opencode/planner.md` | `.wiggum/templates/planner_opencode.md` |
-| `.wiggum/templates/opencode/background-auditor.md` | `.wiggum/templates/background_auditor_opencode.md` |
+| `.wiggum/templates/opencode/background_auditor.md` | `.wiggum/templates/background_auditor_opencode.md` |
 
 Note: there is no `opencode/implementer.md` template override — the opencode
 target uses a single-file orchestrator with the subagent body embedded

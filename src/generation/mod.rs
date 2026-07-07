@@ -16,12 +16,10 @@ pub mod tokens;
 
 use std::path::Path;
 
-use tera::Context;
-
 use crate::domain::dag::validate_dag;
 use crate::domain::plan::Plan;
 use crate::domain::targets::TargetSet;
-use crate::error::{Result, WiggumError};
+use crate::error::Result;
 use crate::ports::ArtifactWriter;
 
 /// Generated artifacts from a plan.
@@ -62,11 +60,6 @@ pub struct GeneratedArtifacts {
     pub planner_opencode: String,
     /// `.opencode/agents/background-auditor.md`.
     pub background_auditor_opencode: String,
-    /// `.opencode/package.json` — pins `@opencode-ai/plugin` so the opencode
-    /// runtime can install the plugin when the project is opened.
-    pub opencode_package_json: String,
-    /// `.opencode/.gitignore` — excludes `node_modules`, lockfiles, etc.
-    pub opencode_gitignore: String,
     /// `ORCHESTRATOR.md` at the project root — a long-form workflow reference
     /// document (state machine, agents table, evaluator rubric, completion
     /// standard, failure modes) that anyone — human or fresh LLM — can read
@@ -131,8 +124,6 @@ pub fn generate_all(plan: &Plan) -> Result<GeneratedArtifacts> {
     let hooks_json = hooks::render().to_string();
     let claude_md = claude::render(plan)?;
     let agent_rules_content = agent_rules::render(plan)?;
-    let opencode_package_json = render_opencode_package_json(plan)?;
-    let opencode_gitignore = render_opencode_gitignore()?;
 
     Ok(GeneratedArtifacts {
         progress,
@@ -148,8 +139,6 @@ pub fn generate_all(plan: &Plan) -> Result<GeneratedArtifacts> {
         evaluator_opencode,
         planner_opencode,
         background_auditor_opencode,
-        opencode_package_json,
-        opencode_gitignore,
         orchestrator_root,
         hooks_json,
         claude_md,
@@ -195,8 +184,6 @@ pub fn generate_all_with_overrides(plan: &Plan, project_path: &Path) -> Result<G
     let hooks_json = hooks::render().to_string();
     let claude_md = claude::render_with(&tera, plan)?;
     let agent_rules_content = agent_rules::render_with(&tera, plan)?;
-    let opencode_package_json = render_opencode_package_json(plan)?;
-    let opencode_gitignore = render_opencode_gitignore()?;
 
     Ok(GeneratedArtifacts {
         progress,
@@ -212,8 +199,6 @@ pub fn generate_all_with_overrides(plan: &Plan, project_path: &Path) -> Result<G
         evaluator_opencode,
         planner_opencode,
         background_auditor_opencode,
-        opencode_package_json,
-        opencode_gitignore,
         orchestrator_root,
         hooks_json,
         claude_md,
@@ -299,17 +284,6 @@ pub fn write_artifacts(
             writer.write_file(&agents_dir.join("evaluator.md"), eval)?;
         }
 
-        // opencode runtime needs the `@opencode-ai/plugin` package installed
-        // and a .gitignore to keep node_modules out of version control.
-        writer.write_file(
-            &opencode_dir.join("package.json"),
-            &artifacts.opencode_package_json,
-        )?;
-        writer.write_file(
-            &opencode_dir.join(".gitignore"),
-            &artifacts.opencode_gitignore,
-        )?;
-
         // `ORCHESTRATOR.md` at the project root — long-form workflow
         // reference document, separate from the `.opencode/agents/orchestrator.md`
         // agent prompt. Both files have distinct purposes: the agent prompt
@@ -351,64 +325,4 @@ pub fn write_artifacts(
     }
 
     Ok(())
-}
-
-/// Version of the `@opencode-ai/plugin` npm package pinned by wiggum. Bumped
-/// in lockstep with new opencode releases; matches the API surface the
-/// generated agent prompts assume (frontmatter `mode`/`permission`,
-/// `task` tool with `subagent_type`, `edit`/`bash`/`task` permission keys).
-const OPENCODE_PLUGIN_VERSION: &str = "1.17.12";
-
-/// Render `.opencode/package.json` for the given plan.
-///
-/// # Errors
-///
-/// Returns an error if template rendering fails.
-fn render_opencode_package_json(plan: &Plan) -> Result<String> {
-    let mut ctx = Context::new();
-    ctx.insert("project_name", &plan.project.name);
-    ctx.insert(
-        "project_name_slug",
-        &slugify_for_npm_package(&plan.project.name),
-    );
-    ctx.insert("opencode_plugin_version", OPENCODE_PLUGIN_VERSION);
-    templates::get_tera()
-        .render("opencode_package_json.md", &ctx)
-        .map_err(|e| WiggumError::Template(e.to_string()))
-}
-
-/// Render `.opencode/.gitignore` — excludes `node_modules`, lockfiles, etc.
-///
-/// # Errors
-///
-/// Returns an error if template rendering fails.
-fn render_opencode_gitignore() -> Result<String> {
-    templates::get_tera()
-        .render("opencode_gitignore.md", &Context::new())
-        .map_err(|e| WiggumError::Template(e.to_string()))
-}
-
-/// Convert a project name into a valid npm package name segment
-/// (lowercase, dashes, no leading/trailing dashes).
-fn slugify_for_npm_package(name: &str) -> String {
-    name.to_lowercase()
-        .chars()
-        .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
-        .collect::<String>()
-        .trim_matches('-')
-        .to_string()
-}
-
-#[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
-mod tests {
-    use super::slugify_for_npm_package;
-
-    #[test]
-    fn slugify_lowercases_and_dashes_non_alphanumeric() {
-        assert_eq!(slugify_for_npm_package("Hoenikker"), "hoenikker");
-        assert_eq!(slugify_for_npm_package("my project!"), "my-project");
-        assert_eq!(slugify_for_npm_package("--leading--"), "leading");
-        assert_eq!(slugify_for_npm_package("rust_app-2"), "rust-app-2");
-    }
 }

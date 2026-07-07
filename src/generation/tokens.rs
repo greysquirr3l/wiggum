@@ -75,14 +75,6 @@ pub fn estimate_all(
             });
         }
         estimates.push(TokenEstimate {
-            name: ".opencode/package.json".to_string(),
-            tokens: estimate_tokens(&artifacts.opencode_package_json),
-        });
-        estimates.push(TokenEstimate {
-            name: ".opencode/.gitignore".to_string(),
-            tokens: estimate_tokens(&artifacts.opencode_gitignore),
-        });
-        estimates.push(TokenEstimate {
             name: "ORCHESTRATOR.md".to_string(),
             tokens: estimate_tokens(&artifacts.orchestrator_root),
         });
@@ -180,8 +172,6 @@ mod tests {
             evaluator_opencode: None,
             planner_opencode: String::new(),
             background_auditor_opencode: String::new(),
-            opencode_package_json: String::new(),
-            opencode_gitignore: String::new(),
             orchestrator_root: String::new(),
             hooks_json: String::new(),
             claude_md: String::new(),

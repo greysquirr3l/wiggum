@@ -45,7 +45,7 @@ Other targets are opt-in via `--target` or the plan's `[targets]` section:
 | Target | CLI / plan field | What gets emitted |
 |---|---|---|
 | VSCode + Copilot (default) | `--target vscode` | `.vscode/orchestrator.prompt.md` + three siblings |
-| opencode | `--target opencode` | `.opencode/agents/orchestrator.md` (single-file, embedded subagent) + planner + background-auditor + (optional) evaluator + `.opencode/package.json` + `.opencode/.gitignore` + `ORCHESTRATOR.md` |
+| opencode | `--target opencode` | `.opencode/agents/orchestrator.md` (single-file, embedded subagent) + planner + background-auditor + (optional) evaluator + `ORCHESTRATOR.md` |
 | Claude Code | `--target claude` | `CLAUDE.md` (project memory) + `.claude/settings.json` (hooks) |
 | Cursor / Windsurf / GitHub Copilot | `--target agent-rules` | `.cursorrules` + `.windsurfrules` + `.github/copilot-instructions.md` |
 

@@ -99,8 +99,6 @@ These prompts use GitHub Copilot's `runSubagent` tool to dispatch subagents.
 | `.opencode/agents/evaluator.md` | QA subagent (`mode: subagent`). Only generated when `[evaluator]` is configured. |
 | `.opencode/agents/planner.md` | Subagent for the planning phase. |
 | `.opencode/agents/background-auditor.md` | Subagent for continuous cross-task regression watching. |
-| `.opencode/package.json` | Pins `@opencode-ai/plugin` so the opencode runtime can install the plugin when the project is opened. |
-| `.opencode/.gitignore` | Excludes `node_modules` and Node/JS package manager lockfiles from the opencode plugin workspace. |
 | `ORCHESTRATOR.md` (project root) | Long-form workflow reference document with the task state machine, agents table, evaluator rubric, completion standard, and failure-mode recovery. Anyone (human or fresh LLM) joining mid-stream reads this to orient. |
 
 The orchestrator prompt is single-file: it embeds the subagent body inline as a `<SUBAGENT_PROMPT>` block and dispatches `subagent_type: "general"`. There is no separate `wiggum-implementer.md` agent to maintain.

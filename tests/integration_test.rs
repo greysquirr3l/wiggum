@@ -86,14 +86,6 @@ fn generate_all_artifacts() {
     assert!(artifacts.orchestrator_root.starts_with("# ORCHESTRATOR"));
     assert!(artifacts.orchestrator_root.contains("Task state machine"));
 
-    // Check opencode package.json
-    assert!(
-        artifacts
-            .opencode_package_json
-            .contains("@opencode-ai/plugin")
-    );
-    assert!(artifacts.opencode_gitignore.contains("node_modules"));
-
     // Check plan doc
     assert!(artifacts.plan_doc.contains("example-project"));
     assert!(artifacts.plan_doc.contains("hexagonal"));
@@ -171,8 +163,8 @@ fn write_artifacts_opencode_target_writes_opencode_agents() {
             .join(".opencode/agents/background-auditor.md")
             .exists()
     );
-    assert!(project_path.join(".opencode/package.json").exists());
-    assert!(project_path.join(".opencode/.gitignore").exists());
+    assert!(!project_path.join(".opencode/package.json").exists());
+    assert!(!project_path.join(".opencode/.gitignore").exists());
 
     // ORCHESTRATOR.md at the root is a real workflow reference doc.
     let root_orch = project_path.join("ORCHESTRATOR.md");

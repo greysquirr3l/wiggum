@@ -18,7 +18,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Added
 
-- **`@opencode-ai/plugin` is now installed automatically** — `wiggum generate --target opencode` writes `.opencode/package.json` (pins `@opencode-ai/plugin@1.17.12`) and `.opencode/.gitignore` (excludes `node_modules`, lockfiles) so the opencode runtime can install the plugin when the project is opened.
+- **`@opencode-ai/plugin` install was removed.** Earlier versions wrote `.opencode/package.json` and `.opencode/.gitignore` to install the opencode plugin via npm on project open. The user's choice to opt into the `opencode` target is taken as evidence that opencode is already installed; wiggum no longer assumes or drives the plugin install. If you have an older plan with these artifacts on disk, `wiggum clean` removes them.
 - **`[style] completion_standard` TOML field** — optional override of the standing completion directive. Defaults to a language-agnostic standard covering preflight, exit criteria, placeholder detection, lint-suppression ban, dependency justification, test coverage, and progress-doc updates. The default is rendered into the orchestrator prompt and the root `ORCHESTRATOR.md` so even unset plans get the bar.
 - **`StyleConfig::resolved_completion_standard()`** — public helper that returns the effective standard (override or default). Reused by both the opencode orchestrator and the root doc templates.
 

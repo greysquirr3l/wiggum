@@ -276,8 +276,6 @@ fn print_success(
         if artifacts.evaluator_opencode.is_some() {
             println!("     🔎 .opencode/agents/evaluator.md");
         }
-        println!("     📦 .opencode/package.json");
-        println!("     🙈 .opencode/.gitignore");
         println!("     📝 ORCHESTRATOR.md");
     }
 
@@ -380,14 +378,6 @@ fn print_dry_run(
             );
         }
         println!(
-            "  .opencode/package.json                    ({:.1} KB)",
-            artifacts.opencode_package_json.len() as f64 / 1024.0
-        );
-        println!(
-            "  .opencode/.gitignore                      ({:.1} KB)",
-            artifacts.opencode_gitignore.len() as f64 / 1024.0
-        );
-        println!(
             "  ORCHESTRATOR.md                            ({:.1} KB)",
             artifacts.orchestrator_root.len() as f64 / 1024.0
         );
@@ -483,10 +473,8 @@ fn artifact_totals(
             + artifacts.evaluator_opencode.as_ref().map_or(0, String::len)
             + artifacts.planner_opencode.len()
             + artifacts.background_auditor_opencode.len()
-            + artifacts.opencode_package_json.len()
-            + artifacts.opencode_gitignore.len()
             + artifacts.orchestrator_root.len();
-        files += 6 + usize::from(artifacts.evaluator_opencode.is_some());
+        files += 4 + usize::from(artifacts.evaluator_opencode.is_some());
     }
     if targets.contains(Target::Claude) {
         size += artifacts.hooks_json.len() + artifacts.claude_md.len();
