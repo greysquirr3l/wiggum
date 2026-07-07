@@ -155,7 +155,6 @@ jobs:
 
       - uses: ./.github/actions/rust-setup
         with:
-          ref: ${{ needs.resolve-tag.outputs.tag }}
           toolchain: ${{ env.RUST_VERSION }}
           targets: ${{ matrix.target }}
           cache-prefix: cargo-release-${{ matrix.target }}
@@ -216,7 +215,6 @@ jobs:
         with:
           toolchain: ${{ env.RUST_VERSION }}
           cache-prefix: cargo-publish
-          ref: ${{ needs.resolve-tag.outputs.tag }}
 
       - name: Verify version matches tag
         env:
