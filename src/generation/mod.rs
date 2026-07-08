@@ -48,19 +48,23 @@ pub struct GeneratedArtifacts {
     pub background_auditor_vscode: String,
 
     // ── opencode target ────────────────────────────────────────────────
-    /// `.opencode/agents/wiggum-orchestrator.md`. Always rendered for the
-    /// opencode target.
+    /// `.opencode/agents/orchestrator.md`. Single-file orchestrator prompt —
+    /// embeds both `<ORCHESTRATOR_INSTRUCTIONS>` and `<SUBAGENT_PROMPT>` so the
+    /// orchestrator can dispatch to the built-in `general` subagent via
+    /// `task(subagent_type="general", prompt=<SUBAGENT_PROMPT>)`.
     pub orchestrator_opencode: String,
-    /// `.opencode/agents/wiggum-implementer.md`. Shared body — the
-    /// orchestrator references the task file via `@path` at dispatch time.
-    pub implementer: String,
-    /// `.opencode/agents/wiggum-evaluator.md`. Present only when
-    /// `[evaluator]` is configured AND the opencode target is selected.
+    /// `.opencode/agents/evaluator.md`. Present only when `[evaluator]` is
+    /// configured AND the opencode target is selected.
     pub evaluator_opencode: Option<String>,
-    /// `.opencode/agents/wiggum-planner.md`.
+    /// `.opencode/agents/planner.md`.
     pub planner_opencode: String,
-    /// `.opencode/agents/wiggum-auditor.md`.
+    /// `.opencode/agents/background-auditor.md`.
     pub background_auditor_opencode: String,
+    /// `ORCHESTRATOR.md` at the project root — a long-form workflow reference
+    /// document (state machine, agents table, evaluator rubric, completion
+    /// standard, failure modes) that anyone — human or fresh LLM — can read
+    /// to orient themselves mid-stream. Real file, not a symlink.
+    pub orchestrator_root: String,
 
     // ── Claude target ──────────────────────────────────────────────────
     /// Claude hooks configuration (`.claude/settings.json`).
@@ -99,7 +103,7 @@ pub fn generate_all(plan: &Plan) -> Result<GeneratedArtifacts> {
     let progress = progress::render(plan, &resolved)?;
     let orchestrator_vscode = orchestrator::render(plan, &resolved)?;
     let orchestrator_opencode = orchestrator::render_opencode(plan, &resolved)?;
-    let implementer = orchestrator::render_implementer(plan)?;
+    let orchestrator_root = orchestrator::render_orchestrator_root(plan, &resolved)?;
     let plan_doc = plan_doc::render(plan, &resolved)?;
 
     let mut tasks = Vec::new();
@@ -132,10 +136,10 @@ pub fn generate_all(plan: &Plan) -> Result<GeneratedArtifacts> {
         planner_vscode,
         background_auditor_vscode,
         orchestrator_opencode,
-        implementer,
         evaluator_opencode,
         planner_opencode,
         background_auditor_opencode,
+        orchestrator_root,
         hooks_json,
         claude_md,
         agent_rules_cursorrules: agent_rules_content.clone(),
@@ -159,7 +163,7 @@ pub fn generate_all_with_overrides(plan: &Plan, project_path: &Path) -> Result<G
     let progress = progress::render_with(&tera, plan, &resolved)?;
     let orchestrator_vscode = orchestrator::render_with(&tera, plan, &resolved)?;
     let orchestrator_opencode = orchestrator::render_opencode_with(&tera, plan, &resolved)?;
-    let implementer = orchestrator::render_implementer_with(&tera, plan)?;
+    let orchestrator_root = orchestrator::render_orchestrator_root_with(&tera, plan, &resolved)?;
     let plan_doc = plan_doc::render_with(&tera, plan, &resolved)?;
 
     let mut tasks = Vec::new();
@@ -192,10 +196,10 @@ pub fn generate_all_with_overrides(plan: &Plan, project_path: &Path) -> Result<G
         planner_vscode,
         background_auditor_vscode,
         orchestrator_opencode,
-        implementer,
         evaluator_opencode,
         planner_opencode,
         background_auditor_opencode,
+        orchestrator_root,
         hooks_json,
         claude_md,
         agent_rules_cursorrules: agent_rules_content.clone(),
@@ -263,36 +267,32 @@ pub fn write_artifacts(
 
     // opencode target.
     if targets.contains(Target::Opencode) {
-        let opencode_dir = project_path.join(".opencode/agents");
+        let opencode_dir = project_path.join(".opencode");
         writer.ensure_dir(&opencode_dir)?;
+        let agents_dir = opencode_dir.join("agents");
+        writer.ensure_dir(&agents_dir)?;
         writer.write_file(
-            &opencode_dir.join("wiggum-orchestrator.md"),
+            &agents_dir.join("orchestrator.md"),
             &artifacts.orchestrator_opencode,
         )?;
+        writer.write_file(&agents_dir.join("planner.md"), &artifacts.planner_opencode)?;
         writer.write_file(
-            &opencode_dir.join("wiggum-implementer.md"),
-            &artifacts.implementer,
-        )?;
-        writer.write_file(
-            &opencode_dir.join("wiggum-planner.md"),
-            &artifacts.planner_opencode,
-        )?;
-        writer.write_file(
-            &opencode_dir.join("wiggum-auditor.md"),
+            &agents_dir.join("background-auditor.md"),
             &artifacts.background_auditor_opencode,
         )?;
         if let Some(eval) = &artifacts.evaluator_opencode {
-            writer.write_file(&opencode_dir.join("wiggum-evaluator.md"), eval)?;
+            writer.write_file(&agents_dir.join("evaluator.md"), eval)?;
         }
 
-        // Some opencode-compatible clients (e.g. minimax-m3) look for the
-        // orchestrator agent at the project root under the conventional
-        // name `ORCHESTRATOR.md` rather than scanning `.opencode/agents/`.
-        // Write a symlink so the two paths share content; if symlinks are
-        // not supported on this platform, fall back to a regular file copy.
-        let root_link = project_path.join("ORCHESTRATOR.md");
-        let target_rel = std::path::Path::new(".opencode/agents/wiggum-orchestrator.md");
-        write_root_orchestrator_link(&root_link, target_rel, &artifacts.orchestrator_opencode)?;
+        // `ORCHESTRATOR.md` at the project root — long-form workflow
+        // reference document, separate from the `.opencode/agents/orchestrator.md`
+        // agent prompt. Both files have distinct purposes: the agent prompt
+        // tells the orchestrator what to do; this document tells anyone
+        // (human or LLM) how the loop works.
+        writer.write_file(
+            &project_path.join("ORCHESTRATOR.md"),
+            &artifacts.orchestrator_root,
+        )?;
     }
 
     // Claude target.
@@ -325,134 +325,4 @@ pub fn write_artifacts(
     }
 
     Ok(())
-}
-
-/// Write `ORCHESTRATOR.md` at the project root for opencode-compatible
-/// clients that scan the working directory instead of `.opencode/agents/`.
-///
-/// Tries to create a symlink to `.opencode/agents/wiggum-orchestrator.md`
-/// first so the two paths always share content. If symlinks are not
-/// supported on this platform (or symlinking fails for any other reason),
-/// falls back to a regular file copy.
-#[cfg_attr(not(unix), allow(unused_variables))]
-fn write_root_orchestrator_link(root_link: &Path, target_rel: &Path, content: &str) -> Result<()> {
-    use std::fs;
-    use std::io::Write;
-
-    // If something already exists at this path (a real file from a previous
-    // generate, a dangling symlink from before the target existed), remove
-    // it so the new symlink / copy can take its place.
-    match fs::symlink_metadata(root_link) {
-        Ok(_) => {
-            fs::remove_file(root_link)?;
-        }
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
-        Err(e) => return Err(e.into()),
-    }
-
-    #[cfg(unix)]
-    {
-        if std::os::unix::fs::symlink(target_rel, root_link).is_ok() {
-            return Ok(());
-        }
-        // Fall through to the file-copy fallback.
-    }
-
-    let mut f = fs::File::create(root_link)?;
-    f.write_all(content.as_bytes())?;
-    Ok(())
-}
-
-#[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
-mod tests {
-    use std::fs;
-    use std::path::Path;
-
-    use tempfile::TempDir;
-
-    use super::write_root_orchestrator_link;
-
-    fn make_target(tmp: &TempDir) -> std::path::PathBuf {
-        let target = tmp.path().join(".opencode/agents/wiggum-orchestrator.md");
-        fs::create_dir_all(target.parent().unwrap()).unwrap();
-        fs::write(&target, "ORCH BODY").unwrap();
-        target
-    }
-
-    #[test]
-    fn write_root_orchestrator_link_writes_symlink_or_copy_on_disk() {
-        // Exercise the helper against a real tempdir so we cover the
-        // symlink path on unix and the file-copy fallback otherwise.
-        let tmp = TempDir::new().unwrap();
-        let root_link = tmp.path().join("ORCHESTRATOR.md");
-        let target_rel = Path::new(".opencode/agents/wiggum-orchestrator.md");
-        make_target(&tmp);
-
-        write_root_orchestrator_link(&root_link, target_rel, "ORCH BODY").unwrap();
-
-        // The link path exists in some form (symlink on unix, regular file
-        // on the file-copy fallback).
-        let md = fs::symlink_metadata(&root_link)
-            .unwrap_or_else(|e| panic!("ORCHESTRATOR.md must exist after link: {e}"));
-        assert!(
-            md.file_type().is_symlink() || md.file_type().is_file(),
-            "ORCHESTRATOR.md must be a symlink or regular file"
-        );
-
-        #[cfg(unix)]
-        {
-            assert!(
-                md.file_type().is_symlink(),
-                "on unix, ORCHESTRATOR.md must be a symlink"
-            );
-            let resolved = fs::read_link(&root_link).unwrap();
-            assert_eq!(resolved, target_rel);
-        }
-
-        // Content is reachable through the link (or copy).
-        let body = fs::read_to_string(&root_link).unwrap();
-        assert_eq!(body, "ORCH BODY");
-    }
-
-    #[test]
-    fn write_root_orchestrator_link_replaces_existing_file() {
-        let tmp = TempDir::new().unwrap();
-        let root_link = tmp.path().join("ORCHESTRATOR.md");
-        fs::write(&root_link, "stale content").unwrap();
-        make_target(&tmp);
-
-        let target_rel = Path::new(".opencode/agents/wiggum-orchestrator.md");
-        write_root_orchestrator_link(&root_link, target_rel, "fresh").unwrap();
-
-        // After the call the existing entry has been replaced — either by
-        // a fresh symlink to the canonical target or by a fresh file copy.
-        let md = fs::symlink_metadata(&root_link).unwrap();
-        assert!(
-            md.file_type().is_symlink() || md.file_type().is_file(),
-            "ORCHESTRATOR.md must still be a symlink or regular file after replace"
-        );
-    }
-
-    #[test]
-    fn write_root_orchestrator_link_produces_link_entry_even_for_missing_target() {
-        // Symlink targets may legitimately be missing during a smoke test.
-        // The helper should still create the link entry (the link will
-        // become reachable once the canonical target is generated).
-        let tmp = TempDir::new().unwrap();
-        let root_link = tmp.path().join("ORCHESTRATOR.md");
-        let target_rel = Path::new("missing/target.md");
-
-        write_root_orchestrator_link(&root_link, target_rel, "BODY").unwrap();
-
-        #[cfg(unix)]
-        {
-            let md = fs::symlink_metadata(&root_link).unwrap();
-            assert!(
-                md.file_type().is_symlink(),
-                "on unix, ORCHESTRATOR.md must be a symlink even when target is missing"
-            );
-            assert_eq!(fs::read_link(&root_link).unwrap(), target_rel);
-        }
-    }
 }

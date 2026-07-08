@@ -270,13 +270,13 @@ fn print_success(
 
     if targets.contains(Target::Opencode) {
         println!("   opencode:");
-        println!("     🤖 .opencode/agents/wiggum-orchestrator.md");
-        println!("     🔧 .opencode/agents/wiggum-implementer.md");
+        println!("     🤖 .opencode/agents/orchestrator.md");
+        println!("     🗂  .opencode/agents/planner.md");
+        println!("     🔍 .opencode/agents/background-auditor.md");
         if artifacts.evaluator_opencode.is_some() {
-            println!("     🔎 .opencode/agents/wiggum-evaluator.md");
+            println!("     🔎 .opencode/agents/evaluator.md");
         }
-        println!("     🗂  .opencode/agents/wiggum-planner.md");
-        println!("     🔍 .opencode/agents/wiggum-auditor.md");
+        println!("     📝 ORCHESTRATOR.md");
     }
 
     if targets.contains(Target::Claude) {
@@ -303,10 +303,9 @@ fn print_success(
         );
     }
     if targets.contains(Target::Opencode) {
-        println!(
-            "  2. In opencode: open the folder — the wiggum-orchestrator agent is auto-discovered"
-        );
+        println!("  2. In opencode: open the folder — the `orchestrator` agent is auto-discovered");
         println!("     Run `wiggum watch` in a separate terminal to monitor progress.");
+        println!("     Read ORCHESTRATOR.md at the project root for the full workflow reference.");
     }
     if targets.contains(Target::Claude) {
         println!(
@@ -361,26 +360,26 @@ fn print_dry_run(
 
     if targets.contains(Target::Opencode) {
         println!(
-            "  .opencode/agents/wiggum-orchestrator.md  ({:.1} KB)",
+            "  .opencode/agents/orchestrator.md          ({:.1} KB)",
             artifacts.orchestrator_opencode.len() as f64 / 1024.0
         );
         println!(
-            "  .opencode/agents/wiggum-implementer.md   ({:.1} KB)",
-            artifacts.implementer.len() as f64 / 1024.0
+            "  .opencode/agents/planner.md               ({:.1} KB)",
+            artifacts.planner_opencode.len() as f64 / 1024.0
+        );
+        println!(
+            "  .opencode/agents/background-auditor.md    ({:.1} KB)",
+            artifacts.background_auditor_opencode.len() as f64 / 1024.0
         );
         if let Some(eval) = &artifacts.evaluator_opencode {
             println!(
-                "  .opencode/agents/wiggum-evaluator.md    ({:.1} KB)",
+                "  .opencode/agents/evaluator.md             ({:.1} KB)",
                 eval.len() as f64 / 1024.0
             );
         }
         println!(
-            "  .opencode/agents/wiggum-planner.md       ({:.1} KB)",
-            artifacts.planner_opencode.len() as f64 / 1024.0
-        );
-        println!(
-            "  .opencode/agents/wiggum-auditor.md       ({:.1} KB)",
-            artifacts.background_auditor_opencode.len() as f64 / 1024.0
+            "  ORCHESTRATOR.md                            ({:.1} KB)",
+            artifacts.orchestrator_root.len() as f64 / 1024.0
         );
     }
 
@@ -471,10 +470,10 @@ fn artifact_totals(
     }
     if targets.contains(Target::Opencode) {
         size += artifacts.orchestrator_opencode.len()
-            + artifacts.implementer.len()
             + artifacts.evaluator_opencode.as_ref().map_or(0, String::len)
             + artifacts.planner_opencode.len()
-            + artifacts.background_auditor_opencode.len();
+            + artifacts.background_auditor_opencode.len()
+            + artifacts.orchestrator_root.len();
         files += 4 + usize::from(artifacts.evaluator_opencode.is_some());
     }
     if targets.contains(Target::Claude) {

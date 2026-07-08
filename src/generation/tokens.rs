@@ -57,26 +57,26 @@ pub fn estimate_all(
 
     if targets.contains(Target::Opencode) {
         estimates.push(TokenEstimate {
-            name: ".opencode/agents/wiggum-orchestrator.md".to_string(),
+            name: ".opencode/agents/orchestrator.md".to_string(),
             tokens: estimate_tokens(&artifacts.orchestrator_opencode),
         });
         estimates.push(TokenEstimate {
-            name: ".opencode/agents/wiggum-implementer.md".to_string(),
-            tokens: estimate_tokens(&artifacts.implementer),
+            name: ".opencode/agents/planner.md".to_string(),
+            tokens: estimate_tokens(&artifacts.planner_opencode),
+        });
+        estimates.push(TokenEstimate {
+            name: ".opencode/agents/background-auditor.md".to_string(),
+            tokens: estimate_tokens(&artifacts.background_auditor_opencode),
         });
         if let Some(eval) = &artifacts.evaluator_opencode {
             estimates.push(TokenEstimate {
-                name: ".opencode/agents/wiggum-evaluator.md".to_string(),
+                name: ".opencode/agents/evaluator.md".to_string(),
                 tokens: estimate_tokens(eval),
             });
         }
         estimates.push(TokenEstimate {
-            name: ".opencode/agents/wiggum-planner.md".to_string(),
-            tokens: estimate_tokens(&artifacts.planner_opencode),
-        });
-        estimates.push(TokenEstimate {
-            name: ".opencode/agents/wiggum-auditor.md".to_string(),
-            tokens: estimate_tokens(&artifacts.background_auditor_opencode),
+            name: "ORCHESTRATOR.md".to_string(),
+            tokens: estimate_tokens(&artifacts.orchestrator_root),
         });
     }
 
@@ -169,10 +169,10 @@ mod tests {
             planner_vscode: String::new(),
             background_auditor_vscode: String::new(),
             orchestrator_opencode: String::new(),
-            implementer: String::new(),
             evaluator_opencode: None,
             planner_opencode: String::new(),
             background_auditor_opencode: String::new(),
+            orchestrator_root: String::new(),
             hooks_json: String::new(),
             claude_md: String::new(),
             agent_rules_cursorrules: String::new(),

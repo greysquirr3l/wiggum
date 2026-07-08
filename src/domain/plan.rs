@@ -517,6 +517,28 @@ pub struct StyleConfig {
     #[serde(default = "default_avoid_god_files")]
     pub avoid_god_files: bool,
 
+    /// Standing directive on the bar for shipped work. Injected into the
+    /// orchestrator prompt and propagated verbatim into every subagent
+    /// dispatch alongside `Accumulated Learnings` and `Codebase State`.
+    ///
+    /// The completion standard is the project's definition of done. It is
+    /// edited rarely (typically once, when the project is bootstrapped) and
+    /// then travels unchanged with every dispatch so that every fresh
+    /// subagent — including ones spun up mid-stream after compaction —
+    /// receives the same load-bearing bar.
+    ///
+    /// Defaults to a generic completion standard appropriate for any
+    /// language. Override per project in the plan TOML:
+    ///
+    /// ```toml
+    /// [style]
+    /// completion_standard = "All tasks must pass preflight (build + test +
+    /// lint) with no warnings, no `#[allow(...)]` suppressions, and no
+    /// placeholder implementations remaining in production code."
+    /// ```
+    #[serde(default)]
+    pub completion_standard: Option<String>,
+
     /// When `true`, inject the active language's strict rule set into the
     /// orchestrator, implementer, evaluator, and per-task prompts. Rules are
     /// language-specific — for Rust they mirror `docs/nick.md` (no
@@ -555,8 +577,39 @@ impl Default for StyleConfig {
             avoid_ai_patterns: default_avoid_ai_patterns(),
             avoid_god_files: default_avoid_god_files(),
             strict: false,
+            completion_standard: None,
         }
     }
+}
+
+impl StyleConfig {
+    /// Resolve the completion standard, falling back to a generic default
+    /// when the plan does not set one. The standard is a multi-line string
+    /// that is propagated verbatim into every subagent dispatch alongside
+    /// `Accumulated Learnings` and `Codebase State`.
+    #[must_use]
+    pub fn resolved_completion_standard(&self) -> String {
+        self.completion_standard
+            .clone()
+            .unwrap_or_else(default_completion_standard)
+    }
+}
+
+/// Default completion standard used when the plan does not set one.
+/// Generic enough to apply to any language; project-specific overrides
+/// should narrow it (e.g. add Rust-specific "no `unwrap()` outside tests").
+fn default_completion_standard() -> String {
+    "Every task ships when all of the following hold:\n\
+     - Preflight (build + test + lint) passes with zero errors and zero warnings.\n\
+     - Every exit criterion in the task file has been met, not just the ones that were convenient.\n\
+     - No placeholder implementations remain in production code: no `todo!()`, no `unimplemented!()`, \
+     no functions that return a hard-coded default value as a stand-in for real logic.\n\
+     - No lint suppressions (`#[allow(...)]` / `// nolint` / `# noqa` / etc.) have been added to silence errors — \
+     the underlying issue was fixed in code.\n\
+     - No new dependency was added without justification in the task Notes column.\n\
+     - Public functions added in this task have at least one unit or integration test that exercises them.\n\
+     - The Codebase State and Accumulated Learnings sections of PROGRESS.md were updated."
+        .to_string()
 }
 
 impl Preflight {
