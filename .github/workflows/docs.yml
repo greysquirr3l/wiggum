@@ -24,7 +24,7 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v5 (Node 24)
 
       - name: Install mdBook
-        uses: peaceiris/actions-mdbook@a6f333f62c4b46ed5190d00cab3b7f9a6996274c # main HEAD (Node 24; v2.0.0 tag is Node 20)
+        uses: peaceiris/actions-mdbook@v2.0.0
         with:
           mdbook-version: "latest"
 
