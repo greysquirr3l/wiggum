@@ -83,7 +83,7 @@ jobs:
 
           sha=$(git rev-list -n1 "${RELEASE_TAG}")
           repo="${GITHUB_REPOSITORY}"
-          api="https://api.github.com/repos/${repo}/actions/runs?head_sha=${sha}&event=push&per_page=50"
+          api="https://api.github.com/repos/${repo}/actions/runs?head_sha=${sha}&per_page=50"
 
           echo "Checking CI status for ${repo}@${sha}"
 
