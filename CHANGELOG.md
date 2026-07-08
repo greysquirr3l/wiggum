@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.17.1] - 2026-07-08
+
+### Fixed
+
+- **CI/release: create missing v0.17.0 tag** — The auto-tag workflow on the CI branch did not re-trigger when `main` was fast-forwarded in PR #79. Re-releasing as v0.17.1 with the missing git tag to mark the release commit properly.
+
+### Changed
+
+- **Dependencies: bump console 0.16.3 → 0.16.4** — Integrates PR #74 (dependabot update). No source code changes; lib and bin behavior unchanged.
+
 ## [0.17.0] - 2026-07-07
 
 ### Changed
