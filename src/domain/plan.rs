@@ -937,7 +937,7 @@ const SECURITY_SENSITIVE_KEYWORDS: &[&str] = &[
 
 /// Returns `true` if `slug` contains any security-sensitive keyword
 /// (case-insensitive substring match).
-fn has_security_sensitive_slug(slug: &str) -> bool {
+pub(crate) fn has_security_sensitive_slug(slug: &str) -> bool {
     let lower = slug.to_lowercase();
     SECURITY_SENSITIVE_KEYWORDS
         .iter()
@@ -1603,7 +1603,9 @@ depends_on = []
         assert_eq!(plan.orchestrator.gates, vec!["auth".to_string()]);
         let resolved = unwrap_ok_or_panic(plan.resolve_tasks(), "resolve");
         let Err(err) = validate_gates(&plan, &resolved) else {
-            panic!("validate_gates should error: auth-handler matches gate 'auth' but declares no gate");
+            panic!(
+                "validate_gates should error: auth-handler matches gate 'auth' but declares no gate"
+            );
         };
         let msg = err.to_string();
         assert!(msg.contains("gate coverage"), "msg: {msg}");

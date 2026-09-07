@@ -12,7 +12,7 @@ use wiggum::adapters::{bootstrap, diff, init, patterns, replan, resume, retro, s
 use wiggum::domain::check;
 use wiggum::domain::dag::{parallel_groups, validate_dag};
 use wiggum::domain::lint;
-use wiggum::domain::plan::Plan;
+use wiggum::domain::plan::{Plan, validate_gates};
 use wiggum::domain::pricing::PricingData;
 use wiggum::domain::targets::{Target, TargetSet};
 use wiggum::error::WiggumError;
@@ -172,6 +172,7 @@ fn cmd_generate(
     let resolved = plan.resolve_tasks()?;
     let sorted = validate_dag(&resolved)?;
     plan.validate_gates_and_evaluator(&resolved)?;
+    validate_gates(&plan, &resolved)?;
     info!(
         "Plan validated: {} phases, {} tasks",
         plan.phases.len(),
@@ -221,6 +222,14 @@ fn cmd_generate(
     // unless the caller passed --no-summary. This surfaces the plan-quality
     // signal at the moment it matters most — right after scaffolding.
     print_check_summary(&plan, &resolved, opts.no_summary);
+
+    // T05: print a one-line first-command hint so the user knows what to do
+    // next without having to read the docs.
+    let score = check::score_plan(&plan, &resolved);
+    println!(
+        "{}",
+        wiggum::domain::hints::first_command_hint(&plan, &score)
+    );
 
     if opts.dry_run {
         print_dry_run(
