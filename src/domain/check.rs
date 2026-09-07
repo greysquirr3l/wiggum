@@ -443,8 +443,8 @@ fn score_richness(tasks: &[ResolvedTask]) -> DimensionScore {
 
 // ─── Dimension: Token budget ──────────────────────────────────────────────────
 
-const TOKEN_WARN_THRESHOLD: usize = 80_000;
-const TOKEN_CRITICAL_THRESHOLD: usize = 150_000;
+pub const TOKEN_WARN_THRESHOLD: usize = 80_000;
+pub const TOKEN_CRITICAL_THRESHOLD: usize = 150_000;
 
 fn score_token_budget(tasks: &[ResolvedTask]) -> DimensionScore {
     let mut findings = Vec::new();

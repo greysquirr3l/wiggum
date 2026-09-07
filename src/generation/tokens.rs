@@ -178,6 +178,7 @@ mod tests {
             agent_rules_cursorrules: String::new(),
             agent_rules_windsurfrules: String::new(),
             agent_rules_copilot_instructions: String::new(),
+            budget: String::new(),
         }
     }
 
