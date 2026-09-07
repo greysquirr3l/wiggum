@@ -557,15 +557,25 @@ pub struct StyleConfig {
 
     /// When `true`, inject the active language's strict rule set into the
     /// orchestrator, implementer, evaluator, and per-task prompts. Rules are
-    /// language-specific — for Rust they mirror `docs/nick.md` (no
-    /// `.unwrap()` / `.expect()` / `panic!` in non-test code, no index
-    /// slicing, no `#[allow(clippy::...)]` suppressions, prefer
-    /// `.is_multiple_of(n)`, etc.); for Go, TypeScript, Python, Java, C#,
-    /// Kotlin, Swift, Ruby, Elixir, and PHP they follow the profiles in
+    /// language-specific — for Rust they mirror `~/Projects/nick-v2.md`
+    /// (DDD-lite hexagonal layout, narrow port traits, `AuthContext` +
+    /// idempotency keys, `with_tx` boundaries, object-safe async port
+    /// traits via `async-trait`, `LazyCell` for single-threaded contexts,
+    /// the strengthened `#[expect]` rule, web security defaults, Rust
+    /// 1.95+ syntax — match arm `if let` guards, let chains, `std::io::pipe`,
+    /// the 1.97 `pin!` deref coercion fix, `deny(dead_code_pub_in_binary)`,
+    /// `#[cfg(unix)]` cross-platform hygiene) plus the original
+    /// panic-free baseline (no `.unwrap()` / `.expect()` in production,
+    /// no index slicing, no `#[allow(clippy::...)]` suppressions, prefer
+    /// `.is_multiple_of(n)`, etc.). The Rust 1.78→1.98 catchup guide at
+    /// `~/Projects/rust/rust-docs/rust-catchup-1.78-1.98.md` is the source
+    /// of truth for the toolchain version that ships these features. For
+    /// Go, TypeScript, Python, Java, C#, Kotlin, Swift, Ruby, Elixir,
+    /// and PHP the rulesets follow the profiles in
     /// `docs/strict-lints.md`. Cross-language baselines (fail-secure,
-    /// parse-don't-validate, CSPRNG, no weak crypto, parameterised queries,
-    /// no untrusted deserialisation, etc.) are folded into each language's
-    /// profile.
+    /// parse-don't-validate, CSPRNG, no weak crypto, parameterised
+    /// queries, no untrusted deserialisation, etc.) are folded into each
+    /// language's profile.
     ///
     /// Defaults to `false` — back-compat for existing plans that may rely
     /// on ordinary lint passes without the pedantic / strict profile. Set
