@@ -114,6 +114,18 @@ impl TargetSet {
         }
     }
 
+    /// No targets enabled — used by `--thin` to skip every per-tool prompt
+    /// file while still emitting the universal artifacts.
+    #[must_use]
+    pub const fn none() -> Self {
+        Self {
+            vscode: false,
+            opencode: false,
+            claude: false,
+            agent_rules: false,
+        }
+    }
+
     /// Parse from a CLI string. Accepts `vscode`, `opencode`, `claude`,
     /// `agent-rules`, or `all` (enables every target).
     ///

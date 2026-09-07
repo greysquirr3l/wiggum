@@ -33,6 +33,7 @@ struct GenerateOptions {
     skip_agents_md: bool,
     target_override: Option<String>,
     no_summary: bool,
+    thin: bool,
 }
 
 fn main() {
@@ -58,6 +59,7 @@ fn main() {
             skip_agents_md,
             target,
             no_summary,
+            thin,
         } => cmd_generate(
             &plan,
             output.as_deref(),
@@ -72,6 +74,7 @@ fn main() {
                 skip_agents_md,
                 target_override: target,
                 no_summary,
+                thin,
             },
         ),
         Command::Validate { plan, lint } => cmd_validate(&plan, lint),
@@ -160,8 +163,20 @@ fn cmd_generate(
     let plan = Plan::from_toml(&toml_content)?;
 
     // Resolve the target set: --target CLI flag wins, else plan field, else default (vscode).
-    let targets = resolve_targets(&plan, opts.target_override.as_deref())?;
-    if targets.is_empty() {
+    let mut targets = resolve_targets(&plan, opts.target_override.as_deref())?;
+
+    // T09: --thin overrides the resolved target set to empty, so only the
+    // universal artifacts (PROGRESS, PLAN, BUDGET, RUN_LOG, ORCHESTRATOR.md,
+    // AGENTS, tasks/*) are written. The plan-level [targets] and --target
+    // are both ignored in thin mode.
+    if opts.thin {
+        if !targets.is_empty() {
+            println!(
+                "ℹ Thin mode: skipping per-tool prompt files (.vscode/, .opencode/, .claude/, agent_rules)."
+            );
+        }
+        targets = TargetSet::none();
+    } else if targets.is_empty() {
         return Err(WiggumError::Validation(
             "no target selected — at least one of vscode/opencode/claude must be enabled"
                 .to_string(),

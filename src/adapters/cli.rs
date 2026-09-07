@@ -48,6 +48,12 @@ pub enum Command {
         /// Suppress the plan quality scorecard printed after generation.
         #[arg(long)]
         no_summary: bool,
+
+        /// Generate only universal artifacts (plan/progress/agents/budget/run-log/ORCHESTRATOR.md
+        /// and per-task files). Skip per-tool prompt files (`.vscode/`, `.opencode/`, `.claude/`,
+        /// `agent_rules`). Useful for users who want the loop without committing per-tool prompt files.
+        #[arg(long)]
+        thin: bool,
     },
 
     /// Validate a plan file without generating artifacts

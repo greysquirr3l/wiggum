@@ -1,0 +1,51 @@
+# tests/fixtures/thin-plan.toml — minimal plan for the --thin flag test.
+# Configures targets.vscode = true so the test can verify that --thin
+# overrides the plan-level target and produces no .vscode/ subdirectory.
+
+[project]
+name        = "thin-test"
+description = "Minimal fixture to verify wiggum generate --thin skips per-tool prompt files."
+language     = "rust"
+path         = "/tmp/thin-test"
+architecture = "modular"
+
+[preflight]
+build = "cargo build --workspace"
+test  = "cargo test --workspace"
+lint  = "cargo clippy --workspace -- -D warnings"
+
+[orchestrator]
+persona     = "Test orchestrator."
+strategy    = "standard"
+max_retries = 2
+on_failure  = "pause"
+
+[evaluator]
+persona        = "QA"
+pass_threshold = 7
+hard_fail      = false
+mode           = "blocking"
+
+[security]
+skip_hardening_task = true
+
+[integration]
+skip_wiring_audit = true
+skip_stub_audit   = true
+
+[targets]
+vscode = true
+
+[[phases]]
+name  = "Phase 1"
+order = 1
+
+[[phases.tasks]]
+slug      = "alpha"
+title     = "Alpha"
+goal      = "Implement alpha with proper tests."
+depends_on = []
+hints     = []
+test_hints = []
+must_haves = []
+evaluation_criteria = []
