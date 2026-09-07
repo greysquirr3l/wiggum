@@ -1,3 +1,8 @@
+#![deny(dead_code_pub_in_binary)]
+// T13 — deny-by-default for unused `pub` items in this binary crate
+// (warn-by-default in Cargo 1.97+). Catches dead `pub fn`s in main.rs
+// that would otherwise pass CI but contribute nothing.
+
 use std::path::{Path, PathBuf};
 use std::process;
 
