@@ -271,6 +271,16 @@ pub struct Orchestrator {
     ///   when the auto-derive rule would have required one.
     #[serde(default)]
     pub require_evaluator: Option<bool>,
+    /// Categories of task that require an explicit human gate before the
+    /// subagent can begin implementation. When empty (the default), wiggum
+    /// auto-derives a list from the resolved task slugs/titles using
+    /// [`GATE_KEYWORDS`]. When non-empty, only those categories are
+    /// considered gates and every task whose slug or title matches must
+    /// declare `gate = "<category>"` in its `TaskDef`; otherwise
+    /// `wiggum validate`/`generate` errors with a message naming the
+    /// missing gate and the affected task.
+    #[serde(default)]
+    pub gates: Vec<String>,
 }
 
 /// Prompt strategy mode controlling task and orchestrator template styles.
@@ -471,6 +481,7 @@ impl Default for Orchestrator {
             model: None,
             subagent_model: None,
             require_evaluator: None,
+            gates: Vec::new(),
         }
     }
 }
@@ -681,6 +692,7 @@ impl Plan {
         if let Some(evaluator) = &plan.evaluator {
             evaluator.validate()?;
         }
+        plan.orchestrator.gates = auto_derive_gates(&plan.orchestrator.gates, &plan.phases);
         Ok(plan)
     }
 
@@ -947,6 +959,120 @@ pub fn auto_derive_require_evaluator(resolved: &[ResolvedTask]) -> bool {
         || resolved
             .iter()
             .any(|t| has_security_sensitive_slug(&t.slug))
+}
+
+/// Keywords that flag a task as requiring an explicit human gate.
+///
+/// When matched in a task slug or title, the task must declare a matching
+/// `gate = "<category>"` in its `TaskDef`. Mirrors
+/// [`SECURITY_SENSITIVE_KEYWORDS`] but is its own constant so gate
+/// semantics can evolve independently of the evaluator auto-derive rule.
+pub const GATE_KEYWORDS: &[&str] = &[
+    "auth",
+    "payment",
+    "billing",
+    "crypto",
+    "credential",
+    "webhook",
+    "secret",
+    "key",
+    "token",
+    "sign",
+    "signature",
+    "kdf",
+    "hash",
+];
+
+/// Auto-derive the orchestrator's gate list from the plan's task slugs
+/// and titles.
+///
+/// - When `explicit_gates` is non-empty, it is returned verbatim
+///   (the user has chosen which categories are gates).
+/// - When `explicit_gates` is empty, the function scans every task's
+///   slug and title (case-insensitive substring match) and returns the
+///   deduplicated, alphabetically-sorted set of matched keywords.
+///
+/// The return value replaces `plan.orchestrator.gates` after parsing so
+/// downstream validation and rendering see the resolved list.
+#[must_use]
+pub fn auto_derive_gates(explicit_gates: &[String], phases: &[Phase]) -> Vec<String> {
+    if !explicit_gates.is_empty() {
+        return explicit_gates.to_vec();
+    }
+
+    let mut matched: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
+    for phase in phases {
+        for task in &phase.tasks {
+            let haystack = format!("{} {}", task.slug, task.title).to_lowercase();
+            for kw in GATE_KEYWORDS {
+                if haystack.contains(kw) {
+                    matched.insert((*kw).to_string());
+                }
+            }
+        }
+    }
+    matched.into_iter().collect()
+}
+
+/// Validate gate declarations against the resolved task list.
+///
+/// Returns `WiggumError::Validation` listing every task whose slug or
+/// title matches a gate category but does not declare a matching
+/// `gate = "<category>"` field. Returns `Ok(())` when no gate categories
+/// are configured, or when every gated task carries a matching
+/// declaration.
+///
+/// Note: this is distinct from `validate_gates_and_evaluator` which
+/// checks the evaluator policy. Gate validation is independent and may
+/// be run even when evaluator validation is opted out.
+///
+/// # Errors
+///
+/// Returns `WiggumError::Validation` with one line per offending task.
+pub fn validate_gates(plan: &Plan, resolved: &[ResolvedTask]) -> Result<()> {
+    let gates = &plan.orchestrator.gates;
+    if gates.is_empty() {
+        return Ok(());
+    }
+
+    let gates_lower: Vec<String> = gates.iter().map(|g| g.to_lowercase()).collect();
+    let mut offenders: Vec<String> = Vec::new();
+
+    for task in resolved {
+        let haystack = format!("{} {}", task.slug, task.title).to_lowercase();
+        let matched: Vec<&str> = gates_lower
+            .iter()
+            .filter(|kw| haystack.contains(kw.as_str()))
+            .map(String::as_str)
+            .collect();
+        if matched.is_empty() {
+            continue;
+        }
+        let declared = task.gate.as_deref().map(str::to_lowercase);
+        let has_match = declared
+            .as_ref()
+            .is_some_and(|d| matched.iter().any(|m| m == &d.as_str()));
+        if !has_match {
+            offenders.push(format!(
+                "T{:02}-{}: slug/title matches gate(s) {:?} but no matching `gate = \"...\"` declared",
+                task.number, task.slug, matched
+            ));
+        }
+    }
+
+    if !offenders.is_empty() {
+        let listed = match gates.first() {
+            Some(single) if gates.len() == 1 => format!("\"{single}\""),
+            _ => format!("[{}]", gates.join(", ")),
+        };
+        return Err(WiggumError::Validation(format!(
+            "gate coverage: {} task(s) require an explicit `gate` declaration matching one of {listed}:\n  - {}",
+            offenders.len(),
+            offenders.join("\n  - ")
+        )));
+    }
+
+    Ok(())
 }
 
 /// Build the auto-injected security hardening task.
@@ -1388,5 +1514,127 @@ depends_on = []
         let resolved = unwrap_ok_or_panic(plan.resolve_tasks(), "resolve");
         assert!(!auto_derive_require_evaluator(&resolved));
         assert!(!plan.effective_require_evaluator(&resolved));
+    }
+
+    // ── T03: gate auto-derive + validation ───────────────────────────
+
+    /// Build a plan TOML where the [orchestrator] section can include a
+    /// custom `gates = [...]` override and individual tasks can declare
+    /// `gate = "..."`. Mirrors `build_plan` but exposes the extra knobs.
+    fn build_plan_with_gates(
+        task_specs: &[(&str, Option<&str>)], // (slug, optional gate declaration)
+        explicit_gates: Option<&[&str]>,
+    ) -> String {
+        use std::fmt::Write as _;
+        let mut plan = String::from(
+            r#"
+[project]
+name = "test"
+description = "test"
+language = "rust"
+path = "/tmp/test"
+
+[orchestrator]
+"#,
+        );
+
+        if let Some(gates) = explicit_gates {
+            let _ = writeln!(
+                plan,
+                "gates = [{}]",
+                gates
+                    .iter()
+                    .map(|g| format!("\"{g}\""))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            );
+        }
+
+        plan.push_str(
+            r"
+[security]
+skip_hardening_task = true
+
+[integration]
+skip_wiring_audit = true
+skip_stub_audit = true
+",
+        );
+
+        plan.push_str("\n[[phases]]\nname = \"Phase 1\"\norder = 1\n");
+        for (slug, gate) in task_specs {
+            let _ = write!(
+                plan,
+                r#"
+[[phases.tasks]]
+slug = "{slug}"
+title = "{slug}"
+goal = "Implement {slug} with proper tests"
+depends_on = []
+"#,
+            );
+            if let Some(g) = gate {
+                let _ = writeln!(plan, "gate = \"{g}\"");
+            }
+        }
+        plan
+    }
+
+    #[test]
+    fn gates_auto_derive_when_unset_and_slug_matches() {
+        let toml = build_plan_with_gates(&[("auth-handler", None)], None);
+        let plan = unwrap_ok_or_panic(Plan::from_toml(&toml), "parse plan");
+        assert!(
+            plan.orchestrator.gates.iter().any(|g| g == "auth"),
+            "auto-derive should populate `auth` for slug auth-handler, got {:?}",
+            plan.orchestrator.gates
+        );
+    }
+
+    #[test]
+    fn gates_explicit_custom_requires_declaration() {
+        // Explicit gates = ["custom"] + slug auth-handler (which matches no
+        // listed gate) but no `gate = "..."` on the task. Since the slug
+        // matches neither "custom" nor any default gate keyword, this should
+        // actually pass — but if we instead pick a slug that matches the
+        // explicit gate, it errors.
+        let toml = build_plan_with_gates(&[("auth-handler", None)], Some(&["auth"]));
+        let plan = unwrap_ok_or_panic(Plan::from_toml(&toml), "parse plan");
+        assert_eq!(plan.orchestrator.gates, vec!["auth".to_string()]);
+        let resolved = unwrap_ok_or_panic(plan.resolve_tasks(), "resolve");
+        let Err(err) = validate_gates(&plan, &resolved) else {
+            panic!("validate_gates should error: auth-handler matches gate 'auth' but declares no gate");
+        };
+        let msg = err.to_string();
+        assert!(msg.contains("gate coverage"), "msg: {msg}");
+        assert!(msg.contains("auth-handler"), "msg: {msg}");
+        assert!(msg.contains("auth"), "msg: {msg}");
+    }
+
+    #[test]
+    fn gates_explicit_with_matching_declaration_passes() {
+        let toml = build_plan_with_gates(&[("auth-handler", Some("auth"))], Some(&["auth"]));
+        let plan = unwrap_ok_or_panic(Plan::from_toml(&toml), "parse plan");
+        let resolved = unwrap_ok_or_panic(plan.resolve_tasks(), "resolve");
+        if let Err(e) = validate_gates(&plan, &resolved) {
+            panic!("validate_gates should pass when gate is declared: {e}");
+        }
+    }
+
+    #[test]
+    fn gates_non_matching_slug_with_empty_gates_auto_derives_but_no_validation_error() {
+        // 'fetch-events' doesn't match any keyword → auto-derive produces
+        // an empty gates list → validate_gates is a no-op.
+        let toml = build_plan_with_gates(&[("fetch-events", None)], None);
+        let plan = unwrap_ok_or_panic(Plan::from_toml(&toml), "parse plan");
+        assert!(
+            plan.orchestrator.gates.is_empty(),
+            "fetch-events should not trigger gate auto-derive, got {:?}",
+            plan.orchestrator.gates
+        );
+        let resolved = unwrap_ok_or_panic(plan.resolve_tasks(), "resolve");
+        if let Err(e) = validate_gates(&plan, &resolved) {
+            panic!("validate_gates should be a no-op with empty gates: {e}");
+        }
     }
 }
