@@ -32,6 +32,7 @@ struct GenerateOptions {
     estimate_tokens: bool,
     skip_agents_md: bool,
     target_override: Option<String>,
+    no_summary: bool,
 }
 
 fn main() {
@@ -56,6 +57,7 @@ fn main() {
             estimate_tokens,
             skip_agents_md,
             target,
+            no_summary,
         } => cmd_generate(
             &plan,
             output.as_deref(),
@@ -69,6 +71,7 @@ fn main() {
                 estimate_tokens,
                 skip_agents_md,
                 target_override: target,
+                no_summary,
             },
         ),
         Command::Validate { plan, lint } => cmd_validate(&plan, lint),
@@ -168,6 +171,7 @@ fn cmd_generate(
     // Validate first
     let resolved = plan.resolve_tasks()?;
     let sorted = validate_dag(&resolved)?;
+    plan.validate_gates_and_evaluator(&resolved)?;
     info!(
         "Plan validated: {} phases, {} tasks",
         plan.phases.len(),
@@ -175,6 +179,20 @@ fn cmd_generate(
     );
     info!("Execution order: {}", sorted.join(" → "));
     info!("Targets: {}", describe_targets(targets));
+
+    // T02: when the user has explicitly opted out of the evaluator against
+    // the auto-derive policy, surface the choice as a visible warning at
+    // scaffold time. The user can ignore; the loop cannot.
+    if plan.evaluator.is_none()
+        && !plan.orchestrator.require_evaluator.unwrap_or(true)
+        && wiggum::domain::plan::auto_derive_require_evaluator(&resolved)
+    {
+        eprintln!(
+            "⚠️  evaluator skipped against policy: this plan would normally require an [evaluator] \
+             block (≥4 tasks or security-sensitive slug), but `require_evaluator = false` is set. \
+             Single-session grading is enabled — verify manually."
+        );
+    }
 
     // Generate (with user template overrides if present)
     let project_path =
@@ -198,6 +216,11 @@ fn cmd_generate(
     if opts.skip_agents_md {
         artifacts.agents_md = None;
     }
+
+    // Print the plan quality scorecard on both the dry-run and the normal path,
+    // unless the caller passed --no-summary. This surfaces the plan-quality
+    // signal at the moment it matters most — right after scaffolding.
+    print_check_summary(&plan, &resolved, opts.no_summary);
 
     if opts.dry_run {
         print_dry_run(
@@ -224,6 +247,24 @@ fn cmd_generate(
     print_success(&artifacts, &project_path, targets);
 
     Ok(())
+}
+
+/// Print a compact one-glance scorecard for the plan's quality.
+///
+/// Pure: delegates to [`check::score_plan`] (no I/O) and [`check::format_scorecard`]
+/// (pure formatter), then writes to stdout via `println!` per the T01 task
+/// spec. Suppressed when `no_summary` is set.
+fn print_check_summary(
+    plan: &Plan,
+    resolved: &[wiggum::domain::plan::ResolvedTask],
+    no_summary: bool,
+) {
+    if no_summary {
+        return;
+    }
+    let score = check::score_plan(plan, resolved);
+    println!();
+    println!("{}", check::format_scorecard(&score).trim_end());
 }
 
 /// Resolve the active `TargetSet` from CLI override and the plan.

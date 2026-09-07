@@ -44,6 +44,10 @@ pub enum Command {
         /// Overrides the plan-level `[targets]` section.
         #[arg(long, value_parser = ["vscode", "opencode", "claude", "agent-rules", "all"])]
         target: Option<String>,
+
+        /// Suppress the plan quality scorecard printed after generation.
+        #[arg(long)]
+        no_summary: bool,
     },
 
     /// Validate a plan file without generating artifacts

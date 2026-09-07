@@ -159,14 +159,12 @@ fn is_mutating_tool(tool_name: &str) -> bool {
 }
 
 fn strict_guardrail_mode_enabled() -> bool {
-    std::env::var("WIGGUM_MCP_GUARDRAIL_STRICT")
-        .ok()
-        .is_some_and(|value| {
-            value.eq_ignore_ascii_case("1")
-                || value.eq_ignore_ascii_case("true")
-                || value.eq_ignore_ascii_case("yes")
-                || value.eq_ignore_ascii_case("on")
-        })
+    std::env::var("WIGGUM_MCP_GUARDRAIL_STRICT").is_ok_and(|value| {
+        value.eq_ignore_ascii_case("1")
+            || value.eq_ignore_ascii_case("true")
+            || value.eq_ignore_ascii_case("yes")
+            || value.eq_ignore_ascii_case("on")
+    })
 }
 
 fn evaluate_session_guardrail(tool_name: &str) -> Option<String> {

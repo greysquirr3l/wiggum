@@ -256,6 +256,21 @@ pub struct Orchestrator {
     /// subagents inherit the orchestrator's model.
     #[serde(default)]
     pub subagent_model: Option<String>,
+    /// Whether the plan requires an `[evaluator]` block.
+    ///
+    /// Tri-state, parsed as `Option<bool>`:
+    /// - `None` (omitted in TOML): auto-derive — `true` when the resolved
+    ///   plan has ≥4 tasks OR any task slug contains a security-sensitive
+    ///   keyword (`auth`, `payment`, `billing`, `crypto`, `credential`,
+    ///   `webhook`, `secret`, `key`, `token`, `sign`, `signature`, `kdf`,
+    ///   `hash`). See [`auto_derive_require_evaluator`].
+    /// - `Some(true)`: evaluator is mandatory — `wiggum validate`/`generate`
+    ///   error if the `[evaluator]` section is absent.
+    /// - `Some(false)`: evaluator explicitly skipped. `wiggum validate`
+    ///   accepts the plan, and `wiggum generate` prints a visible warning
+    ///   when the auto-derive rule would have required one.
+    #[serde(default)]
+    pub require_evaluator: Option<bool>,
 }
 
 /// Prompt strategy mode controlling task and orchestrator template styles.
@@ -455,6 +470,7 @@ impl Default for Orchestrator {
             on_failure: FailureAction::default(),
             model: None,
             subagent_model: None,
+            require_evaluator: None,
         }
     }
 }
@@ -647,7 +663,8 @@ impl Plan {
     ///
     /// # Errors
     ///
-    /// Returns an error if the TOML is malformed or missing required fields.
+    /// Returns an error if the TOML is malformed, missing required fields, or
+    /// fails post-parse validation (gates + evaluator coverage).
     pub fn from_toml(input: &str) -> Result<Self> {
         let mut plan: Self = toml::from_str(input)?;
         plan.preflight = plan.preflight.with_defaults(plan.project.language);
@@ -655,6 +672,56 @@ impl Plan {
             evaluator.validate()?;
         }
         Ok(plan)
+    }
+
+    /// Compute the effective `require_evaluator` value after honoring any
+    /// explicit user override in the plan TOML.
+    ///
+    /// - If the plan set `require_evaluator = true|false`, that wins.
+    /// - Otherwise, [`auto_derive_require_evaluator`] decides based on the
+    ///   resolved task list.
+    #[must_use]
+    pub fn effective_require_evaluator(&self, resolved: &[ResolvedTask]) -> bool {
+        self.orchestrator
+            .require_evaluator
+            .unwrap_or_else(|| auto_derive_require_evaluator(resolved))
+    }
+
+    /// Validate gate and evaluator policies against the resolved task list.
+    ///
+    /// # Errors
+    ///
+    /// Returns `WiggumError::Validation` when the plan's effective
+    /// `require_evaluator` is true but the `[evaluator]` section is missing.
+    /// The message names the trigger (task count or security-sensitive slug)
+    /// and points at the two ways to resolve it: add an `[evaluator]` block
+    /// or opt out with `require_evaluator = false`.
+    pub fn validate_gates_and_evaluator(&self, resolved: &[ResolvedTask]) -> Result<()> {
+        let required = self.effective_require_evaluator(resolved);
+        if required && self.evaluator.is_none() {
+            let reason = if resolved.len() >= 4 {
+                format!(
+                    "this plan resolves to {} tasks (threshold: 4)",
+                    resolved.len()
+                )
+            } else {
+                let sensitive: Vec<&str> = resolved
+                    .iter()
+                    .filter(|t| has_security_sensitive_slug(&t.slug))
+                    .map(|t| t.slug.as_str())
+                    .collect();
+                format!(
+                    "this plan has security-sensitive task slug(s): {}",
+                    sensitive.join(", ")
+                )
+            };
+            return Err(WiggumError::Validation(format!(
+                "evaluator required: {reason}, but no [evaluator] section is configured. \
+                 Either add an [evaluator] block to the plan, or set `require_evaluator = false` \
+                 in [orchestrator] to opt out (wiggum generate will print a warning)."
+            )));
+        }
+        Ok(())
     }
 
     /// Resolve phases into a flat, numbered task list.
@@ -823,6 +890,53 @@ fn has_web_surface(tasks: &[ResolvedTask]) -> bool {
         let haystack = format!("{} {}", t.slug, t.title).to_lowercase();
         WEB_SURFACE_KEYWORDS.iter().any(|kw| haystack.contains(kw))
     })
+}
+
+/// Keywords in task slugs that flag the plan as security-sensitive.
+///
+/// Matching is a case-insensitive substring test against the slug. If any
+/// resolved task slug contains one of these words, the plan auto-derives
+/// `require_evaluator = true` so a QA evaluator is wired in.
+const SECURITY_SENSITIVE_KEYWORDS: &[&str] = &[
+    "auth",
+    "payment",
+    "billing",
+    "crypto",
+    "credential",
+    "webhook",
+    "secret",
+    "key",
+    "token",
+    "sign",
+    "signature",
+    "kdf",
+    "hash",
+];
+
+/// Returns `true` if `slug` contains any security-sensitive keyword
+/// (case-insensitive substring match).
+fn has_security_sensitive_slug(slug: &str) -> bool {
+    let lower = slug.to_lowercase();
+    SECURITY_SENSITIVE_KEYWORDS
+        .iter()
+        .any(|kw| lower.contains(kw))
+}
+
+/// Auto-derive `require_evaluator` from the resolved task list.
+///
+/// Returns `true` when the plan has ≥4 tasks or any task slug contains a
+/// security-sensitive keyword (`auth`, `payment`, `billing`, `crypto`,
+/// `credential`, `webhook`, `secret`, `key`, `token`, `sign`, `signature`,
+/// `kdf`, `hash`).
+///
+/// Used by [`Plan::effective_require_evaluator`] when the plan does not
+/// explicitly set `require_evaluator` in the TOML.
+#[must_use]
+pub fn auto_derive_require_evaluator(resolved: &[ResolvedTask]) -> bool {
+    resolved.len() >= 4
+        || resolved
+            .iter()
+            .any(|t| has_security_sensitive_slug(&t.slug))
 }
 
 /// Build the auto-injected security hardening task.
@@ -1016,4 +1130,253 @@ fn stub_cleanup_task(
 /// Triggered when there are 3+ explicit (user-defined) tasks.
 const fn needs_integration_audit(explicit_task_count: usize) -> bool {
     explicit_task_count >= 3
+}
+
+// ─── Tests ────────────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::panic)]
+mod evaluator_policy_tests {
+    use super::*;
+    use std::fmt::Write as _;
+
+    /// Build a minimal plan TOML with `n` tasks and an optional
+    /// `require_evaluator` override, plus an optional `[evaluator]` section.
+    ///
+    /// Disables the auto-injected `security-hardening` and
+    /// `integration-wiring` tasks so the resolved task count equals the
+    /// number of slugs passed in — tests assert on exact counts.
+    fn build_plan(
+        task_slugs: &[&str],
+        require_evaluator: Option<&str>,
+        with_evaluator: bool,
+    ) -> String {
+        let mut plan = String::from(
+            r#"
+[project]
+name = "test"
+description = "test"
+language = "rust"
+path = "/tmp/test"
+
+[orchestrator]
+"#,
+        );
+        if let Some(req) = require_evaluator {
+            let _ = writeln!(plan, "require_evaluator = {req}");
+        }
+
+        if with_evaluator {
+            plan.push_str(
+                r#"
+[evaluator]
+persona = "QA"
+pass_threshold = 7
+hard_fail = false
+mode = "blocking"
+"#,
+            );
+        }
+
+        plan.push_str(
+            r"
+[security]
+skip_hardening_task = true
+
+[integration]
+skip_wiring_audit = true
+skip_stub_audit = true
+",
+        );
+
+        plan.push_str("\n[[phases]]\nname = \"Phase 1\"\norder = 1\n");
+        for slug in task_slugs {
+            let _ = write!(
+                plan,
+                r#"
+[[phases.tasks]]
+slug = "{slug}"
+title = "{slug}"
+goal = "Implement {slug} with proper tests"
+depends_on = []
+"#
+            );
+        }
+        plan
+    }
+
+    /// Helper: parse the plan and run the evaluator/gates validator explicitly.
+    /// `Plan::from_toml` does NOT auto-validate the evaluator policy (so that
+    /// unit tests and integration tests can load sample plans without needing
+    /// to add `[evaluator]` blocks), but the production path in
+    /// `cmd_generate` does call this helper. Tests assert on the error
+    /// produced by `validate_gates_and_evaluator`.
+    fn parse_and_validate_or_err(toml: &str, context: &str) -> WiggumError {
+        let plan = match Plan::from_toml(toml) {
+            Ok(p) => p,
+            Err(e) => panic!("{context}: parse failed: {e}"),
+        };
+        let resolved = match plan.resolve_tasks() {
+            Ok(r) => r,
+            Err(e) => panic!("{context}: resolve failed: {e}"),
+        };
+        match plan.validate_gates_and_evaluator(&resolved) {
+            Err(e) => e,
+            Ok(()) => panic!("{context}: expected validator Err, got Ok"),
+        }
+    }
+
+    /// Helper: panic with the given message if `result` is not an Ok.
+    fn unwrap_ok_or_panic<T>(result: Result<T>, context: &str) -> T {
+        match result {
+            Ok(v) => v,
+            Err(e) => panic!("{context}: expected Ok, got Err({e})"),
+        }
+    }
+
+    #[test]
+    fn five_tasks_no_evaluator_require_true_errors() {
+        let slugs = ["alpha", "beta", "gamma", "delta", "epsilon"];
+        let toml = build_plan(&slugs, Some("true"), false);
+        let err = parse_and_validate_or_err(&toml, "should error when required but missing");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("evaluator required"),
+            "error should mention evaluator required: {msg}"
+        );
+        assert!(
+            msg.contains("require_evaluator"),
+            "error should mention the fix (require_evaluator): {msg}"
+        );
+    }
+
+    #[test]
+    fn five_tasks_no_evaluator_require_false_validates_and_warns() {
+        let slugs = ["alpha", "beta", "gamma", "delta", "epsilon"];
+        let toml = build_plan(&slugs, Some("false"), false);
+        let plan = unwrap_ok_or_panic(Plan::from_toml(&toml), "validate should accept opt-out");
+        assert!(plan.evaluator.is_none());
+        let resolved = unwrap_ok_or_panic(plan.resolve_tasks(), "resolve tasks");
+        assert!(!plan.effective_require_evaluator(&resolved));
+    }
+
+    #[test]
+    fn three_tasks_no_evaluator_no_require_does_not_require() {
+        let slugs = ["alpha", "beta", "gamma"];
+        let toml = build_plan(&slugs, None, false);
+        let plan = unwrap_ok_or_panic(Plan::from_toml(&toml), "non-sensitive plan should pass");
+        let resolved = unwrap_ok_or_panic(plan.resolve_tasks(), "resolve tasks");
+        assert!(!auto_derive_require_evaluator(&resolved));
+        assert!(!plan.effective_require_evaluator(&resolved));
+    }
+
+    #[test]
+    fn explicit_require_true_with_evaluator_validates() {
+        let slugs = ["alpha", "beta", "gamma", "delta", "epsilon"];
+        let toml = build_plan(&slugs, Some("true"), true);
+        let plan = unwrap_ok_or_panic(
+            Plan::from_toml(&toml),
+            "explicit true with evaluator should pass",
+        );
+        assert!(plan.evaluator.is_some());
+        let resolved = unwrap_ok_or_panic(plan.resolve_tasks(), "resolve tasks");
+        assert!(plan.effective_require_evaluator(&resolved));
+    }
+
+    #[test]
+    fn auto_derive_keyword_matching_is_case_insensitive() {
+        let slugs = ["Payment-Processor"];
+        let toml = build_plan(&slugs, None, false);
+        let err = parse_and_validate_or_err(&toml, "PAYMENT slug should match regardless of case");
+        assert!(err.to_string().contains("evaluator required"));
+    }
+
+    #[test]
+    fn auto_derive_recognises_all_listed_keywords() {
+        let cases = [
+            "auth-login",
+            "stripe-payment",
+            "billing-export",
+            "crypto-signer",
+            "credential-store",
+            "inbound-webhook",
+            "secret-rotation",
+            "key-derivation",
+            "token-refresh",
+            "sign-verify",
+            "signature-validation",
+            "argon2-kdf",
+            "checksum-hash",
+        ];
+        for slug in cases {
+            let toml = build_plan(&[slug], None, false);
+            let err = parse_and_validate_or_err(
+                &toml,
+                &format!("slug `{slug}` should auto-derive require_evaluator=true"),
+            );
+            assert!(
+                err.to_string().contains("evaluator required"),
+                "slug `{slug}` error should mention evaluator required"
+            );
+        }
+    }
+
+    #[test]
+    fn four_tasks_hit_count_threshold_without_keywords() {
+        // 4 tasks (threshold edge), no security-sensitive slugs → derived true.
+        let slugs = ["alpha", "beta", "gamma", "delta"];
+        let toml = build_plan(&slugs, None, false);
+        let err = parse_and_validate_or_err(&toml, "4 tasks should trigger threshold");
+        assert!(err.to_string().contains("threshold: 4"));
+    }
+
+    #[test]
+    fn five_tasks_explicit_override_accepts_plan() {
+        let slugs = ["alpha", "beta", "gamma", "delta", "epsilon"];
+        let toml = build_plan(&slugs, Some("false"), false);
+        let plan = unwrap_ok_or_panic(Plan::from_toml(&toml), "explicit override should accept");
+        assert!(plan.evaluator.is_none());
+        let resolved = unwrap_ok_or_panic(plan.resolve_tasks(), "resolve");
+        assert!(!plan.effective_require_evaluator(&resolved));
+        assert!(auto_derive_require_evaluator(&resolved));
+    }
+
+    #[test]
+    fn two_tasks_no_evaluator_no_explicit_require_no_error() {
+        let slugs = ["alpha", "beta"];
+        let toml = build_plan(&slugs, None, false);
+        let plan = unwrap_ok_or_panic(
+            Plan::from_toml(&toml),
+            "two-task plan should validate without evaluator",
+        );
+        let resolved = unwrap_ok_or_panic(plan.resolve_tasks(), "resolve");
+        assert!(!plan.effective_require_evaluator(&resolved));
+        assert!(!auto_derive_require_evaluator(&resolved));
+    }
+
+    #[test]
+    fn one_task_auth_slug_auto_derives_true_and_errors() {
+        let slugs = ["auth-handler"];
+        let toml = build_plan(&slugs, None, false);
+        let err = parse_and_validate_or_err(&toml, "auth-handler should auto-derive required");
+        let msg = err.to_string();
+        assert!(msg.contains("evaluator required"), "msg: {msg}");
+        assert!(
+            msg.contains("auth-handler"),
+            "error should name the sensitive slug: {msg}"
+        );
+    }
+
+    #[test]
+    fn one_task_unrelated_slug_auto_derives_false() {
+        let slugs = ["data-loader"];
+        let toml = build_plan(&slugs, None, false);
+        let plan = unwrap_ok_or_panic(
+            Plan::from_toml(&toml),
+            "non-sensitive slug should not require evaluator",
+        );
+        let resolved = unwrap_ok_or_panic(plan.resolve_tasks(), "resolve");
+        assert!(!auto_derive_require_evaluator(&resolved));
+        assert!(!plan.effective_require_evaluator(&resolved));
+    }
 }

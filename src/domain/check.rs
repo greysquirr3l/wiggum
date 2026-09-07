@@ -676,6 +676,45 @@ pub fn format_score_report(score: &PlanScore) -> String {
     out
 }
 
+/// Format a [`PlanScore`] as a compact one-glance scorecard suitable for
+/// printing at the end of `wiggum generate`.
+///
+/// The output is intentionally narrower than [`format_score_report`]:
+/// one line per dimension, a single `Overall: X/10 (Healthy|Needs work)`
+/// verdict line, and at most three top suggestion bullets. This is the
+/// function called by `print_check_summary` in the binary.
+#[must_use]
+pub fn format_scorecard(score: &PlanScore) -> String {
+    use std::fmt::Write as _;
+    let mut out = String::with_capacity(512);
+
+    let _ = writeln!(out, "Plan Quality Scorecard");
+    for dim in &score.dimensions {
+        let _ = writeln!(
+            out,
+            "  {:<22} {:>2}/10  {}",
+            dim.name, dim.score, dim.verdict
+        );
+    }
+
+    let overall_verdict = if score.is_healthy() {
+        "Healthy"
+    } else {
+        "Needs work"
+    };
+    let _ = writeln!(out, "Overall: {}/10 ({})", score.overall, overall_verdict);
+
+    let top_n = score.suggestions.len().min(3);
+    if top_n > 0 {
+        let _ = writeln!(out, "\nTop suggestions:");
+        for s in score.suggestions.iter().take(top_n) {
+            let _ = writeln!(out, "  - [{}] {}", s.severity, s.message);
+        }
+    }
+
+    out
+}
+
 /// Serialize `s` as a JSON string literal using RFC 8259-compliant escaping.
 ///
 /// Delegates to `serde_json` to avoid the `\u{XX}` Rust-Debug pitfall.
@@ -878,5 +917,94 @@ mod tests {
         let (plan, tasks) = minimal_plan(&goals);
         let score = score_plan(&plan, &tasks);
         assert!(score.overall <= 10, "overall score should not exceed 10");
+    }
+
+    #[test]
+    fn scorecard_healthy_plan_format() {
+        let goals = vec![
+            (
+                "scaffold",
+                "Set up the Cargo workspace with CI pipeline and workspace-level Cargo.toml",
+            ),
+            (
+                "domain",
+                "Implement entities, value objects, and port traits for the domain layer",
+            ),
+            (
+                "infra",
+                "Implement the PostgreSQL repository adapter using sqlx with connection pooling",
+            ),
+            (
+                "auth",
+                "Implement JWT authentication middleware with token validation and refresh",
+            ),
+        ];
+        let (plan, tasks) = minimal_plan(&goals);
+        let score = score_plan(&plan, &tasks);
+
+        let card = format_scorecard(&score);
+
+        // Must contain the canonical header and per-dimension lines.
+        assert!(
+            card.starts_with("Plan Quality Scorecard"),
+            "scorecard must start with header, got: {card}"
+        );
+        // Each dimension appears as a labeled row, e.g.
+        //   "  Granularity             8/10  good"
+        // so look for the score appearing after the dimension name on the
+        // same line. Don't try to match exact whitespace (which depends on
+        // the `{:>2}` padding for single-digit scores).
+        for dim in &score.dimensions {
+            let score_token = format!("{}/10", dim.score);
+            let dim_line_prefix = format!("\n  {} ", dim.name);
+            assert!(
+                card.contains(&dim_line_prefix)
+                    && card
+                        .lines()
+                        .any(|line| line.contains(dim.name) && line.contains(&score_token)),
+                "scorecard missing dimension row for {} with score {}; full output:\n{card}",
+                dim.name,
+                score_token,
+            );
+        }
+        // Overall line carries the Healthy|Needs work verdict.
+        let overall_line = format!("Overall: {}/10", score.overall);
+        assert!(
+            card.contains(&overall_line),
+            "scorecard missing Overall line {overall_line:?}; full output:\n{card}"
+        );
+        assert!(
+            card.contains("(Healthy)") || card.contains("(Needs work)"),
+            "scorecard must use Healthy|Needs work verdict, got: {card}"
+        );
+        assert!(
+            !card.contains("(excellent)") && !card.contains("(good)"),
+            "scorecard overall should not echo the per-dimension verdict words; got: {card}"
+        );
+    }
+
+    #[test]
+    fn scorecard_caps_suggestions_at_three() {
+        // A plan with placeholder goals triggers several findings per dimension,
+        // so we can verify the scorecard emits at most 3 suggestion bullets.
+        let goals = vec![
+            ("task-a", "TBD"),
+            ("task-b", "TODO: fill in"),
+            ("task-c", "placeholder"),
+        ];
+        let (plan, tasks) = minimal_plan(&goals);
+        let score = score_plan(&plan, &tasks);
+        assert!(
+            score.suggestions.len() >= 3,
+            "fixture should produce at least 3 suggestions, got {}",
+            score.suggestions.len()
+        );
+
+        let card = format_scorecard(&score);
+        let bullet_count = card.matches("\n  - [").count();
+        assert_eq!(
+            bullet_count, 3,
+            "scorecard must cap suggestions at 3, got {bullet_count} in:\n{card}"
+        );
     }
 }
