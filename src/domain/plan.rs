@@ -964,9 +964,10 @@ pub fn auto_derive_require_evaluator(resolved: &[ResolvedTask]) -> bool {
 /// Keywords that flag a task as requiring an explicit human gate.
 ///
 /// When matched in a task slug or title, the task must declare a matching
-/// `gate = "<category>"` in its `TaskDef`. Mirrors
-/// [`SECURITY_SENSITIVE_KEYWORDS`] but is its own constant so gate
-/// semantics can evolve independently of the evaluator auto-derive rule.
+/// `gate = "<category>"` in its `TaskDef`. Mirrors the internal
+/// `SECURITY_SENSITIVE_KEYWORDS` list used by `require_evaluator`
+/// auto-derive, but is its own constant so gate semantics can evolve
+/// independently.
 pub const GATE_KEYWORDS: &[&str] = &[
     "auth",
     "payment",

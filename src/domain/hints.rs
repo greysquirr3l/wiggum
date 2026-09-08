@@ -21,8 +21,8 @@ const MAX_HINT_LEN: usize = 80;
 ///   dimensions first.
 /// - Otherwise → open ORCHESTRATOR.md and run the first task.
 ///
-/// The returned string is at most [`MAX_HINT_LEN`] bytes; longer hints
-/// are truncated on a char boundary with an ellipsis suffix.
+/// The returned string is at most 80 bytes; longer hints are truncated on
+/// a char boundary with an ellipsis suffix.
 #[must_use]
 pub fn first_command_hint(plan: &Plan, score: &PlanScore) -> String {
     let raw = if plan_has_gated_tasks(plan) {
