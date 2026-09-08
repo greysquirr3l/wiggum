@@ -8,8 +8,8 @@ Interactively create a new plan file.
 wiggum init [--plan <path>]
 ```
 
-| Option | Description |
-|--------|-------------|
+| Option         | Description                                                  |
+| -------------- | ------------------------------------------------------------ |
 | `--plan`, `-p` | Path to write the generated plan TOML (default: `plan.toml`) |
 
 ## `wiggum generate`
@@ -20,38 +20,40 @@ Generate all artifacts from a plan file.
 wiggum generate <plan> [OPTIONS]
 ```
 
-| Option | Description |
-|--------|-------------|
-| `<plan>` | Path to the plan TOML file |
-| `--output`, `-o` | Override the output directory (defaults to `project.path` from the plan) |
-| `--force` | Overwrite existing files without prompting |
-| `--dry-run` | Preview what would be generated without writing files |
-| `--estimate-tokens` | Show estimated token counts for generated artifacts |
-| `--skip-agents-md` | Skip `AGENTS.md` generation |
-| `--target <vscode\|opencode\|claude\|agent-rules\|all>` | Override the target tool selection. Overrides the plan's `[targets]` section. See [Targets](./targets.md). |
+| Option                                                  | Description                                                                                                         |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `<plan>`                                                | Path to the plan TOML file                                                                                          |
+| `--output`, `-o`                                        | Override the output directory (defaults to `project.path` from the plan)                                            |
+| `--force`                                               | Overwrite existing files without prompting                                                                          |
+| `--dry-run`                                             | Preview what would be generated without writing files                                                               |
+| `--estimate-tokens`                                     | Show estimated token counts for generated artifacts                                                                 |
+| `--skip-agents-md`                                      | Skip `AGENTS.md` generation                                                                                         |
+| `--target <vscode\|opencode\|claude\|agent-rules\|all>` | Override the target tool selection. Overrides the plan's `[targets]` section. See [Targets](./targets.md).          |
+| `--no-summary`                                          | Suppress the plan quality scorecard printed after generation                                                        |
+| `--thin`                                                | Universal artifacts only — skip every per-tool prompt directory (`.vscode/`, `.opencode/`, `.claude/`, agent_rules) |
 
 ## `wiggum check`
 
-Score the quality of a plan file before generating. Unlike `validate --lint`, which checks structural correctness, `check` scores the *substance* of a plan on five dimensions and produces concrete improvement suggestions.
+Score the quality of a plan file before generating. Unlike `validate --lint`, which checks structural correctness, `check` scores the _substance_ of a plan on five dimensions and produces concrete improvement suggestions. The same score is now printed at the end of `wiggum generate` so the quality signal lands at the moment it matters most — right after scaffolding. Pass `--no-summary` to suppress it.
 
 ```bash
 wiggum check <plan> [--json]
 ```
 
-| Option | Description |
-|--------|-------------|
-| `<plan>` | Path to the plan TOML file |
+| Option   | Description                                           |
+| -------- | ----------------------------------------------------- |
+| `<plan>` | Path to the plan TOML file                            |
 | `--json` | Output results as JSON instead of human-readable text |
 
 The six scoring dimensions are:
 
-| Dimension | What it measures |
-|-----------|------------------|
-| **Granularity** | Whether tasks are sized for a single agent session (not too broad or too narrow) |
-| **Dependency health** | DAG fan-out, orphan detection, and over-coupling |
-| **Coverage** | Balance of task kinds across the plan |
-| **Richness** | Presence of hints, must-haves, evaluation criteria |
-| **Token budget** | Estimated prompt size across all generated artifacts |
+| Dimension              | What it measures                                                                                                                        |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| **Granularity**        | Whether tasks are sized for a single agent session (not too broad or too narrow)                                                        |
+| **Dependency health**  | DAG fan-out, orphan detection, and over-coupling                                                                                        |
+| **Coverage**           | Balance of task kinds across the plan                                                                                                   |
+| **Richness**           | Presence of hints, must-haves, evaluation criteria                                                                                      |
+| **Token budget**       | Estimated prompt size across all generated artifacts                                                                                    |
 | **Harness complexity** | Whether the evaluator harness matches plan scale — penalises over-engineered harnesses on tiny plans and rewards high criteria coverage |
 
 Each dimension scores 0–10. The overall score is a weighted composite. Plans scoring **≥ 7** are considered healthy; `wiggum check` exits with a non-zero status if the plan is below this threshold.
@@ -71,9 +73,9 @@ Validate a plan file without generating artifacts.
 wiggum validate <plan> [--lint]
 ```
 
-| Option | Description |
-|--------|-------------|
-| `<plan>` | Path to the plan TOML file |
+| Option   | Description                          |
+| -------- | ------------------------------------ |
+| `<plan>` | Path to the plan TOML file           |
 | `--lint` | Run lint rules to check plan quality |
 
 ## `wiggum add-task`
@@ -92,11 +94,11 @@ Bootstrap a plan from an existing project directory. Detects language, build sys
 wiggum bootstrap [path] [OPTIONS]
 ```
 
-| Option | Description |
-|--------|-------------|
-| `[path]` | Path to the project directory (default: `.`) |
+| Option           | Description                                                         |
+| ---------------- | ------------------------------------------------------------------- |
+| `[path]`         | Path to the project directory (default: `.`)                        |
 | `--output`, `-o` | Path to write the generated plan TOML (default: `<path>/plan.toml`) |
-| `--force` | Overwrite existing plan file without prompting |
+| `--force`        | Overwrite existing plan file without prompting                      |
 
 ## `wiggum serve`
 
@@ -128,11 +130,11 @@ Analyse a completed `PROGRESS.md` and emit retrospective improvement suggestions
 wiggum retro [OPTIONS]
 ```
 
-| Option | Description |
-|--------|-------------|
-| `--progress` | Path to `PROGRESS.md` (default: `PROGRESS.md`) |
-| `--plan` | Path to the plan TOML (used to correlate task slugs) |
-| `--save` | Save the retrospective as a reusable pattern in `~/.wiggum/patterns/` |
+| Option       | Description                                                           |
+| ------------ | --------------------------------------------------------------------- |
+| `--progress` | Path to `PROGRESS.md` (default: `PROGRESS.md`)                        |
+| `--plan`     | Path to the plan TOML (used to correlate task slugs)                  |
+| `--save`     | Save the retrospective as a reusable pattern in `~/.wiggum/patterns/` |
 
 ## `wiggum replan`
 
@@ -143,11 +145,11 @@ evidence recorded in `PROGRESS.md`, then re-renders the task's `.md` file with a
 wiggum replan <plan> --task <slug> [--dry-run]
 ```
 
-| Option | Description |
-|--------|-------------|
-| `<plan>` | Path to the plan TOML file |
-| `--task`, `-t` | Slug of the task to re-generate (required) |
-| `--dry-run` | Print the new content to stdout instead of writing to disk |
+| Option         | Description                                                |
+| -------------- | ---------------------------------------------------------- |
+| `<plan>`       | Path to the plan TOML file                                 |
+| `--task`, `-t` | Slug of the task to re-generate (required)                 |
+| `--dry-run`    | Print the new content to stdout instead of writing to disk |
 
 Failure evidence is extracted from lines in `PROGRESS.md` that are tagged `[~]` or contain
 "required fix". Extracted lines are prepended as `[Previous failure]` hints in the regenerated
@@ -178,9 +180,9 @@ Save a pattern from a PROGRESS.md file (or an existing retro output).
 wiggum patterns save --from <progress-path> --plan <plan-path>
 ```
 
-| Option | Description |
-|--------|-------------|
-| `--from` | Path to the source `PROGRESS.md` |
+| Option   | Description                                        |
+| -------- | -------------------------------------------------- |
+| `--from` | Path to the source `PROGRESS.md`                   |
 | `--plan` | Path to the plan TOML (provides language metadata) |
 
 ### `apply`
@@ -191,8 +193,8 @@ Apply matching patterns as additional hints to a plan file. Patterns are matched
 wiggum patterns apply --plan <plan-path>
 ```
 
-| Option | Description |
-|--------|-------------|
+| Option   | Description                      |
+| -------- | -------------------------------- |
 | `--plan` | Path to the plan TOML to augment |
 
 ## `wiggum report`
@@ -203,10 +205,10 @@ Generate a post-execution report from `PROGRESS.md`.
 wiggum report [OPTIONS]
 ```
 
-| Option | Description |
-|--------|-------------|
-| `--progress` | Path to `PROGRESS.md` (default: `PROGRESS.md`) |
-| `--project-dir` | Project directory for git timeline (optional) |
+| Option          | Description                                    |
+| --------------- | ---------------------------------------------- |
+| `--progress`    | Path to `PROGRESS.md` (default: `PROGRESS.md`) |
+| `--project-dir` | Project directory for git timeline (optional)  |
 
 ## `wiggum watch`
 
@@ -216,10 +218,10 @@ Watch `PROGRESS.md` for live progress updates.
 wiggum watch [OPTIONS]
 ```
 
-| Option | Description |
-|--------|-------------|
-| `--progress` | Path to `PROGRESS.md` (default: `PROGRESS.md`) |
-| `--poll-ms` | Poll interval in milliseconds (default: `1000`) |
+| Option         | Description                                                                                          |
+| -------------- | ---------------------------------------------------------------------------------------------------- |
+| `--progress`   | Path to `PROGRESS.md` (default: `PROGRESS.md`)                                                       |
+| `--poll-ms`    | Poll interval in milliseconds (default: `1000`)                                                      |
 | `--stall-secs` | Seconds before an in-progress task triggers a stall warning (default: `1800`; set to `0` to disable) |
 
 When `--stall-secs` is non-zero, the watch display emits a `⚠ HEALTH` warning next to any task that has remained `[~]` in-progress for longer than the threshold. The warning continues to refresh on every poll cycle until the task transitions to a terminal state.

@@ -156,7 +156,7 @@ const PROGRESS_TEMPLATE: &str = r"# {{ project_name }} — Implementation Progre
 
 | Task | Status | Notes |
 |---|---|---|
-{% for task in phase.tasks %}| T{{ task.number_padded }} — {{ task.title }} | `[ ]` | |
+{% for task in phase.tasks %}| {% if task.gate %}[GATE] {% endif %}T{{ task.number_padded }} — {{ task.title }} | `[ ]` | |
 {% endfor %}
 ---
 {% endfor %}
@@ -505,11 +505,15 @@ Avoid patterns that reveal AI authorship.
 </SUBAGENT_PROMPT>
 "#;
 
-const TASK_TEMPLATE: &str = r#"# T{{ number_padded }} — {{ title }}
-{% if gate %}
+const TASK_TEMPLATE: &str = r#"{% if gate %}
 > ⛔ **GATE — Human confirmation required before starting this task.**
-> {{ gate }}
-{% endif %}
+> Category: `{{ gate }}`
+>
+> The orchestrator must STOP and emit this banner verbatim. The human must
+> confirm (e.g. by restarting the orchestrator) before implementation begins.
+
+{% endif %}# T{{ number_padded }} — {{ title }}
+
 > **Depends on**: {{ depends_on_desc }}.
 
 ## Goal
