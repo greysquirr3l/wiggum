@@ -54,8 +54,8 @@ pub fn task_context_tokens(task: &ResolvedTask) -> usize {
 /// Sections:
 /// 1. Summary — total estimated tokens, total artifacts, base overhead.
 /// 2. Per-artifact table — token estimate for each generated file.
-/// 3. Per-task table — token estimate per task, with ⚠ CRITICAL marker
-///    for tasks over [`TOKEN_CRITICAL_THRESHOLD`] and ⚠ WARN for tasks
+/// 3. Per-task table — token estimate per task, with `[CRITICAL]` marker
+///    for tasks over [`TOKEN_CRITICAL_THRESHOLD`] and `[WARN]` for tasks
 ///    over [`TOKEN_WARN_THRESHOLD`].
 /// 4. Thresholds — the canonical warn / critical boundaries.
 /// 5. Recommended daily cap — max single task × 10, so the orchestrator
@@ -66,6 +66,7 @@ pub fn task_context_tokens(task: &ResolvedTask) -> usize {
 /// Returns an error only if the underlying `String` writer fails, which
 /// in practice cannot happen with `String`. The `Result` return is for
 /// symmetry with other renderers.
+#[allow(clippy::too_many_lines)]
 pub fn render(plan: &Plan, tasks: &[ResolvedTask]) -> Result<String> {
     let mut out = String::with_capacity(2048);
 
@@ -89,9 +90,9 @@ pub fn render(plan: &Plan, tasks: &[ResolvedTask]) -> Result<String> {
     for task in tasks {
         let tokens = task_context_tokens(task);
         let status = if tokens > TOKEN_CRITICAL_THRESHOLD {
-            "⚠ CRITICAL"
+            "[CRITICAL]"
         } else if tokens > TOKEN_WARN_THRESHOLD {
-            "⚠ WARN"
+            "[WARN]"
         } else {
             "ok"
         };
@@ -167,7 +168,59 @@ pub fn render(plan: &Plan, tasks: &[ResolvedTask]) -> Result<String> {
     );
     let _ = writeln!(out);
 
+    // ── Cost tiers (T08) ────────────────────────────────────────────
+    // Three operating modes with deterministic formulas:
+    //   noop   = total / 20  — read PROGRESS.md only, round to nearest 100
+    //   report = total / 3   — review each task without implementing
+    //   action = total * 2   — full task execution with one retry cycle
+    // Plus a stable_fraction and a suggested daily cap derived from action.
+    let noop_tokens = round_to_nearest_100(total_tokens / 20);
+    let report_tokens = total_tokens / 3;
+    let action_tokens = total_tokens.saturating_mul(2);
+    let stable_fraction: f64 = 0.4;
+    let suggested_daily_cap = action_tokens.saturating_mul(5);
+
+    let _ = writeln!(out, "## Cost tiers");
+    let _ = writeln!(out);
+    let _ = writeln!(
+        out,
+        "Per-iteration cost under three operating modes. Use this to plan \
+         session budgets before running the orchestrator."
+    );
+    let _ = writeln!(out);
+    let _ = writeln!(out, "| Mode | Tokens | % of total |");
+    let _ = writeln!(out, "|------|-------:|-----------:|");
+    let pct = |n: usize| -> String {
+        match (n * 100).checked_div(total_tokens) {
+            Some(pct) if total_tokens > 0 => format!("{pct}%"),
+            _ => "—".to_string(),
+        }
+    };
+    let _ = writeln!(out, "| noop   | {noop_tokens}  | {} |", pct(noop_tokens));
+    let _ = writeln!(out, "| report | {report_tokens} | {} |", pct(report_tokens));
+    let _ = writeln!(out, "| action | {action_tokens} | {} |", pct(action_tokens));
+    let _ = writeln!(out);
+    let _ = writeln!(
+        out,
+        "Stable fraction between iterations: **{stable_fraction:.1}** \
+         (estimated reuse of PROGRESS.md + accumulated learnings; tune \
+         per model)."
+    );
+    let _ = writeln!(out);
+    let _ = writeln!(
+        out,
+        "Suggested daily cap: **{suggested_daily_cap} tokens** (= action × 5). \
+         Treat as a single-developer upper bound for a dogfood session; \
+         reduce if running multiple plans in parallel."
+    );
+    let _ = writeln!(out);
+
     Ok(out)
+}
+
+/// Round `n` to the nearest multiple of 100.
+const fn round_to_nearest_100(n: usize) -> usize {
+    (n.saturating_add(50) / 100).saturating_mul(100)
 }
 
 fn estimate_plan_doc_tokens(plan: &Plan) -> usize {
@@ -210,7 +263,7 @@ fn estimate_orchestrator_prompt_tokens(plan: &Plan) -> usize {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used)]
+#[allow(clippy::unwrap_used, clippy::panic, clippy::indexing_slicing)]
 mod tests {
     use super::*;
 
@@ -298,7 +351,7 @@ mod tests {
         let tasks = vec![minimal_task(1, "huge", 700_000)];
         let md = render(&plan, &tasks).unwrap();
         assert!(
-            md.contains("⚠ CRITICAL"),
+            md.contains("[CRITICAL]"),
             "expected CRITICAL marker for huge task, got:\n{md}"
         );
     }
@@ -313,5 +366,83 @@ mod tests {
         assert!(md.starts_with("# BUDGET"));
         let h1_count = md.lines().filter(|l| l.starts_with("# ")).count();
         assert!(h1_count >= 1, "expected at least one H1, got {h1_count}");
+    }
+
+    // ── T08: cost tiers ─────────────────────────────────────────────
+
+    #[test]
+    fn cost_tiers_section_present() {
+        let plan = minimal_plan();
+        let tasks = vec![minimal_task(1, "alpha", 200)];
+        let md = render(&plan, &tasks).unwrap();
+        assert!(
+            md.contains("## Cost tiers"),
+            "missing Cost tiers section, got:\n{md}"
+        );
+    }
+
+    #[test]
+    fn cost_tiers_order_noop_le_report_le_action() {
+        let plan = minimal_plan();
+        let tasks = vec![minimal_task(1, "alpha", 1_000_000)]; // ~250k tokens
+        let md = render(&plan, &tasks).unwrap();
+
+        // Extract the three token values from the table rows.
+        let extract = |label: &str| -> usize {
+            let needle = format!("| {label} ");
+            let row = md
+                .lines()
+                .find(|l| l.starts_with(&needle))
+                .unwrap_or_else(|| panic!("missing row for {label}:\n{md}"));
+            let cells: Vec<&str> = row.split('|').collect();
+            // Cells: ['', 'noop  ', ' 12300 ', ...]
+            let token_cell = cells[2].trim();
+            token_cell
+                .replace(',', "")
+                .parse::<usize>()
+                .unwrap_or_else(|e| panic!("unparseable tokens `{token_cell}` for {label}: {e}"))
+        };
+        let noop = extract("noop");
+        let report = extract("report");
+        let action = extract("action");
+        assert!(noop <= report, "noop {noop} > report {report}");
+        assert!(report <= action, "report {report} > action {action}");
+    }
+
+    #[test]
+    fn suggested_daily_cap_equals_action_times_five() {
+        let plan = minimal_plan();
+        let tasks = vec![minimal_task(1, "alpha", 1_000_000)];
+        let md = render(&plan, &tasks).unwrap();
+
+        let action = {
+            let row = md.lines().find(|l| l.starts_with("| action ")).unwrap();
+            row.split('|')
+                .nth(2)
+                .unwrap_or("")
+                .trim()
+                .replace(',', "")
+                .parse::<usize>()
+                .unwrap()
+        };
+        let daily_cap = {
+            let line = md
+                .lines()
+                .find(|l| l.contains("Suggested daily cap"))
+                .unwrap();
+            // Format: "Suggested daily cap: **12345 tokens** (= action × 5)..."
+            let after = line.split("**").nth(1).unwrap();
+            after
+                .split_whitespace()
+                .next()
+                .unwrap()
+                .parse::<usize>()
+                .unwrap()
+        };
+        assert_eq!(
+            daily_cap,
+            action * 5,
+            "daily cap {daily_cap} != action {action} * 5"
+        );
     }
 }
