@@ -1,7 +1,14 @@
-#![deny(dead_code_pub_in_binary)]
-// T13 — deny-by-default for unused `pub` items in this binary crate
-// (warn-by-default in Cargo 1.97+). Catches dead `pub fn`s in main.rs
-// that would otherwise pass CI but contribute nothing.
+#![cfg_attr(
+    rust_version_gte = "1.97",
+    deny(dead_code_pub_in_binary),
+    // T13 — deny-by-default for unused `pub` items in this binary crate
+    // (warn-by-default in Cargo 1.97+). Catches dead `pub fn`s in main.rs
+    // that would otherwise pass CI but contribute nothing.
+)]
+// `rust_version_gte` is a nightly-only cfg flag; allow the lint so
+// stable toolchains don't fail. The cfg_attr above is a no-op on stable
+// anyway.
+#![allow(unexpected_cfgs)]
 
 use std::path::{Path, PathBuf};
 use std::process;
