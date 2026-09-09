@@ -4,6 +4,28 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.18.0] - 2026-09-08
+
+### Added
+
+- **Plan quality scorecard at scaffold time** — `wiggum generate` prints the 5-dimension `wiggum check` scorecard after writing artifacts. Suppressable via `--no-summary`. (PR #93)
+- **Mandatory evaluator for non-trivial plans** — `[orchestrator] require_evaluator` auto-derives to true when the plan has ≥4 tasks or any slug matches a security-sensitive keyword (`auth`, `payment`, `billing`, `crypto`, `credential`, `webhook`, `secret`, `key`, `token`, `sign`, `signature`, `kdf`, `hash`). Without an `[evaluator]` block, `wiggum validate` errors with a fix-pointing message. Opt out with `require_evaluator = false` and `wiggum generate` prints a visible warning.
+- **Gates for security-sensitive tasks** — `[orchestrator] gates: Vec<String>` with auto-derive from slug/title keywords. `validate_gates` errors when a gated task doesn't declare its matching `gate = "<category>"` field.
+- **Gate banner in task files** — gated task files emit a `⛔ GATE` blockquote _above_ the H1 so the orchestrator stops before scanning into the task body. PROGRESS.md rows for gated tasks are prefixed with `[GATE]`.
+- **`Next: …` hint** — single ≤80-char line telling the user what to do next (review gates / add evaluator / open ORCHESTRATOR.md). Decision-tree based on plan state.
+- **`BUDGET.md`** — universal scaffold artifact with per-task token table (`[CRITICAL]`/`[WARN]` markers), summary metrics, threshold table, daily cap, and a Cost tiers section (noop / report / action + suggested daily cap).
+- **`RUN_LOG.md`** — universal scaffold artifact with empty per-iteration table and How-to-use section.
+- **`--thin` flag** — emit only universal artifacts, skip per-tool prompt directories.
+- **`--no-summary` flag** — suppress the plan quality scorecard.
+- **Rust `strict_rules` array** — 15 new rules appended from `~/Projects/nick-v2.md` and the Rust 1.78→1.98 catchup guide. Tooling pin bumped to Rust 1.95+.
+
+### Changed
+
+- **Toolchain config** — `.cargo/config.toml` gains `[build] warnings = "deny"` (Cargo 1.97+); bin crate gains `#[deny(dead_code_pub_in_binary)]` at root.
+- **Strict-mode documentation** — `project-docs/docs_source/strict-standards.md` documents the Rust 1.95+ baseline with 5 code snippets (object-safe async port traits, `LazyCell` vs `LazyLock`, `#[expect]` over `#[allow]`, let chains, match arm `if let` guards).
+- **`reference/example-plan.toml`** — declares `require_evaluator = true` and `gates = []` with inline policy comments.
+- **README** — added a "Discipline features" section enumerating every new field and flag.
+
 ## [0.17.1] - 2026-07-08
 
 ### Fixed
