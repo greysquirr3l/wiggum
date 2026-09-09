@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.18.1] - 2026-09-08
+
+### Fixed
+
+- **CI/release: re-establish v0.18.0 on `main` and republish as v0.18.1** — v0.18.0 was tagged on `fix/release-tag-and-console` before the branch was fast-forwarded onto `main` via PR #94, so the tag pointed at a commit not in the default branch's history. The auto-tag workflow correctly skipped creating a duplicate. This release re-establishes the tag on the actual default-branch tip and bumps to 0.18.1 so the new tag is clean and publishable to crates.io.
+- **rustdoc: `cargo doc --no-deps --locked` -D warnings** — public doc links to private `MAX_HINT_LEN` (src/domain/hints.rs) and `SECURITY_SENSITIVE_KEYWORDS` (src/domain/plan.rs) are rewritten to prose so stable rustc accepts them.
+- **Cargo.toml/.cargo/config.toml: `dead_code_pub_in_binary` lint gate** — the bin crate's `#![deny(dead_code_pub_in_binary)]` is now behind `#![cfg_attr(rust_version_gte = "1.97", …)]` so CI's pinned Rust 1.95 doesn't fail with `unknown lint` while local dev on 1.97+ still enforces the lint.
+
+### Changed
+
+- **Repository: `main` is now the active default branch.** Development was happening on `fix/release-tag-and-console` since v0.17.1, which broke the CI-on-`main` / auto-tag-on-release workflow chain. PR #94 fast-forwards `main` to v0.18.0 (with a non-FF merge of the v0.17.1 release merge). All future work targets `main` directly.
+
 ## [0.18.0] - 2026-09-08
 
 ### Added
