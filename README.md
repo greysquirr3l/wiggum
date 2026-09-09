@@ -42,7 +42,7 @@ wiggum generate plan.toml
 | `validate`        | Validate plan structure and dependency graph                                                              |
 | `add-task`        | Add a task to an existing plan                                                                            |
 | `bootstrap`       | Generate a plan from an existing project                                                                  |
-| `reverse`         | Generate a plan from a remote git URL + apply user hints                                                  |
+| `reverse`         | Generate a plan from a remote git URL + apply user hints + optional LLM phase decomposition               |
 | `diff`            | Compare two plan files                                                                                    |
 | `resume`          | Recover an interrupted orchestrator loop                                                                  |
 | `retro`           | Generate improvement suggestions from PROGRESS.md                                                         |

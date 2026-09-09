@@ -333,6 +333,130 @@ fn reverse_rejects_bad_hints_extension() {
         ));
 }
 
+// ── subdir + LLM tests ─────────────────────────────────────────────────────
+
+#[test]
+fn reverse_with_subdir_flag_creates_plan() {
+    let tmp = TempDir::new().expect("tempdir");
+    let repo = tmp.path().join("fixture");
+    std::fs::create_dir(&repo).expect("mkdir fixture");
+    make_git_fixture(&repo);
+
+    let out_path = tmp.path().join("plan.toml");
+    let url = format!("file://{}", repo.display());
+
+    Command::cargo_bin("wiggum")
+        .expect("cargo_bin")
+        .env("RUST_LOG", "error")
+        .arg("reverse")
+        .arg(&url)
+        .arg("--subdir")
+        .arg("src")
+        .arg("--output")
+        .arg(&out_path)
+        .assert()
+        .success();
+
+    let toml = std::fs::read_to_string(&out_path).expect("read plan.toml");
+    let plan: toml::Value = toml::from_str(&toml).expect("parse generated TOML");
+    let project = plan.get("project").expect("project section");
+    assert_eq!(
+        project.get("language").and_then(|v| v.as_str()),
+        Some("rust")
+    );
+}
+
+#[test]
+fn reverse_with_subdir_rejects_empty_subdir() {
+    let tmp = TempDir::new().expect("tempdir");
+    let repo = tmp.path().join("fixture");
+    std::fs::create_dir(&repo).expect("mkdir fixture");
+    make_git_fixture(&repo);
+
+    let out_path = tmp.path().join("plan.toml");
+    let url = format!("file://{}", repo.display());
+
+    Command::cargo_bin("wiggum")
+        .expect("cargo_bin")
+        .env("RUST_LOG", "error")
+        .arg("reverse")
+        .arg(&url)
+        .arg("--subdir")
+        .arg("")
+        .arg("--output")
+        .arg(&out_path)
+        .assert()
+        .failure()
+        .stderr(predicates::str::contains("subdir must be a non-empty path"));
+}
+
+#[test]
+fn reverse_with_llm_no_api_key_fails() {
+    let tmp = TempDir::new().expect("tempdir");
+    let repo = tmp.path().join("fixture");
+    std::fs::create_dir(&repo).expect("mkdir fixture");
+    make_git_fixture(&repo);
+
+    let out_path = tmp.path().join("plan.toml");
+    let url = format!("file://{}", repo.display());
+
+    Command::cargo_bin("wiggum")
+        .expect("cargo_bin")
+        .env("RUST_LOG", "error")
+        // Clear any ambient keys to make this test hermetic.
+        .env_remove("ANTHROPIC_API_KEY")
+        .env_remove("MINIMAX_API_KEY")
+        .arg("reverse")
+        .arg(&url)
+        .arg("--llm")
+        .arg("anthropic")
+        .arg("--output")
+        .arg(&out_path)
+        .assert()
+        .failure()
+        .stderr(predicates::str::contains("no API key for LLM provider"));
+}
+
+#[test]
+fn reverse_with_unknown_llm_provider_fails() {
+    let tmp = TempDir::new().expect("tempdir");
+    let repo = tmp.path().join("fixture");
+    std::fs::create_dir(&repo).expect("mkdir fixture");
+    make_git_fixture(&repo);
+
+    let out_path = tmp.path().join("plan.toml");
+    let url = format!("file://{}", repo.display());
+
+    Command::cargo_bin("wiggum")
+        .expect("cargo_bin")
+        .env("RUST_LOG", "error")
+        .arg("reverse")
+        .arg(&url)
+        .arg("--llm")
+        .arg("bogus-provider")
+        .arg("--output")
+        .arg(&out_path)
+        .assert()
+        .failure()
+        .stderr(predicates::str::contains("'bogus-provider'"));
+}
+
+#[test]
+fn reverse_help_documents_llm_flag() {
+    let help = Command::cargo_bin("wiggum")
+        .expect("cargo_bin")
+        .env("RUST_LOG", "error")
+        .arg("reverse")
+        .arg("--help")
+        .output()
+        .expect("invoke wiggum reverse --help");
+    let stdout = String::from_utf8_lossy(&help.stdout);
+    assert!(stdout.contains("--llm"));
+    assert!(stdout.contains("--llm-model"));
+    assert!(stdout.contains("--api-key"));
+    assert!(stdout.contains("--subdir"));
+}
+
 /// Silence unused-import for `PathBuf` in case future edits drop it.
 #[allow(dead_code)]
 fn _keep_pathbuf(_: PathBuf) {}

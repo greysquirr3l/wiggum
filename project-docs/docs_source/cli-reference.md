@@ -102,33 +102,47 @@ wiggum bootstrap [path] [OPTIONS]
 
 ## `wiggum reverse`
 
-Clone a remote git repo into a tempdir and generate a `plan.toml` skeleton from its contents. Optionally merge a hints file (TOML for structured overrides, Markdown for freeform rules).
+Clone a remote git repo into a tempdir and generate a `plan.toml` skeleton from its contents. Optionally merge a hints file (TOML for structured overrides, Markdown for freeform rules) and/or run an LLM pass to produce intelligent phases + tasks.
 
 ```bash
 wiggum reverse <url> [OPTIONS]
 ```
 
-| Option           | Description                                                                       |
-| ---------------- | --------------------------------------------------------------------------------- |
-| `<url>`          | Any URL `git clone` accepts (GitHub, GitLab, self-hosted, SSH, `file://`)         |
-| `--hints`        | Optional hints file — `.toml` for structured, `.md` for freeform rules            |
-| `--output`, `-o` | Path to write the generated plan TOML (default: `./plan.toml`)                    |
-| `--force`        | Overwrite existing plan file without prompting                                    |
-| `--keep-tmp`     | Keep the cloned tempdir after generation (for debugging)                          |
+| Option           | Description                                                                                                                |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `<url>`          | Any URL `git clone` accepts (GitHub, GitLab, self-hosted, SSH, `file://`)                                                  |
+| `--hints`        | Optional hints file — `.toml` for structured, `.md` for freeform rules                                                     |
+| `--output`, `-o` | Path to write the generated plan TOML (default: `./plan.toml`)                                                             |
+| `--force`        | Overwrite existing plan file without prompting                                                                             |
+| `--keep-tmp`     | Keep the cloned tempdir after generation (for debugging)                                                                   |
+| `--subdir`       | Scope the clone to a specific subfolder of the repo. For GitHub URLs, `/tree/<branch>/<path>` works too                    |
+| `--github-api`   | Prefer the GitHub REST API for fetching repo metadata/tree/files (falls back to `git clone` on failure)                    |
+| `--llm`          | Use an LLM to generate intelligent phases + tasks. Provider = `anthropic` or `minimax`. Requires `<PROVIDER>_API_KEY` env var |
+| `--llm-model`    | Override the LLM model (default: `claude-sonnet-4-5` for anthropic, `MiniMax-M3` for minimax)                              |
+| `--api-key`      | Override the LLM API key (otherwise read from `ANTHROPIC_API_KEY` / `MINIMAX_API_KEY`)                                      |
 
-Example with structured hints:
+Examples:
 
 ```bash
+# Deterministic, no LLM
 wiggum reverse https://github.com/foo/bar --hints hints.toml
-```
 
-Example with freeform Markdown hints:
+# Scope to a monorepo subpackage
+wiggum reverse https://github.com/foo/bar/tree/main/services/api --hints hints.md
 
-```bash
-wiggum reverse git@github.com:foo/bar.git --hints hints.md
+# LLM-driven phase decomposition (Anthropic Claude)
+ANTHROPIC_API_KEY=sk-... wiggum reverse https://github.com/foo/bar --llm anthropic
+
+# LLM-driven (MiniMax)
+MINIMAX_API_KEY=... wiggum reverse https://github.com/foo/bar --llm minimax
+
+# Pick a specific MiniMax model
+wiggum reverse https://github.com/foo/bar --llm minimax --llm-model MiniMax-M2.7-highspeed
 ```
 
 The hints TOML supports `[project]`, `[orchestrator]`, and `[[phase]]` blocks. See [reference/example-hints.toml](https://github.com/greysquirr3l/wiggum/blob/main/reference/example-hints.toml) for the full schema, and [reference/example-hints.md](https://github.com/greysquirr3l/wiggum/blob/main/reference/example-hints.md) for the Markdown variant.
+
+When `--llm` is set, the deterministic skeleton is replaced by an LLM-generated phase decomposition. The LLM receives the detected language, manifest, top-level tree, README excerpt, and your hints; it returns a JSON plan that we validate and merge. The LLM pass honours any phases you declared in your hints TOML — your structure wins over the model's.
 
 ## `wiggum serve`
 
