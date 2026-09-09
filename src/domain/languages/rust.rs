@@ -76,12 +76,17 @@ pub static PROFILE: &LanguageProfile = &LanguageProfile {
         "Doc comments (`///`) should describe contracts and edge cases, not repeat function signatures.",
     ],
 
-    // Mirrors `~/Projects/nick.md` (Rust Standards). Opt-in via
+    // Mirrors `~/Projects/nick-v2.md` (Rust Standards, supersedes the
+    // original `nick.md`) and the Rust 1.78→1.98 catchup guide at
+    // `~/Projects/rust/rust-docs/rust-catchup-1.78-1.98.md`. Opt-in via
     // `[style] strict = true` in the plan TOML. The goal is to keep the
     // generated Rust genuinely idiomatic — no panic-shaped code paths, no
-    // silenced clippy lints, and the full pedantic+nursery+perf profile
-    // active.
+    // silenced clippy lints, DDD-lite hexagonal layout with narrow port
+    // traits, AuthContext + idempotency keys, object-safe async port
+    // traits via `async-trait`, and the full pedantic+nursery+perf
+    // profile active.
     strict_rules: &[
+        // ── Original 14 rules from nick.md (preserved verbatim) ──────
         "Never use `.expect()` or `.unwrap()` on `Result` or `Option` in production code — propagate with `?` or handle with explicit `match` / `if let` / `.unwrap_or_else(|e| ...)` where the failure mode is genuinely recoverable.",
         "Never use `.unwrap()` / `.expect()` inside helper closures either — they panic on the first unexpected input and turn recoverable errors into crashes. Use `?` or explicit match.",
         "Never use `panic!`, `unreachable!`, `todo!`, or `unimplemented!` in production code paths. Reserve them for tests and `match` arms where the invariant has already been statically proven.",
@@ -96,5 +101,22 @@ pub static PROFILE: &LanguageProfile = &LanguageProfile {
         "Deterministic domain APIs: pass time / clock / RNG into domain functions explicitly rather than calling `Utc::now()`, `Instant::now()`, or `rand::thread_rng()` inside them.",
         "Prefer `LazyLock` (stable since 1.80) over `lazy_static!` for static initialisation.",
         "Doc comments (`///`) on public items must include `# Examples`, `# Errors`, and `# Panics` sections where the function can fail in any of those ways.",
+        // ── New 15 rules from nick-v2.md + rust-catchup-1.78-1.98.md ──
+        "Use DDD-lite hexagonal layout for multi-crate projects: standardise on `src/{domain,ports,application,adapters}` and keep workspace crate count intentionally low; cohesive crates beat fine-grained splits.",
+        "Each command/query handler defines a narrow port trait covering only the methods it uses (1–3 max). Compose via supertraits (`trait Foo: Read + Write {}`) when a handler genuinely needs multiple methods — never share a wide 'Repository' trait across handlers.",
+        "Keep security predicates (e.g. `can_user_see_x`) as pure domain functions with default-deny. The port interface lives in the handler; the security rule lives in `domain/`.",
+        "`AuthContext` is required on every stateful repository/store port method. Fail-secure default deny in domain code — never in adapter glue. Policy is enforced before data access, not after.",
+        "Idempotency keys are first-class newtypes (`IdempotencyKey(Uuid)`). Enforce `check → execute → persist result` in every command handler; never let the same key execute twice without dedup.",
+        "Transaction boundary: adapters expose `with_tx(|repo| async { ... })`. `&mut Tx` never leaks into application or domain code — keep transaction plumbing inside the adapter.",
+        "For object-safe async port traits (`Arc<dyn Trait>` ports used for DI), use `async-trait` (boxed `Pin<Box<dyn Future + Send>>`) instead of native `async fn` in traits. One heap allocation per call is acceptable for HTTP handlers / DB ops; reserve concrete `impl Trait` for hot paths.",
+        "Parse invalid CLI input at adapter boundaries: map clap parse errors to domain error types via `From`/`FromStr`; never let raw `String` from clap cross into domain code. Bin crates use `anyhow::Context` / `with_context` for user-facing messages.",
+        "Prefer `LazyCell` (stable since 1.80) over `LazyLock` in single-threaded contexts. `LazyLock` is for multi-threaded initialisation only — using it thread-locally is overkill and signals a confused ownership model.",
+        "Prefer `#[expect(lint)]` over `#[allow(lint)]` for temporary suppressions: the compiler warns when the suppression becomes unnecessary, so dead attributes don't accumulate. `#[allow]` is reserved for permanent, intentional deviations with a documented reason.",
+        "Web-facing projects default to OWASP Top 10 baseline: fail-secure deny, least-privilege CI/runtime identities, automated SAST (CodeQL) + dependency audit in CI, never use `pull_request_target` for untrusted PRs, never log secrets.",
+        "Rust 1.95+ syntax: prefer match arm `if let` guards for cleaner pattern control flow; use let chains (`if let X = opt && let Ok(y) = x.parse() && y > 0 { ... }`) on 2024 edition codebases.",
+        "Rust 1.87+: use `std::io::pipe()` for in-process piped IO in helper scripts and tests instead of spawning `sh -c`. Use `Vec::extract_if` instead of the nightly `drain_filter`.",
+        "Rust 1.97 soundness: the `pin!` macro deref coercion fix changes how `Pin<Box<T>>` coerces through projections — audit `Pin` usage in async code that previously relied on implicit deref through a pinned projection. Treat as a soundness fix.",
+        "Tight binary crates: add `#[deny(dead_code_pub_in_binary)]` at the bin crate root to catch unused `pub` items that the new warn-by-default lint would otherwise let through.",
+        "Cross-platform first: avoid Unix-only assumptions in tests/tools unless `#[cfg(unix)]`-guarded. Note Windows-specific fixes from 1.97 — `WSAESHUTDOWN` now maps to `BrokenPipe` (was `ConnectionReset`), and `Send`/`Sync` for `std::env::Vars` / `VarsOs` were adjusted.",
     ],
 };
