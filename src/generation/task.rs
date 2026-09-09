@@ -135,4 +135,66 @@ goal = "Set up the project."
         assert!(rendered.contains(".unwrap()"));
         assert!(rendered.contains(".is_multiple_of"));
     }
+
+    // ── T04: gate banner ─────────────────────────────────────────────
+
+    fn gated_plan() -> Plan {
+        let toml = r#"
+[project]
+name = "gate-test"
+path = "./gate-test"
+description = "gate banner test"
+language = "rust"
+
+[orchestrator]
+gates = ["auth"]
+
+[[phases]]
+name = "Phase 1"
+order = 1
+
+[[phases.tasks]]
+slug = "auth-handler"
+title = "Auth Handler"
+goal = "Implement auth."
+gate = "auth"
+
+[[phases.tasks]]
+slug = "fetch-events"
+title = "Fetch Events"
+goal = "Fetch events."
+"#;
+        Plan::from_toml(toml).unwrap()
+    }
+
+    #[test]
+    fn gated_task_renders_gate_banner_above_h1() {
+        let plan = gated_plan();
+        let resolved = plan.resolve_tasks().unwrap();
+        let gated = resolved.iter().find(|t| t.slug == "auth-handler").unwrap();
+        let rendered = render(&plan, gated).unwrap();
+        assert!(
+            rendered.contains("GATE"),
+            "gated task must render a GATE banner, got:\n{rendered}"
+        );
+        // Banner appears above the H1 title (the first '# T' line).
+        let banner_pos = rendered.find("GATE").unwrap();
+        let h1_pos = rendered.find("# T").unwrap();
+        assert!(
+            banner_pos < h1_pos,
+            "GATE banner must precede the H1 title, got banner@{banner_pos} h1@{h1_pos}"
+        );
+    }
+
+    #[test]
+    fn non_gated_task_omits_gate_banner() {
+        let plan = gated_plan();
+        let resolved = plan.resolve_tasks().unwrap();
+        let plain_task = resolved.iter().find(|t| t.slug == "fetch-events").unwrap();
+        let rendered = render(&plan, plain_task).unwrap();
+        assert!(
+            !rendered.contains("GATE"),
+            "non-gated task must NOT render a GATE banner, got:\n{rendered}"
+        );
+    }
 }

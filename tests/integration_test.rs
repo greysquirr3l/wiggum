@@ -789,3 +789,94 @@ evaluation_criteria = ["build clean"]
         "All tasks with criteria should yield max harness score"
     );
 }
+
+// ── T09: --thin flag ────────────────────────────────────────────────────────
+
+/// Load the thin-plan fixture, mutating its project.path to a temp dir so
+/// the test can write real artifacts without polluting the fixture file.
+fn load_thin_plan_into(project_path: &std::path::Path) -> Plan {
+    let fs = FsAdapter;
+    let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/thin-plan.toml");
+    let toml_content = fs
+        .read_plan(&fixture)
+        .expect("Failed to read thin-plan.toml");
+    let mut plan = Plan::from_toml(&toml_content).expect("Failed to parse thin-plan.toml");
+    plan.project.path = project_path.to_string_lossy().to_string();
+    plan
+}
+
+#[test]
+fn thin_mode_writes_universal_artifacts_only() {
+    let tmp = TempDir::new().expect("Failed to create temp dir");
+    let project_path = tmp.path().to_path_buf();
+    let plan = load_thin_plan_into(&project_path);
+
+    let artifacts = generation::generate_all(&plan).expect("Generation failed");
+    let fs = FsAdapter;
+    // --thin is modelled by passing TargetSet::none() to write_artifacts.
+    generation::write_artifacts(&fs, &project_path, &artifacts, &TargetSet::none())
+        .expect("Failed to write artifacts");
+
+    // Universal artifacts present.
+    assert!(
+        project_path.join("PROGRESS.md").exists(),
+        "PROGRESS.md missing"
+    );
+    assert!(
+        project_path.join("IMPLEMENTATION_PLAN.md").exists(),
+        "IMPLEMENTATION_PLAN.md missing"
+    );
+    assert!(project_path.join("BUDGET.md").exists(), "BUDGET.md missing");
+    assert!(project_path.join("AGENTS.md").exists(), "AGENTS.md missing");
+    assert!(
+        project_path.join("features.json").exists(),
+        "features.json missing"
+    );
+    assert!(
+        project_path.join("tasks").exists(),
+        "tasks/ directory missing"
+    );
+
+    // Per-tool artifacts absent.
+    assert!(
+        !project_path.join(".vscode").exists(),
+        ".vscode/ should NOT exist in thin mode"
+    );
+    assert!(
+        !project_path.join(".opencode").exists(),
+        ".opencode/ should NOT exist in thin mode"
+    );
+    assert!(
+        !project_path.join(".claude").exists(),
+        ".claude/ should NOT exist in thin mode"
+    );
+}
+
+#[test]
+fn thin_mode_target_set_none_equals_no_targets() {
+    // Sanity: TargetSet::none() is the canonical empty target set.
+    let t = TargetSet::none();
+    assert!(!t.vscode);
+    assert!(!t.opencode);
+    assert!(!t.claude);
+    assert!(!t.agent_rules);
+    assert!(t.is_empty(), "TargetSet::none() must be empty");
+}
+
+#[test]
+fn thin_flag_appears_in_cli_help() {
+    use assert_cmd::Command;
+    let help = Command::cargo_bin("wiggum")
+        .unwrap()
+        // suppress stderr noise from tracing init
+        .env("RUST_LOG", "error")
+        .arg("generate")
+        .arg("--help")
+        .output()
+        .expect("Failed to invoke wiggum generate --help");
+    let stdout = String::from_utf8_lossy(&help.stdout);
+    assert!(
+        stdout.contains("--thin"),
+        "--thin flag must appear in `wiggum generate --help` output, got:\n{stdout}"
+    );
+}
