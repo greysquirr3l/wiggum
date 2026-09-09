@@ -64,3 +64,4 @@ reference/*
 !reference/example-workspace/**
 
 ai_assisted_development-security.md
+.wiggum/

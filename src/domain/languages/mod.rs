@@ -191,6 +191,45 @@ mod tests {
         }
     }
 
+    /// T11 regression guard: each topic synced from
+    /// `~/Projects/nick-v2.md` and the Rust 1.78→1.98 catchup guide must
+    /// appear as a substring in at least one Rust strict rule. Adding a new
+    /// topic to nick-v2 should add a matching assertion here.
+    #[test]
+    fn rust_strict_rules_cover_nick_v2_topics() {
+        let rules = profile(Language::Rust).strict_rules;
+        let joined = rules.join("\n");
+
+        let topics = [
+            ("ddd-lite hexagonal layout", "DDD-lite hexagonal layout"),
+            ("narrow port trait", "narrow port trait"),
+            ("authcontext default deny", "default-deny"),
+            ("idempotency keys", "IdempotencyKey"),
+            ("with_tx boundary", "with_tx"),
+            ("object-safe async via async-trait", "async-trait"),
+            ("lazycell single-threaded", "LazyCell"),
+            ("expect over allow", "#[expect("),
+            ("web security defaults", "OWASP Top 10"),
+            ("match arm if-let guards", "match arm `if let`"),
+            ("let chains 2024 edition", "let chains"),
+            ("std::io::pipe", "std::io::pipe"),
+            ("pin deref coercion fix 1.97", "pin!` macro deref coercion"),
+            ("deny(dead_code_pub_in_binary)", "dead_code_pub_in_binary"),
+            ("cross-platform cfg(unix)", "#[cfg(unix)]"),
+        ];
+
+        let mut missing: Vec<&str> = Vec::new();
+        for (label, needle) in topics {
+            if !joined.contains(needle) {
+                missing.push(label);
+            }
+        }
+        assert!(
+            missing.is_empty(),
+            "Rust strict_rules is missing topics from nick-v2 / catchup guide: {missing:?}"
+        );
+    }
+
     #[test]
     fn all_profiles_have_non_empty_conventions() {
         for lang in Language::ALL {
