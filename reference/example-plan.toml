@@ -39,6 +39,20 @@ persona     = "You are a senior Rust engineer specialising in async HTTP service
 strategy    = "standard"   # standard | tdd | gsd | complete
 max_retries = 2             # retry a failed task up to N times before applying on_failure
 on_failure  = "pause"       # pause | skip | escalate — action when retries are exhausted
+# Mandatory maker-checker (T02). Auto-derives to true when this plan
+# resolves to >=4 tasks or any slug matches a security-sensitive keyword
+# (auth, payment, billing, crypto, credential, webhook, secret, key,
+# token, sign, signature, kdf, hash). Explicit override below turns
+# the policy on; set to `false` to opt out (wiggum generate prints a
+# warning at scaffold time).
+require_evaluator = true
+# Gates for human-in-the-loop approval (T03). When empty (the default)
+# wiggum auto-derives gate categories from task slug/title keywords.
+# Each task whose slug matches a gate keyword must declare
+# `gate = "<category>"` in its TaskDef, otherwise `wiggum validate`
+# errors with the missing-gate message. Set explicitly to override
+# auto-derive: `gates = ["auth", "payment"]`.
+gates = []
 # Optional model pinning. Wiggum can't enforce the model from a prompt file, but it
 # will render `model` as a recommendation header in orchestrator.prompt.md and inject
 # `subagent_model` as the `model:` argument on every `runSubagent` dispatch.
