@@ -120,7 +120,23 @@ fn main() {
             output,
             force,
             keep_tmp,
-        } => cmd_reverse(&url, hints.as_deref(), output, force, keep_tmp),
+            subdir,
+            github_api,
+            llm,
+            llm_model,
+            api_key,
+        } => cmd_reverse(
+            &url,
+            hints.as_deref(),
+            output,
+            force,
+            keep_tmp,
+            subdir,
+            github_api,
+            llm,
+            llm_model,
+            api_key,
+        ),
         Command::Clean {
             plan,
             output,
@@ -638,12 +654,18 @@ fn cmd_bootstrap(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 fn cmd_reverse(
     url: &str,
     hints: Option<&Path>,
     output: Option<PathBuf>,
     force: bool,
     keep_tmp: bool,
+    subdir: Option<String>,
+    github_api: bool,
+    llm: Option<String>,
+    llm_model: Option<String>,
+    api_key: Option<String>,
 ) -> wiggum::error::Result<()> {
     let opts = reverse::ReverseOptions {
         url: url.to_string(),
@@ -651,6 +673,11 @@ fn cmd_reverse(
         output: output.unwrap_or_else(|| PathBuf::from("plan.toml")),
         force,
         keep_tmp,
+        subdir,
+        github_api,
+        llm,
+        llm_model,
+        api_key,
     };
     reverse::run_reverse(&opts)?;
     Ok(())

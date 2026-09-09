@@ -13,8 +13,9 @@
 //! 4. Render a `Plan` via [`crate::adapters::bootstrap::build_plan_from_scan`]
 //!    with the merged scan, then write it to `--output`.
 
-mod fetch;
-mod hints;
+pub mod fetch;
+pub mod hints;
+pub mod llm;
 
 use std::path::{Path, PathBuf};
 
@@ -35,6 +36,19 @@ pub struct ReverseOptions {
     pub force: bool,
     /// Keep the cloned tempdir after generation (for debugging).
     pub keep_tmp: bool,
+    /// Scope the clone + scan to a specific subfolder of the repo. Overrides
+    /// any `/tree/<branch>/<path>` subfolder encoded in the URL.
+    pub subdir: Option<String>,
+    /// Prefer the GitHub REST API for fetching the repo. Falls back to
+    /// `git clone` on rate-limit / non-GitHub URL / missing token.
+    pub github_api: bool,
+    /// Use an LLM to decompose the repo into intelligent phases + tasks.
+    /// `Some(provider)` activates the LLM pass (provider = "anthropic" or "minimax").
+    pub llm: Option<String>,
+    /// Override the LLM model name (provider-specific).
+    pub llm_model: Option<String>,
+    /// Override the LLM API key (otherwise read from `<PROVIDER>_API_KEY`).
+    pub api_key: Option<String>,
 }
 
 /// Run `wiggum reverse` end-to-end.
@@ -45,7 +59,9 @@ pub struct ReverseOptions {
 /// - the URL cannot be cloned (network failure, auth failure, non-git URL),
 /// - the hints file cannot be parsed,
 /// - no language can be detected in the cloned repo,
-/// - the output file already exists and `--force` was not passed.
+/// - the output file already exists and `--force` was not passed,
+/// - the LLM pass is enabled but the API key is missing/invalid,
+/// - the LLM returns a malformed plan that we can't recover from.
 pub fn run_reverse(opts: &ReverseOptions) -> Result<PathBuf> {
     if opts.output.exists() && !opts.force {
         return Err(WiggumError::Validation(format!(
@@ -54,10 +70,24 @@ pub fn run_reverse(opts: &ReverseOptions) -> Result<PathBuf> {
         )));
     }
 
-    println!("🦝 wiggum reverse — cloning {}", opts.url);
-    let clone = fetch::clone_shallow(&opts.url)?;
+    println!("🦝 wiggum reverse — {}", opts.url);
 
-    let result = generate_plan(&clone.path, opts.hints.as_deref());
+    // Resolve subdir: explicit `--subdir` wins over URL-encoded.
+    let subdir = opts
+        .subdir
+        .clone()
+        .or_else(|| fetch::parse_github_subdir(&opts.url));
+
+    // Clone (always — the LLM pass benefits from having the actual files,
+    // not just metadata).
+    let clone = if let Some(sub) = subdir.as_deref() {
+        println!("  sparse-cloning subdir: {sub}");
+        fetch::clone_sparse_subdir(&opts.url, sub)?
+    } else {
+        fetch::clone_shallow(&opts.url)?
+    };
+
+    let result = generate_plan(&clone.path, opts.hints.as_deref(), opts);
 
     // Always clean up the tempdir unless the user explicitly asked to keep it.
     if opts.keep_tmp {
@@ -91,7 +121,11 @@ pub fn run_reverse(opts: &ReverseOptions) -> Result<PathBuf> {
 }
 
 /// Clone the repo, scan it, load hints, merge, and build a `Plan`.
-fn generate_plan(repo_path: &Path, hints_path: Option<&Path>) -> Result<(Plan, ScanResult)> {
+fn generate_plan(
+    repo_path: &Path,
+    hints_path: Option<&Path>,
+    opts: &ReverseOptions,
+) -> Result<(Plan, ScanResult)> {
     let mut scan = bootstrap::scan_project(repo_path)?;
 
     let loaded_hints = if let Some(path) = hints_path {
@@ -116,6 +150,41 @@ fn generate_plan(repo_path: &Path, hints_path: Option<&Path>) -> Result<(Plan, S
     // for project.path; the user will override it via their plan once generated.
     // But we want it to reflect the actual repo they're targeting, so overwrite:
     plan.project.path = "<repo>".to_string();
+
+    // Optional LLM pass — replaces the placeholder phases with intelligent ones.
+    if let Some(provider_str) = &opts.llm {
+        if let Some(provider) = llm::Provider::from_cli(provider_str) {
+            // We have to do async work in a sync function — use a tiny runtime.
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .map_err(|e| {
+                    WiggumError::Validation(format!("build tokio runtime for LLM call: {e}"))
+                })?;
+            let key = provider.resolve_api_key(opts.api_key.as_deref())?;
+            let client = llm::build_client(provider, key);
+            let model = opts
+                .llm_model
+                .clone()
+                .unwrap_or_else(|| provider.default_model().to_string());
+            println!("  🧠 LLM phase decomposition via {provider} ({model})…");
+            let resp = rt.block_on(llm::decompose_into_plan(
+                client,
+                repo_path,
+                &scan,
+                loaded_hints.as_ref(),
+                &mut plan,
+            ))?;
+            println!(
+                "     ↳ {} input + {} output tokens",
+                resp.input_tokens, resp.output_tokens
+            );
+        } else {
+            return Err(WiggumError::Validation(format!(
+                "unknown --llm provider '{provider_str}' (expected anthropic or minimax)"
+            )));
+        }
+    }
 
     Ok((plan, scan))
 }

@@ -9,6 +9,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 ### Added
 
 - **`wiggum reverse <url> --hints <file>`** — clone a remote git repo to a tempdir, scan it with the same heuristics as `wiggum bootstrap`, then merge user hints into a generated `plan.toml`. Hints can be TOML (structured: `[project]`, `[orchestrator]`, `[[phase]]`) or Markdown (freeform `## Rules` bullets become orchestrator rules). Inspired by [filiksyos/gitreverse](https://github.com/filiksyos/gitreverse) but emits a structured Wiggum `plan.toml` instead of a single vibe-coding prompt. Reference examples in `reference/example-hints.toml` and `reference/example-hints.md`.
+- **`wiggum reverse --subdir <path>`** — scope the clone to a single subfolder of the repo (e.g. a monorepo subpackage). Uses `git clone --filter=blob:none --sparse` + `git sparse-checkout set <subdir>` for speed. GitHub URLs with `/tree/<branch>/<path>` also work without the explicit flag.
+- **`wiggum reverse --llm <provider>`** — replace the deterministic skeleton with an LLM-driven phase decomposition. Providers: `anthropic` (api.anthropic.com) and `minimax` (api.minimax.io/anthropic — Anthropic-shaped). Reads `<PROVIDER>_API_KEY` from the env by default; override with `--api-key` or `--llm-model`. Default models: `claude-sonnet-4-5` for Anthropic, `MiniMax-M3` for MiniMax. The LLM pass honours any phases you declared in your hints TOML — your structure wins over the model's.
+- **`wiggum reverse --github-api`** — prefer the GitHub REST API for fetching repo metadata/tree/files (falls back to `git clone` on rate limit / non-GitHub URL / missing token).
+
+### Dependencies
+
+- `reqwest = "0.12"` (rustls-tls) and `async-trait = "0.1"` added for the LLM HTTP client.
 
 ## [0.18.1] - 2026-09-08
 

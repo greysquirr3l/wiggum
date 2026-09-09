@@ -60,6 +60,13 @@ tera = "1"
 # DAG validation
 petgraph = "0.8"
 
+# HTTP client (used by `wiggum reverse` for the optional GitHub REST fetch and
+# the LLM phase-decomposition pass — Anthropic + MiniMax are both Anthropic-shaped)
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+
+# Async-trait shim so the dyn-compatible `LlmClient` trait can carry an `async fn`
+async-trait = "0.1"
+
 # Async runtime (MCP server)
 tokio = { version = "1.52.3", features = ["full"] }
 
