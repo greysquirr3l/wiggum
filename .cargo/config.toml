@@ -1,6 +1,9 @@
 [build]
 # Use all available cores
 jobs = -1
+# Cargo 1.97+ — equivalent to `-D warnings` in CI. Catches new dead-code,
+# unused-imports, etc. at build time without needing clippy.
+warnings = "deny"
 
 [target.'cfg(all())']
 rustflags = [
