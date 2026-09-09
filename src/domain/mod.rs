@@ -1,5 +1,6 @@
 pub mod check;
 pub mod dag;
+pub mod hints;
 pub mod languages;
 pub mod lint;
 pub mod plan;

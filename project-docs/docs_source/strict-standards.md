@@ -27,23 +27,112 @@ strict = false
 
 Each language profile defines a `strict_rules` array that is injected as a new section in the generated prompts only when `strict = true`. The rules are language-specific but share a common theme: they encode the modern, security-centric baseline that the language's toolchain makes possible when fully engaged.
 
-For Rust, strict mode mirrors the rules in your project's `nick.md` (the personal standards file). For every other language, the ruleset is documented in the companion file `docs/strict-lints.md` at the root of the wiggum repo.
+For Rust, strict mode mirrors the rules in your project's `nick-v2.md` (the personal standards file; supersedes the original `nick.md`). New rules are sourced from the Rust 1.78→1.98 catchup guide at `~/Projects/rust/rust-docs/rust-catchup-1.78-1.98.md`. For every other language, the ruleset is documented in the companion file `docs/strict-lints.md` at the root of the wiggum repo.
+
+## What strict mode adds for Rust (1.95+)
+
+The Rust strict_rules array is sourced from two documents:
+
+- **`~/Projects/nick-v2.md`** — DDD-lite hexagonal layout, narrow port traits, `AuthContext` + idempotency keys, `with_tx` transaction boundaries, object-safe async port traits, CLI input parsing at adapter boundaries, the strengthened `#[expect]` rule, OWASP web security defaults.
+- **`rust-catchup-1.78-1.98.md`** — Rust 1.95+ syntax (`if let` arm guards, let chains on 2024 edition), `std::io::pipe()` + `Vec::extract_if` (1.87+), the 1.97 `pin!` deref coercion soundness fix, `deny(dead_code_pub_in_binary)` for tight binaries, cross-platform `#[cfg(unix)]` hygiene.
+
+### Code snippets for surprising new rules
+
+#### Object-safe async port trait (boxed future)
+
+In a hexagonal codebase where port traits are used as `Arc<dyn Trait>` for dependency injection, native `async fn` in traits isn't object-safe. Use the `async-trait` crate or write an explicit boxed future:
+
+```rust
+// Native async — NOT object-safe
+trait MyPort {
+    async fn process(&self) -> Result<()>;
+}
+
+// Object-safe — explicit boxed future
+trait MyPort: Send + Sync {
+    fn process(&self) -> std::pin::Pin<Box<dyn Future<Output = Result<()>> + Send + '_>>;
+}
+
+impl MyPort for ConcreteAdapter {
+    fn process(&self) -> std::pin::Pin<Box<dyn Future<Output = Result<()>> + Send + '_>> {
+        Box::pin(async move {
+            // implementation
+            Ok(())
+        })
+    }
+}
+```
+
+One heap allocation per call is acceptable for HTTP handlers and DB operations; reserve concrete `impl Trait` for hot paths.
+
+#### `LazyCell` vs `LazyLock` choice (Rust 1.80+)
+
+```rust
+// Single-threaded context — use LazyCell
+use std::cell::LazyCell;
+static CONFIG: LazyCell<Config> = LazyCell::new(|| load_config());
+
+// Multi-threaded initialisation — use LazyLock
+use std::sync::LazyLock;
+static CONFIG: LazyLock<Config> = LazyLock::new(|| load_config());
+```
+
+Reaching for `LazyLock` thread-locally signals a confused ownership model — single-threaded code should use `LazyCell` (no atomic reference count, no thread safety overhead).
+
+#### `#[expect(dead_code)]` over `#[allow(dead_code)]` (Rust 1.81+)
+
+```rust
+// Old way — silently becomes dead code when the lint no longer fires
+#[allow(dead_code)]
+fn temporary_scaffolding() { }
+
+// New way — compiler warns when the suppression becomes unnecessary
+#[expect(dead_code)]
+fn temporary_scaffolding() { }
+```
+
+Use `#[expect(lint, reason = "...")]` for temporary suppressions; reserve `#[allow]` for permanent, intentional deviations with a documented reason.
+
+#### Let chains (2024 edition)
+
+```rust
+if let Some(x) = opt
+    && let Ok(y) = x.parse::<i32>()
+    && y > 0
+{
+    println!("{y}");
+}
+```
+
+Replaces nested `if let Some(...) { if let Ok(...) { if ... {} } }` chains. Available on the 2024 edition only — port your crate to 2024 before adopting this pattern.
+
+#### Match arm `if let` guards (Rust 1.95+)
+
+```rust
+match event {
+    Event::Login { user_id } if user_id.is_admin() => handle_admin(),
+    Event::Login { user_id } => handle_user(user_id),
+    _ => {}
+}
+```
+
+Cleaner pattern-matching control flow than nesting a `match` inside an `if let`.
 
 Example strict-mode rule excerpts by language:
 
-| Language | Sample strict rules (see `docs/strict-lints.md` for the full set) |
-|----------|---------------------------------------------------------------------|
-| Rust | No `.unwrap()` / `.expect()` / `panic!` in production code; no index slicing that can panic; no `#[allow(clippy::...)]` suppressions; full pedantic + nursery + perf clippy profile with hard denials |
-| Go | `golangci-lint v2` + `gofumpt` + `govulncheck`; never discard errors; `context.Context` everywhere; `depguard` bans on `crypto/md5`, `crypto/sha1`, `math/rand` |
-| TypeScript | `typescript-eslint v8` strictTypeChecked; `noUncheckedIndexedAccess`; Zod at every input boundary; no `any` / `!`; `node:crypto` for randomness |
-| Python | Ruff with the `S` (bandit) group on; `mypy --strict`; `pip-audit`; no `pickle.loads` / `yaml.load`; `secrets` for tokens |
-| Java | `Error Prone` + `NullAway` + `SpotBugs` findsecbugs; `PreparedStatement` only; no `ObjectInputStream` on untrusted data |
-| C# / .NET | Roslyn `AnalysisMode=All` + `Nullable=enable` + Security Code Scan; no `!` null-forgiving; no `BinaryFormatter` |
-| Kotlin | detekt `allRules` + `explicitApi()`; no `!!`; no `GlobalScope`; structured concurrency only |
-| Swift | Swift 6 language mode + complete strict concurrency; no `@unchecked Sendable`; no force-unwrap/try/cast outside tests |
-| Ruby | RuboCop `Security/*` + `Lint/*` as errors; Brakeman with `-z`; Sorbet `# typed: strict` |
-| Elixir | `--warnings-as-errors` + `mix credo --strict` + Dialyzer + Sobelow `--exit`; never `String.to_atom/1` on user input |
-| PHP | PHPStan `level max` + `phpstan-strict-rules` + Psalm `--taint-analysis`; `declare(strict_types=1)`; `password_hash` (Argon2id); `random_bytes` / `random_int` |
+| Language   | Sample strict rules (see `docs/strict-lints.md` for the full set)                                                                                                                                     |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Rust       | No `.unwrap()` / `.expect()` / `panic!` in production code; no index slicing that can panic; no `#[allow(clippy::...)]` suppressions; full pedantic + nursery + perf clippy profile with hard denials |
+| Go         | `golangci-lint v2` + `gofumpt` + `govulncheck`; never discard errors; `context.Context` everywhere; `depguard` bans on `crypto/md5`, `crypto/sha1`, `math/rand`                                       |
+| TypeScript | `typescript-eslint v8` strictTypeChecked; `noUncheckedIndexedAccess`; Zod at every input boundary; no `any` / `!`; `node:crypto` for randomness                                                       |
+| Python     | Ruff with the `S` (bandit) group on; `mypy --strict`; `pip-audit`; no `pickle.loads` / `yaml.load`; `secrets` for tokens                                                                              |
+| Java       | `Error Prone` + `NullAway` + `SpotBugs` findsecbugs; `PreparedStatement` only; no `ObjectInputStream` on untrusted data                                                                               |
+| C# / .NET  | Roslyn `AnalysisMode=All` + `Nullable=enable` + Security Code Scan; no `!` null-forgiving; no `BinaryFormatter`                                                                                       |
+| Kotlin     | detekt `allRules` + `explicitApi()`; no `!!`; no `GlobalScope`; structured concurrency only                                                                                                           |
+| Swift      | Swift 6 language mode + complete strict concurrency; no `@unchecked Sendable`; no force-unwrap/try/cast outside tests                                                                                 |
+| Ruby       | RuboCop `Security/*` + `Lint/*` as errors; Brakeman with `-z`; Sorbet `# typed: strict`                                                                                                               |
+| Elixir     | `--warnings-as-errors` + `mix credo --strict` + Dialyzer + Sobelow `--exit`; never `String.to_atom/1` on user input                                                                                   |
+| PHP        | PHPStan `level max` + `phpstan-strict-rules` + Psalm `--taint-analysis`; `declare(strict_types=1)`; `password_hash` (Argon2id); `random_bytes` / `random_int`                                         |
 
 ## Cross-language baseline
 
@@ -69,6 +158,7 @@ The strict profiles track specific toolchain versions because the rules are writ
 
 Current pins (see `docs/strict-lints.md` for the canonical list):
 
+- **Rust — 1.95+ minimum** (match arm `if let` guards, `deny(dead_code_pub_in_binary)`, `LazyCell`/`LazyLock`); 1.97+ recommended for the `pin!` deref coercion soundness fix and `[build] warnings = "deny"`; 2024 edition required for let chains.
 - Go — `golangci-lint v2` + Go 1.24+ + `gofumpt`
 - TypeScript — `typescript-eslint v8` flat config + `projectService: true`
 - Python — Ruff (linter + formatter) + `mypy --strict` + Python 3.12+
