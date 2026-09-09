@@ -31,22 +31,23 @@ wiggum generate plan.toml
 
 ## Commands
 
-| Command | Description |
-|---------|-------------|
-| `init` | Interactively create a new plan |
-| `generate` | Generate task files, progress tracker, and orchestrator prompt |
-| `validate` | Validate plan structure and dependency graph |
-| `add-task` | Add a task to an existing plan |
-| `bootstrap` | Generate a plan from an existing project |
-| `diff` | Compare two plan files |
-| `resume` | Recover an interrupted orchestrator loop |
-| `retro` | Generate improvement suggestions from PROGRESS.md |
-| `split` | Split an oversized task into smaller units |
-| `templates` | Manage reusable task templates |
-| `version` | Show CLI version with embedded git SHA (`wiggum <version> (<sha\|unknown>)`) |
-| `serve --mcp` | Start the MCP server |
-| `report` | Generate a post-execution report |
-| `watch` | Live progress monitoring |
+| Command           | Description                                                                                               |
+| ----------------- | --------------------------------------------------------------------------------------------------------- |
+| `init`            | Interactively create a new plan                                                                           |
+| `generate`        | Generate task files, progress tracker, and orchestrator prompt                                            |
+| `generate --thin` | Universal artifacts only — skip per-tool prompt files (`.vscode/`, `.opencode/`, `.claude/`, agent_rules) |
+| `validate`        | Validate plan structure and dependency graph                                                              |
+| `add-task`        | Add a task to an existing plan                                                                            |
+| `bootstrap`       | Generate a plan from an existing project                                                                  |
+| `diff`            | Compare two plan files                                                                                    |
+| `resume`          | Recover an interrupted orchestrator loop                                                                  |
+| `retro`           | Generate improvement suggestions from PROGRESS.md                                                         |
+| `split`           | Split an oversized task into smaller units                                                                |
+| `templates`       | Manage reusable task templates                                                                            |
+| `version`         | Show CLI version with embedded git SHA (`wiggum <version> (<sha\|unknown>)`)                              |
+| `serve --mcp`     | Start the MCP server                                                                                      |
+| `report`          | Generate a post-execution report                                                                          |
+| `watch`           | Live progress monitoring                                                                                  |
 
 ## Generated artifacts
 
@@ -56,6 +57,8 @@ project/
 ├── PROGRESS.md
 ├── AGENTS.md
 ├── features.json
+├── BUDGET.md                       # per-task token estimates + thresholds
+├── RUN_LOG.md                      # empty iteration log scaffold
 └── tasks/
     ├── T01-{slug}.md
     ├── T02-{slug}.md
@@ -141,11 +144,11 @@ See [`reference/example-plan.toml`](reference/example-plan.toml) for a fully ann
 
 Execution strategies supported in `[orchestrator].strategy`:
 
-| Strategy | Workflow |
-|----------|----------|
-| `standard` | goal → implement → test → preflight |
-| `tdd` | red → green → refactor → preflight |
-| `gsd` | must-haves checklist → implement → verify |
+| Strategy   | Workflow                                                                        |
+| ---------- | ------------------------------------------------------------------------------- |
+| `standard` | goal → implement → test → preflight                                             |
+| `tdd`      | red → green → refactor → preflight                                              |
+| `gsd`      | must-haves checklist → implement → verify                                       |
 | `complete` | root-fix end-to-end → tests (including failure paths) → docs update → preflight |
 
 The `complete` strategy is inspired by Gary Tam's (Y Combinator) execution standard: every task must be a finished deliverable, not a partial checkpoint. Root causes are fixed, not worked around. Tests cover edge and failure cases. Documentation lands in the same task.
@@ -249,6 +252,19 @@ avoid_god_files = true
 # avoid_ai_patterns = false
 # avoid_god_files = false
 ```
+
+## Discipline features
+
+Wiggum turns a plan into an engineering loop rather than a one-shot prompt. These features wire the discipline in:
+
+- **Plan quality scorecard at scaffold time** — `wiggum generate` prints a 5-dimension scorecard (Granularity, Dependency health, Coverage, Richness, Token budget, Harness complexity) with the overall score and top suggestions before it writes any files. Suppress with `--no-summary`.
+- **Mandatory evaluator for non-trivial plans** — `[orchestrator] require_evaluator` (T02) auto-derives to `true` when the plan resolves to ≥4 tasks or any slug matches a security-sensitive keyword (`auth`, `payment`, `billing`, `crypto`, `credential`, `webhook`, `secret`, `key`, `token`, `sign`, `signature`, `kdf`, `hash`). Without an `[evaluator]` block the plan fails validation with a fix-pointing error. Opt out with `require_evaluator = false` and `wiggum generate` prints a visible warning at scaffold time.
+- **Gates for security-sensitive tasks** — `[orchestrator] gates: Vec<String>` (T03) is auto-derived from task slug/title keywords when omitted. Any task whose slug matches a gate category must declare `gate = "<category>"` in its `TaskDef`; otherwise `wiggum validate` errors with the missing-gate message.
+- **Gate banner at the top of gated task files** — gated task files emit a `GATE — Human confirmation required before starting this task.` blockquote _above_ the H1, so the orchestrator (or a human reader) stops before scanning into the task body. PROGRESS.md rows for gated tasks are prefixed with `[GATE]`.
+- **`Next: …` hint after the scorecard** — `wiggum generate` ends with a single ≤80-char hint line telling the user what to do next (review gates / add `[evaluator]` / open `ORCHESTRATOR.md`). Decision tree adapts to plan state.
+- **`BUDGET.md`** — universal scaffold artifact with per-task token estimates, `WARN` (80k) / `CRITICAL` (150k) markers, recommended daily cap, and a `Cost tiers` section (noop / report / action). The same numbers feed `wiggum check`'s `Token budget` dimension.
+- **`RUN_LOG.md`** — universal scaffold artifact with an empty markdown table pre-populated for per-iteration audit logging (timestamp, task_id, attempt, preflight_result, commit_sha, duration_seconds, notes). The orchestrator (or a human) appends rows.
+- **`--thin` scaffold mode** — `wiggum generate --thin` emits only the universal artifacts and skips every per-tool prompt directory (`.vscode/`, `.opencode/`, `.claude/`, agent_rules). Useful when you want the loop scaffolding without committing per-tool prompt files.
 
 ## Development
 
