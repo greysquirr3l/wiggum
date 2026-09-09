@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- **`wiggum reverse <url> --hints <file>`** — clone a remote git repo to a tempdir, scan it with the same heuristics as `wiggum bootstrap`, then merge user hints into a generated `plan.toml`. Hints can be TOML (structured: `[project]`, `[orchestrator]`, `[[phase]]`) or Markdown (freeform `## Rules` bullets become orchestrator rules). Inspired by [filiksyos/gitreverse](https://github.com/filiksyos/gitreverse) but emits a structured Wiggum `plan.toml` instead of a single vibe-coding prompt. Reference examples in `reference/example-hints.toml` and `reference/example-hints.md`.
+
 ## [0.18.1] - 2026-09-08
 
 ### Fixed

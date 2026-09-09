@@ -1,0 +1,82 @@
+# example-hints.toml — hints file for `wiggum reverse`
+#
+# Pass this file with `wiggum reverse <url> --hints example-hints.toml` to
+# override what the bootstrap scan detected and seed the plan with your own
+# phases + tasks.
+#
+# Field names use kebab-case (TOML convention). Everything in this file is
+# optional — supply only what you want to override. Missing fields fall back
+# to whatever `wiggum reverse` detected from the source repo.
+
+# ─── Project overrides ────────────────────────────────────────────────────────
+# Override detected language / architecture / name / description.
+# Freeform `extra-rules` are appended to the orchestrator's rule list and
+# deduplicated against rules already inferred from the source repo.
+
+[project]
+name        = "my-service"          # overrides detected name
+description = "Domain-driven microservice for X"   # overrides detected description
+language    = "go"                  # overrides detected language (rust|go|typescript|python|java|csharp|kotlin|swift|ruby|elixir|php)
+architecture = "ddd"                # overrides detected architecture (hexagonal|layered|modular|flat|ddd|...)
+extra-rules = [
+  "Use the latest stable Go (1.23+)",
+  "No globals — wire dependencies through constructors",
+  "Run `go vet ./...` before every commit",
+]
+
+# ─── Orchestrator overrides ──────────────────────────────────────────────────
+# Override persona, strategy, retry policy, and append freeform rules.
+
+[orchestrator]
+persona     = "You are a senior Go engineer specialising in DDD and hexagonal architecture."
+strategy    = "complete"   # standard | tdd | gsd | complete
+max-retries = 3
+on-failure  = "pause"      # pause | skip | escalate
+extra-rules = [
+  "Use `slog` for structured logging",
+  "Never log secrets or PII at any level",
+  "Use `testify` for table-driven tests",
+]
+
+# ─── Pre-declared phases + tasks ──────────────────────────────────────────────
+# [[phase]] blocks seed the plan with your chosen structure. When present,
+# the placeholder "TODO — rename this phase" that `bootstrap` injects is
+# dropped — your structure wins.
+
+[[phase]]
+name = "Domain Core"
+
+  [[phase.tasks]]
+  slug       = "aggregate-roots"
+  title      = "Define aggregate roots"
+  goal       = "Identify and implement the core aggregates (Account, Ledger, Statement)"
+  hints      = [
+    "Start with Account — it has the richest invariants",
+    "Use value objects for Money, Currency, Iban",
+    "Avoid anemic domain models — push behaviour into aggregates",
+  ]
+  gate       = "approve-domain-model"   # human-in-the-loop pause message
+
+  [[phase.tasks]]
+  slug       = "domain-services"
+  title      = "Implement domain services"
+  goal       = "Wire aggregates through domain services for cross-aggregate workflows"
+  depends-on = ["aggregate-roots"]
+  hints      = ["Prefer aggregates calling each other over services when possible"]
+
+[[phase]]
+name = "Adapters"
+
+  [[phase.tasks]]
+  slug       = "http-adapter"
+  title      = "HTTP adapter (Axum)"
+  goal       = "Inbound HTTP layer using Axum, wired to application services"
+  depends-on = ["domain-services"]
+  hints      = ["Use `axum` 0.7+", "Validate at the edge, trust at the core"]
+
+  [[phase.tasks]]
+  slug       = "postgres-adapter"
+  title      = "Postgres adapter"
+  goal       = "Outbound persistence via `pgx` with migrations in `migrations/`"
+  depends-on = ["domain-services"]
+  gate       = "approve-schema"

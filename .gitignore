@@ -58,6 +58,8 @@ reference/*
 !reference/example-progress.md
 !reference/example-refactor-plan.toml
 !reference/orchestrator.prompt.md.example
+!reference/example-hints.toml
+!reference/example-hints.md
 !reference/example-tasks/
 !reference/example-tasks/**
 !reference/example-workspace/

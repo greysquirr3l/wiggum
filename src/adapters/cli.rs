@@ -127,6 +127,28 @@ pub enum Command {
         force: bool,
     },
 
+    /// Reverse a remote Git repo into a plan skeleton + apply user hints
+    Reverse {
+        /// Remote git URL (any URL `git clone` accepts)
+        url: String,
+
+        /// Optional hints file (`.toml` for structured, `.md` for freeform)
+        #[arg(long)]
+        hints: Option<PathBuf>,
+
+        /// Path to write the generated plan TOML (defaults to `./plan.toml`)
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+
+        /// Overwrite existing plan file without prompting
+        #[arg(long)]
+        force: bool,
+
+        /// Keep the cloned tempdir after generation (for debugging)
+        #[arg(long)]
+        keep_tmp: bool,
+    },
+
     /// Remove all wiggum-generated artifacts from a project
     Clean {
         /// Path to the plan TOML file

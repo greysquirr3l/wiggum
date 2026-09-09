@@ -20,7 +20,9 @@ use wiggum::adapters::cli::{Cli, Command, PatternsAction, TemplatesCmd};
 use wiggum::adapters::fs::FsAdapter;
 use wiggum::adapters::mcp;
 use wiggum::adapters::vcs;
-use wiggum::adapters::{bootstrap, diff, init, patterns, replan, resume, retro, split, templates};
+use wiggum::adapters::{
+    bootstrap, diff, init, patterns, replan, resume, retro, reverse, split, templates,
+};
 use wiggum::domain::check;
 use wiggum::domain::dag::{parallel_groups, validate_dag};
 use wiggum::domain::lint;
@@ -48,6 +50,7 @@ struct GenerateOptions {
     thin: bool,
 }
 
+#[allow(clippy::too_many_lines)]
 fn main() {
     tracing_subscriber::fmt()
         .with_env_filter(
@@ -111,6 +114,13 @@ fn main() {
             output,
             force,
         } => cmd_bootstrap(&path, output.as_deref(), force),
+        Command::Reverse {
+            url,
+            hints,
+            output,
+            force,
+            keep_tmp,
+        } => cmd_reverse(&url, hints.as_deref(), output, force, keep_tmp),
         Command::Clean {
             plan,
             output,
@@ -625,6 +635,24 @@ fn cmd_bootstrap(
     force: bool,
 ) -> wiggum::error::Result<()> {
     bootstrap::run_bootstrap(project_path, output, force)?;
+    Ok(())
+}
+
+fn cmd_reverse(
+    url: &str,
+    hints: Option<&Path>,
+    output: Option<PathBuf>,
+    force: bool,
+    keep_tmp: bool,
+) -> wiggum::error::Result<()> {
+    let opts = reverse::ReverseOptions {
+        url: url.to_string(),
+        hints: hints.map(Path::to_path_buf),
+        output: output.unwrap_or_else(|| PathBuf::from("plan.toml")),
+        force,
+        keep_tmp,
+    };
+    reverse::run_reverse(&opts)?;
     Ok(())
 }
 

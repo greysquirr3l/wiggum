@@ -19,6 +19,9 @@ wiggum init
 # Or bootstrap from an existing project
 wiggum bootstrap /path/to/project
 
+# Or reverse-engineer a remote repo + apply hints
+wiggum reverse https://github.com/owner/repo --hints hints.toml
+
 # Validate the plan
 wiggum validate plan.toml --lint
 
@@ -39,6 +42,7 @@ wiggum generate plan.toml
 | `validate`        | Validate plan structure and dependency graph                                                              |
 | `add-task`        | Add a task to an existing plan                                                                            |
 | `bootstrap`       | Generate a plan from an existing project                                                                  |
+| `reverse`         | Generate a plan from a remote git URL + apply user hints                                                  |
 | `diff`            | Compare two plan files                                                                                    |
 | `resume`          | Recover an interrupted orchestrator loop                                                                  |
 | `retro`           | Generate improvement suggestions from PROGRESS.md                                                         |

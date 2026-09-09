@@ -391,7 +391,7 @@ fn extract_agents_md_rules(content: &str, rules: &mut Vec<String>) {
     }
 }
 
-fn print_scan_summary(scan: &ScanResult, project_path: &Path) {
+pub fn print_scan_summary(scan: &ScanResult, project_path: &Path) {
     println!(
         "🦝 wiggum bootstrap — scanning {}\n",
         project_path.display()
