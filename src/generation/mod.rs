@@ -1,6 +1,7 @@
 pub mod agent_rules;
 pub mod agents_md;
 pub mod background_auditor;
+pub mod budget;
 pub mod claude;
 pub mod clean;
 pub mod evaluator;
@@ -10,6 +11,7 @@ pub mod orchestrator;
 pub mod plan_doc;
 pub mod planner;
 pub mod progress;
+pub mod run_log;
 pub mod task;
 pub(crate) mod templates;
 pub mod tokens;
@@ -80,6 +82,13 @@ pub struct GeneratedArtifacts {
     /// `.github/copilot-instructions.md` — GitHub Copilot repo-level
     /// instructions (also picked up by some `VSCode` forks).
     pub agent_rules_copilot_instructions: String,
+
+    // ── Universal scaffold (not gated by target) ────────────────────
+    /// `BUDGET.md` — per-task token estimates, warn/critical thresholds,
+    /// recommended daily cap. T06.
+    pub budget: String,
+    /// `RUN_LOG.md` — empty per-iteration audit log scaffold. T07.
+    pub run_log: String,
 }
 
 impl GeneratedArtifacts {
@@ -124,6 +133,8 @@ pub fn generate_all(plan: &Plan) -> Result<GeneratedArtifacts> {
     let hooks_json = hooks::render().to_string();
     let claude_md = claude::render(plan)?;
     let agent_rules_content = agent_rules::render(plan)?;
+    let budget = budget::render(plan, &resolved)?;
+    let run_log = run_log::render()?;
 
     Ok(GeneratedArtifacts {
         progress,
@@ -145,6 +156,8 @@ pub fn generate_all(plan: &Plan) -> Result<GeneratedArtifacts> {
         agent_rules_cursorrules: agent_rules_content.clone(),
         agent_rules_windsurfrules: agent_rules_content.clone(),
         agent_rules_copilot_instructions: agent_rules_content,
+        budget,
+        run_log,
     })
 }
 
@@ -184,6 +197,8 @@ pub fn generate_all_with_overrides(plan: &Plan, project_path: &Path) -> Result<G
     let hooks_json = hooks::render().to_string();
     let claude_md = claude::render_with(&tera, plan)?;
     let agent_rules_content = agent_rules::render_with(&tera, plan)?;
+    let budget = budget::render(plan, &resolved)?;
+    let run_log = run_log::render()?;
 
     Ok(GeneratedArtifacts {
         progress,
@@ -205,6 +220,8 @@ pub fn generate_all_with_overrides(plan: &Plan, project_path: &Path) -> Result<G
         agent_rules_cursorrules: agent_rules_content.clone(),
         agent_rules_windsurfrules: agent_rules_content.clone(),
         agent_rules_copilot_instructions: agent_rules_content,
+        budget,
+        run_log,
     })
 }
 
@@ -243,6 +260,12 @@ pub fn write_artifacts(
         &project_path.join("features.json"),
         &artifacts.features_json,
     )?;
+
+    // RUN_LOG.md — universal scaffold artifact (T07).
+    writer.write_file(&project_path.join("RUN_LOG.md"), &artifacts.run_log)?;
+
+    // BUDGET.md — universal scaffold artifact (T06).
+    writer.write_file(&project_path.join("BUDGET.md"), &artifacts.budget)?;
 
     // VSCode target.
     if targets.contains(Target::Vscode) {
