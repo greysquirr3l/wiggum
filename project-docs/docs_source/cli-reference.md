@@ -100,6 +100,36 @@ wiggum bootstrap [path] [OPTIONS]
 | `--output`, `-o` | Path to write the generated plan TOML (default: `<path>/plan.toml`) |
 | `--force`        | Overwrite existing plan file without prompting                      |
 
+## `wiggum reverse`
+
+Clone a remote git repo into a tempdir and generate a `plan.toml` skeleton from its contents. Optionally merge a hints file (TOML for structured overrides, Markdown for freeform rules).
+
+```bash
+wiggum reverse <url> [OPTIONS]
+```
+
+| Option           | Description                                                                       |
+| ---------------- | --------------------------------------------------------------------------------- |
+| `<url>`          | Any URL `git clone` accepts (GitHub, GitLab, self-hosted, SSH, `file://`)         |
+| `--hints`        | Optional hints file — `.toml` for structured, `.md` for freeform rules            |
+| `--output`, `-o` | Path to write the generated plan TOML (default: `./plan.toml`)                    |
+| `--force`        | Overwrite existing plan file without prompting                                    |
+| `--keep-tmp`     | Keep the cloned tempdir after generation (for debugging)                          |
+
+Example with structured hints:
+
+```bash
+wiggum reverse https://github.com/foo/bar --hints hints.toml
+```
+
+Example with freeform Markdown hints:
+
+```bash
+wiggum reverse git@github.com:foo/bar.git --hints hints.md
+```
+
+The hints TOML supports `[project]`, `[orchestrator]`, and `[[phase]]` blocks. See [reference/example-hints.toml](https://github.com/greysquirr3l/wiggum/blob/main/reference/example-hints.toml) for the full schema, and [reference/example-hints.md](https://github.com/greysquirr3l/wiggum/blob/main/reference/example-hints.md) for the Markdown variant.
+
 ## `wiggum serve`
 
 Start the MCP server for agent integration.

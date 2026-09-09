@@ -71,7 +71,9 @@ anyhow = "1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 
-[dev-dependencies]
+# Tempdirs (used by `wiggum reverse` to hold the cloned repo)
 tempfile = "3"
+
+[dev-dependencies]
 assert_cmd = "2.2.2"
 predicates = "3"
