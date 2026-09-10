@@ -22,6 +22,12 @@ wiggum bootstrap /path/to/project
 # Or reverse-engineer a remote repo + apply hints
 wiggum reverse https://github.com/owner/repo --hints hints.toml
 
+# …or with LLM-driven phase decomposition (Anthropic Claude)
+ANTHROPIC_API_KEY=sk-... wiggum reverse https://github.com/owner/repo --llm anthropic
+
+# …or with MiniMax (Anthropic-shaped API)
+MINIMAX_API_KEY=... wiggum reverse https://github.com/owner/repo --llm minimax
+
 # Validate the plan
 wiggum validate plan.toml --lint
 
@@ -102,6 +108,70 @@ wiggum generate plan.toml --target all        # all three
 ```
 
 See [`docs/targets.md`](https://greysquirr3l.github.io/wiggum/targets.html) for the full reference.
+
+## Reverse-engineering a repo
+
+`wiggum reverse` turns any git URL into a `plan.toml` skeleton — useful when you're picking up an unfamiliar codebase and want the orchestrator to drive an investigation/implementation pass.
+
+```bash
+wiggum reverse <url> [OPTIONS]
+```
+
+| Option           | Description                                                                                                                |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `<url>`          | Any URL `git clone` accepts (GitHub, GitLab, self-hosted, SSH, `file://`)                                                  |
+| `--hints`        | Optional hints file — `.toml` for structured overrides, `.md` for freeform rules                                          |
+| `--output`, `-o` | Path to write the generated plan TOML (default: `./plan.toml`)                                                             |
+| `--force`        | Overwrite existing plan file without prompting                                                                             |
+| `--keep-tmp`     | Keep the cloned tempdir after generation (for debugging)                                                                   |
+| `--subdir`       | Scope the clone to a specific subfolder of the repo. Auto-detected from `/tree/<branch>/<path>` in GitHub URLs             |
+| `--github-api`   | Prefer the GitHub REST API for fetching repo metadata/tree/files (falls back to `git clone` on failure)                    |
+| `--llm`          | Use an LLM to generate intelligent phases + tasks. Provider = `anthropic` or `minimax`                                      |
+| `--llm-model`    | Override the LLM model (default: `claude-sonnet-4-5` for anthropic, `MiniMax-M3` for minimax)                              |
+| `--api-key`      | Override the LLM API key (otherwise read from `ANTHROPIC_API_KEY` / `MINIMAX_API_KEY`)                                      |
+
+### Hints
+
+`--hints` accepts two formats, detected by file extension:
+
+- **`.toml`** — structured overrides (`[project]`, `[orchestrator]`, `[[phase]]` blocks). See [`reference/example-hints.toml`](reference/example-hints.toml) for the full schema.
+- **`.md`** — freeform. Lines under `## Rules` (or `## Code style`, `## Orchestrator Rules`) become orchestrator rules. See [`reference/example-hints.md`](reference/example-hints.md).
+
+### Subfolder scoping
+
+For monorepos where you only want to plan one subpackage:
+
+```bash
+# Explicit flag
+wiggum reverse https://github.com/foo/monorepo --subdir services/api
+
+# Or just paste the GitHub /tree URL — auto-detected
+wiggum reverse https://github.com/foo/monorepo/tree/main/services/api --hints hints.toml
+```
+
+Internally this uses `git clone --depth=1 --filter=blob:none --sparse` + `git sparse-checkout set <subdir>` so the rest of the working tree is never downloaded.
+
+### LLM phase decomposition
+
+By default `wiggum reverse` produces a single placeholder phase the user fills in. With `--llm`, the detected project context (language, top-level tree, README excerpt, your hints) is sent to an LLM which returns a structured phase + task plan. The deterministic scan's detected project / orchestrator / preflight settings are preserved; only the phase list is rewritten. Any phases you declared in your hints TOML win over the model's suggestions.
+
+Two providers ship today, both speaking the Anthropic-Messages JSON wire format (different base URLs):
+
+```bash
+# Anthropic Claude
+ANTHROPIC_API_KEY=sk-... wiggum reverse https://github.com/foo/bar --llm anthropic
+
+# MiniMax (Anthropic-shaped API, default model MiniMax-M3)
+MINIMAX_API_KEY=... wiggum reverse https://github.com/foo/bar --llm minimax
+
+# Pin a specific MiniMax model
+wiggum reverse https://github.com/foo/bar --llm minimax --llm-model MiniMax-M2.7-highspeed
+
+# Inline API key (otherwise read from env)
+wiggum reverse https://github.com/foo/bar --llm anthropic --api-key sk-...-override
+```
+
+The LLM response is validated before merging (kebab-case slugs, no duplicate slugs, all deps resolve, no self-deps). Malformed responses surface a clear error rather than silently corrupting the plan.
 
 ## Running the loop
 
@@ -269,6 +339,9 @@ Wiggum turns a plan into an engineering loop rather than a one-shot prompt. Thes
 - **`BUDGET.md`** — universal scaffold artifact with per-task token estimates, `WARN` (80k) / `CRITICAL` (150k) markers, recommended daily cap, and a `Cost tiers` section (noop / report / action). The same numbers feed `wiggum check`'s `Token budget` dimension.
 - **`RUN_LOG.md`** — universal scaffold artifact with an empty markdown table pre-populated for per-iteration audit logging (timestamp, task_id, attempt, preflight_result, commit_sha, duration_seconds, notes). The orchestrator (or a human) appends rows.
 - **`--thin` scaffold mode** — `wiggum generate --thin` emits only the universal artifacts and skips every per-tool prompt directory (`.vscode/`, `.opencode/`, `.claude/`, agent_rules). Useful when you want the loop scaffolding without committing per-tool prompt files.
+- **`wiggum reverse` from any git URL** — clone a remote repo to a tempdir, scan it with the same heuristics as `wiggum bootstrap`, and merge user hints (TOML or Markdown) into the generated `plan.toml`. See the [Reverse-engineering a repo](#reverse-engineering-a-repo) section above for the full flag list and provider options.
+- **LLM-driven phase decomposition** — `wiggum reverse --llm <provider>` replaces the placeholder skeleton with intelligent phases + tasks. Providers: `anthropic` (api.anthropic.com, default `claude-sonnet-4-5`) and `minimax` (api.minimax.io/anthropic, Anthropic-shaped, default `MiniMax-M3`). API keys via `<PROVIDER>_API_KEY` env var or `--api-key`. The LLM response is validated (kebab-case slugs, no duplicates, deps resolve) before merge.
+- **Monorepo subfolder scoping** — `wiggum reverse --subdir <path>` (or `/tree/<branch>/<path>` in the URL) does a sparse checkout of just that subfolder via `git clone --filter=blob:none --sparse` + `git sparse-checkout set`, so monorepo subpackages can be planned without cloning the whole tree.
 
 ## Development
 
