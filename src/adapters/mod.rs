@@ -9,6 +9,7 @@ pub mod patterns;
 pub mod replan;
 pub mod resume;
 pub mod retro;
+pub mod reverse;
 pub mod split;
 pub mod templates;
 pub mod vcs;
