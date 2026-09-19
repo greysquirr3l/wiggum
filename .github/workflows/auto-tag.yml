@@ -31,8 +31,18 @@ jobs:
       - name: Gate on release commit
         id: gate
         run: |
+          # Detect a release commit via Cargo.toml version bump rather than
+          # the commit subject. Subject-based detection breaks when a release
+          # commit is squash-merged — GitHub uses the PR title as the squash
+          # subject and the chore(release): prefix is dropped. Inspecting
+          # the diff keeps the gate working for squash, merge, and rebase
+          # workflows alike.
+          #
+          # Subject-based check is retained as a secondary signal so unrelated
+          # commits that happen to touch Cargo.toml don't trip the gate.
           msg="$(git log -1 --pretty=%s)"
-          if [[ "$msg" == chore\(release\):* ]]; then
+          version_diff="$(git diff HEAD~1 HEAD -- Cargo.toml | grep -E '^\+version = ' || true)"
+          if [[ -n "$version_diff" && "$msg" != "ci("* && "$msg" != "chore(deps)"* && "$msg" != "chore(deps/"* ]]; then
             echo "run=true" >> "$GITHUB_OUTPUT"
           else
             echo "run=false" >> "$GITHUB_OUTPUT"
