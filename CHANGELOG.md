@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.19.1] - 2026-09-19
+
+### Fixed
+
+- **CI: auto-tag workflow now detects release commits on squash-merge** — the `auto-tag.yml` gate used to check the head commit subject for `chore(release):*`. That matched on plain merge commits but **broke when a release commit was squash-merged** — GitHub uses the PR title as the squash subject, dropping the inner `chore(release):` prefix. Result on PR #105 (v0.19.0): the gate skipped, v0.19.0 had to be tagged by hand. Switched the gate to inspect the **diff** (`git diff HEAD~1 HEAD -- Cargo.toml | grep -E '^\+version = '`) so it fires for squash, merge, and rebase alike. A secondary subject filter rejects `ci(*)`, `chore(deps)`, and `chore(deps/*)` so dependabot Cargo.toml rewrites don't trip the gate.
+
 ## [0.19.0] - 2026-09-19
 
 ### Added
