@@ -76,6 +76,22 @@ pub fn collect_targets(plan: &Plan, project_path: &Path) -> Result<Vec<PathBuf>>
     // If the tasks dir is empty after removal, mark it for cleanup too
     targets.push(tasks_dir);
 
+    // Capability files — each `[[capabilities]]` entry renders to its own
+    // `.md` file under `capabilities/`. Collect every one that exists so
+    // `wiggum clean` removes them, then mark the directory for empty-dir
+    // cleanup below. Capability slugs are filename-safe by convention (we
+    // use them directly as filenames in `capability::render_all`).
+    let capabilities_dir = project_path.join("capabilities");
+    if capabilities_dir.is_dir() {
+        for cap in &plan.capabilities {
+            let path = capabilities_dir.join(format!("{}.md", cap.name));
+            if path.exists() {
+                targets.push(path);
+            }
+        }
+    }
+    targets.push(capabilities_dir);
+
     targets.sort();
     targets.dedup();
     Ok(targets)
@@ -147,6 +163,16 @@ pub fn remove_artifacts(plan: &Plan, project_path: &Path) -> Result<Vec<PathBuf>
         fs::remove_dir(&github_dir)?;
         info!("Removed empty directory: {}", github_dir.display());
         removed.push(github_dir);
+    }
+
+    // Clean up capabilities/ if empty after removing capability files.
+    // Same empty-dir safety as .github/ — only remove when wiggum is the
+    // sole occupant.
+    let capabilities_dir = project_path.join("capabilities");
+    if capabilities_dir.is_dir() && is_dir_empty(&capabilities_dir) {
+        fs::remove_dir(&capabilities_dir)?;
+        info!("Removed empty directory: {}", capabilities_dir.display());
+        removed.push(capabilities_dir);
     }
 
     Ok(removed)

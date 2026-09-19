@@ -25,7 +25,66 @@ pub struct Plan {
     /// generated (back-compat). The `--target` CLI flag overrides this.
     #[serde(default)]
     pub targets: TargetConfig,
+    /// Behavioural contracts the project must satisfy. Each capability is
+    /// rendered to its own `capabilities/<name>.md` file and referenced
+    /// from any task that implements it via `implements = [...]`.
+    ///
+    /// Capabilities cut across phases — they describe *what* the system
+    /// does, while phases describe *when* that work happens. This lets
+    /// requirements persist independently of the implementation order
+    /// the planner chose.
+    #[serde(default)]
+    pub capabilities: Vec<Capability>,
     pub phases: Vec<Phase>,
+}
+
+/// A behavioural contract the system must satisfy.
+///
+/// Capabilities are the persistent "what" of the project. They survive
+/// regenerations and accumulate scenarios across the lifetime of the
+/// plan, even when the tasks that implement them are re-numbered or
+/// re-ordered.
+///
+/// Each capability renders to `capabilities/<name>.md` and is referenced
+/// from any task via `[[phases.tasks]] implements = ["<name>"]`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Capability {
+    /// Filename-safe slug — used for the output filename
+    /// (`capabilities/<name>.md`) and as the cross-reference target from
+    /// `TaskDef::implements`. Must be unique within the plan.
+    pub name: String,
+    /// Display title for the capability heading.
+    pub title: String,
+    /// Free-form description of the capability's intent. Markdown
+    /// allowed but not required.
+    #[serde(default)]
+    pub description: String,
+    /// "MUST" / "SHALL" style requirements the system must satisfy.
+    /// Rendered as a flat bullet list under `## Requirements`.
+    #[serde(default)]
+    pub requirements: Vec<String>,
+    /// Behavioural scenarios expressed as `WHEN ... THEN ...`. Used by
+    /// the evaluator and the orchestrator as machine-readable acceptance
+    /// contracts — a scenario's `then` clause is a verifiable outcome.
+    #[serde(default)]
+    pub scenarios: Vec<Scenario>,
+}
+
+/// A single behavioural scenario inside a capability.
+///
+/// Scenarios are the acceptance contract for a capability. They are
+/// rendered as `#### Scenario: <name>` blocks with `**WHEN** ...` /
+/// `**THEN** ...` lines, matching the spec format subagents already
+/// know how to verify against.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Scenario {
+    /// Filename-safe slug identifying the scenario within its capability.
+    /// Used to cross-reference scenarios from task files.
+    pub name: String,
+    /// Precondition or trigger. Free-form prose; rendered under `**WHEN**`.
+    pub when: String,
+    /// Observable outcome. Free-form prose; rendered under `**THEN**`.
+    pub then: String,
 }
 
 /// Plan-level target configuration.
@@ -347,7 +406,7 @@ impl TaskKind {
 }
 
 /// A task definition as written in the plan TOML.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct TaskDef {
     pub slug: String,
     pub title: String,
@@ -375,10 +434,16 @@ pub struct TaskDef {
     /// Defaults to `feature` when omitted.
     #[serde(default)]
     pub kind: TaskKind,
+    /// Names of `[[capabilities]]` this task implements. Each name must
+    /// resolve to a capability defined at the plan level. Rendered into
+    /// the task file as a `## Implements` section that links out to
+    /// `capabilities/<name>.md` and lists the relevant scenarios.
+    #[serde(default)]
+    pub implements: Vec<String>,
 }
 
 /// A resolved task with its assigned number (T01, T02, ...).
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Default, Serialize)]
 pub struct ResolvedTask {
     pub number: u32,
     pub slug: String,
@@ -396,6 +461,9 @@ pub struct ResolvedTask {
     pub phase_order: u32,
     /// Task archetype, propagated from `TaskDef`.
     pub kind: TaskKind,
+    /// Capability names this task implements. Carried over from
+    /// `TaskDef::implements`; validated by `Plan::validate_capabilities`.
+    pub implements: Vec<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -709,6 +777,59 @@ impl Plan {
             .unwrap_or_else(|| auto_derive_require_evaluator(resolved))
     }
 
+    /// Validate the capability layer:
+    /// - `[[capabilities]]` slugs must be unique.
+    /// - Every name in any `[[phases.tasks]] implements = [...]` must
+    ///   resolve to a capability defined at the plan level.
+    ///
+    /// # Errors
+    ///
+    /// Returns `WiggumError::Validation` on the first violation found,
+    /// listing every offending task so the user can fix all references
+    /// in one pass. The check is safe to call with an empty `resolved`
+    /// slice — only the duplicate-name check runs in that case.
+    pub fn validate_capabilities(&self, resolved: &[ResolvedTask]) -> Result<()> {
+        // Duplicate capability names.
+        let mut seen: std::collections::HashSet<&str> = std::collections::HashSet::new();
+        let mut duplicates: Vec<&str> = Vec::new();
+        for cap in &self.capabilities {
+            if !seen.insert(cap.name.as_str()) {
+                duplicates.push(&cap.name);
+            }
+        }
+        if !duplicates.is_empty() {
+            duplicates.sort_unstable();
+            duplicates.dedup();
+            return Err(WiggumError::Validation(format!(
+                "duplicate capability name(s): {}. Each [[capabilities]] entry must have a unique `name`.",
+                duplicates.join(", ")
+            )));
+        }
+
+        // Unknown implements references.
+        let known: std::collections::HashSet<&str> =
+            self.capabilities.iter().map(|c| c.name.as_str()).collect();
+        let mut offenders: Vec<String> = Vec::new();
+        for task in resolved {
+            for ref_name in &task.implements {
+                if !known.contains(ref_name.as_str()) {
+                    offenders.push(format!(
+                        "T{:02}-{}: implements unknown capability {:?} (no matching [[capabilities]] entry)",
+                        task.number, task.slug, ref_name
+                    ));
+                }
+            }
+        }
+        if !offenders.is_empty() {
+            return Err(WiggumError::Validation(format!(
+                "capability references: {} task(s) reference undefined capabilities:\n  - {}",
+                offenders.len(),
+                offenders.join("\n  - ")
+            )));
+        }
+        Ok(())
+    }
+
     /// Validate gate and evaluator policies against the resolved task list.
     ///
     /// # Errors
@@ -775,6 +896,7 @@ impl Plan {
                     phase_name: phase.name.clone(),
                     phase_order: phase.order,
                     kind: task.kind,
+                    implements: task.implements.clone(),
                 });
                 number += 1;
             }
@@ -1146,6 +1268,7 @@ fn security_hardening_task(
         phase_name,
         phase_order,
         kind: TaskKind::Audit,
+        implements: Vec::new(),
     }
 }
 
@@ -1200,6 +1323,7 @@ fn integration_wiring_task(
         phase_name,
         phase_order,
         kind: TaskKind::Audit,
+        implements: Vec::new(),
     }
 }
 
@@ -1260,6 +1384,7 @@ fn stub_cleanup_task(
         phase_name,
         phase_order,
         kind: TaskKind::Audit,
+        implements: Vec::new(),
     }
 }
 

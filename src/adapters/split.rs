@@ -288,6 +288,7 @@ fn build_split_tasks(original: &TaskDef, split: &SplitPlan) -> Vec<TaskDef> {
                     vec![]
                 },
                 kind: original.kind,
+                implements: Vec::new(),
             }
         })
         .collect()
@@ -407,6 +408,7 @@ mod tests {
             integration: IntegrationConfig::default(),
             style: StyleConfig::default(),
             targets: TargetConfig::default(),
+            capabilities: Vec::new(),
             phases: vec![Phase {
                 name: "Phase 1".to_string(),
                 order: 1,
@@ -431,6 +433,7 @@ mod tests {
             gate: None,
             evaluation_criteria: Vec::new(),
             kind: TaskKind::default(),
+            implements: Vec::new(),
         }
     }
 

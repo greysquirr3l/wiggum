@@ -164,6 +164,7 @@ mod tests {
             ],
             agents_md: None,
             features_json: String::new(),
+            capabilities: Vec::new(),
             orchestrator_vscode: "y".repeat(800),
             evaluator_vscode: None,
             planner_vscode: String::new(),

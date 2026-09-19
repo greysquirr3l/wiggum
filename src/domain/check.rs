@@ -807,6 +807,7 @@ mod tests {
                 phase_name: "Phase 1".to_string(),
                 phase_order: 1,
                 kind: TaskKind::Feature,
+                implements: Vec::new(),
             })
             .collect();
 
@@ -825,6 +826,7 @@ mod tests {
             integration: crate::domain::plan::IntegrationConfig::default(),
             style: crate::domain::plan::StyleConfig::default(),
             targets: crate::domain::plan::TargetConfig::default(),
+            capabilities: Vec::new(),
             phases: Vec::new(),
         };
 

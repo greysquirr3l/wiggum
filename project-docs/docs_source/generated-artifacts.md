@@ -19,16 +19,27 @@ Each task becomes a numbered markdown file with a consistent structure:
 - **Preflight** — Commands to run before marking complete (build, test, lint, and security audit)
 - **Exit Criteria** — Verifiable conditions for completion, including a `cargo audit` (or equivalent) check
 
+### Capability contracts — `capabilities/<name>.md`
+
+Only emitted when the plan declares one or more `[[capabilities]]` entries.
+Each capability renders to its own file under `capabilities/`, containing the
+title, description, prose `requirements`, and structured `scenarios` (WHEN/THEN).
+Tasks reference capabilities via `implements = ["<name>"]`, which inlines the
+relevant scenarios into the task file under `## Implements`. The
+`IMPLEMENTATION_PLAN.md` links out to every capability file from a new
+`## Capabilities` section. See [Capabilities](./capabilities.md) for the full
+reference.
+
 ### Progress tracker — `PROGRESS.md`
 
 A markdown table tracking all phases and tasks with status columns:
 
-| Status | Meaning |
-|--------|---------|
-| `[ ]` | Not started |
-| `[~]` | In progress |
-| `[x]` | Complete |
-| `[!]` | Blocked |
+| Status | Meaning     |
+| ------ | ----------- |
+| `[ ]`  | Not started |
+| `[~]`  | In progress |
+| `[x]`  | Complete    |
+| `[!]`  | Blocked     |
 
 Includes a **Codebase State** section where subagents record which files were created or modified. This gives each subsequent subagent accurate context about what the previous one actually changed.
 
@@ -82,24 +93,24 @@ Wiggum emits tool-specific agent prompts and configuration based on the active `
 
 ### VSCode target — `.vscode/*.prompt.md`
 
-| File | Role |
-|---|---|
-| `.vscode/orchestrator.prompt.md` | The agent-mode prompt that drives the implementation loop. It tells the orchestrator how to read progress, spawn subagents, verify their output independently, and update the tracker. Includes a sprint contract step, a codebase state handoff step, and a guard against premature completion. |
-| `.vscode/evaluator.prompt.md` | Only generated when `[evaluator]` is configured. Defines a skeptical QA agent that re-runs preflight independently, scores each exit criterion, and updates `features.json` with verified results. |
-| `.vscode/planner.prompt.md` | An agent-mode prompt for the planning phase. The planner subagent assists with breaking down new work items, estimating complexity, and suggesting task decompositions — without touching the implementation. |
-| `.vscode/background-auditor.prompt.md` | A continuously running QA companion that watches for regressions while the orchestrator advances through tasks. |
+| File                                   | Role                                                                                                                                                                                                                                                                                             |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `.vscode/orchestrator.prompt.md`       | The agent-mode prompt that drives the implementation loop. It tells the orchestrator how to read progress, spawn subagents, verify their output independently, and update the tracker. Includes a sprint contract step, a codebase state handoff step, and a guard against premature completion. |
+| `.vscode/evaluator.prompt.md`          | Only generated when `[evaluator]` is configured. Defines a skeptical QA agent that re-runs preflight independently, scores each exit criterion, and updates `features.json` with verified results.                                                                                               |
+| `.vscode/planner.prompt.md`            | An agent-mode prompt for the planning phase. The planner subagent assists with breaking down new work items, estimating complexity, and suggesting task decompositions — without touching the implementation.                                                                                    |
+| `.vscode/background-auditor.prompt.md` | A continuously running QA companion that watches for regressions while the orchestrator advances through tasks.                                                                                                                                                                                  |
 
 These prompts use GitHub Copilot's `runSubagent` tool to dispatch subagents.
 
 ### opencode target — `.opencode/agents/*.md`
 
-| File | Role |
-|---|---|
-| `.opencode/agents/orchestrator.md` | Single-file primary agent (`mode: primary`). Contains both `<ORCHESTRATOR_INSTRUCTIONS>` and `<SUBAGENT_PROMPT>` blocks. Dispatches the built-in `general` subagent via the `task` tool with `subagent_type: "general"` and the inline subagent body as `prompt`. |
-| `.opencode/agents/evaluator.md` | QA subagent (`mode: subagent`). Only generated when `[evaluator]` is configured. |
-| `.opencode/agents/planner.md` | Subagent for the planning phase. |
-| `.opencode/agents/background-auditor.md` | Subagent for continuous cross-task regression watching. |
-| `ORCHESTRATOR.md` (project root) | Long-form workflow reference document with the task state machine, agents table, evaluator rubric, completion standard, and failure-mode recovery. Anyone (human or fresh LLM) joining mid-stream reads this to orient. |
+| File                                     | Role                                                                                                                                                                                                                                                              |
+| ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.opencode/agents/orchestrator.md`       | Single-file primary agent (`mode: primary`). Contains both `<ORCHESTRATOR_INSTRUCTIONS>` and `<SUBAGENT_PROMPT>` blocks. Dispatches the built-in `general` subagent via the `task` tool with `subagent_type: "general"` and the inline subagent body as `prompt`. |
+| `.opencode/agents/evaluator.md`          | QA subagent (`mode: subagent`). Only generated when `[evaluator]` is configured.                                                                                                                                                                                  |
+| `.opencode/agents/planner.md`            | Subagent for the planning phase.                                                                                                                                                                                                                                  |
+| `.opencode/agents/background-auditor.md` | Subagent for continuous cross-task regression watching.                                                                                                                                                                                                           |
+| `ORCHESTRATOR.md` (project root)         | Long-form workflow reference document with the task state machine, agents table, evaluator rubric, completion standard, and failure-mode recovery. Anyone (human or fresh LLM) joining mid-stream reads this to orient.                                           |
 
 The orchestrator prompt is single-file: it embeds the subagent body inline as a `<SUBAGENT_PROMPT>` block and dispatches `subagent_type: "general"`. There is no separate `wiggum-implementer.md` agent to maintain.
 
@@ -126,10 +137,10 @@ The agent-rules target emits three fork-neutral rules files from a single shared
 template, so the rules stay in lockstep across forks. It is designed for VSCode-family
 IDEs that do not speak the GitHub Copilot `runSubagent` or opencode `task` protocols.
 
-| File | Read by |
-|---|---|
-| `.cursorrules` | Cursor (project-level rules) |
-| `.windsurfrules` | Windsurf (project-level rules; same format as `.cursorrules`) |
+| File                              | Read by                                                                       |
+| --------------------------------- | ----------------------------------------------------------------------------- |
+| `.cursorrules`                    | Cursor (project-level rules)                                                  |
+| `.windsurfrules`                  | Windsurf (project-level rules; same format as `.cursorrules`)                 |
 | `.github/copilot-instructions.md` | GitHub Copilot (repo-level instructions); also picked up by some VSCode forks |
 
 Each file contains the project metadata, preflight, architecture, user rules, security

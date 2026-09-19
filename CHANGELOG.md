@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.19.0] - 2026-09-19
+
+### Added
+
+- **`[[capabilities]]` plan section and `capabilities/<name>.md` output** — each `[[capabilities]]` entry in `plan.toml` is rendered to its own `capabilities/<name>.md` file describing a behavioural contract (requirements + scenarios) the system must satisfy. Tasks reference capabilities via `implements = ["<name>"]`, which inlines the linked scenarios into the task file under `## Implements`. `IMPLEMENTATION_PLAN.md` links out to every capability file from a new `## Capabilities` section. `wiggum clean` removes capability files along with the rest of the generated tree. Validates that every `implements` reference resolves to a defined capability.
+- **Capability lint rules** — `wiggum validate --lint` now flags `capability-unused` (warning, capability declared but no task references it), `capability-no-scenarios` (warning, no acceptance contract), and `capability-no-requirements` (info, no prose bullets).
+- **Orchestrator prompt lists capabilities on Setup** — when the plan declares any, the orchestrator reads `capabilities/` before dispatching subagents so it has the full contract picture rather than rediscovering it from each task file.
+
 ## [0.18.1] - 2026-09-08
 
 ### Fixed

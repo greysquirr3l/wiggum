@@ -880,3 +880,134 @@ fn thin_flag_appears_in_cli_help() {
         "--thin flag must appear in `wiggum generate --help` output, got:\n{stdout}"
     );
 }
+
+#[test]
+fn capabilities_render_to_separate_files() {
+    let toml = r#"
+[project]
+name = "kestrel"
+path = "/tmp/kestrel"
+description = "Webhook relay"
+language = "rust"
+architecture = "hexagonal"
+
+[[capabilities]]
+name = "webhook-reception"
+title = "Inbound Webhook Reception"
+description = "Accepts and validates inbound webhooks."
+[[capabilities.scenarios]]
+name = "valid-signature"
+when = "POST /webhook receives a valid HMAC signature"
+then = "the server returns 202 Accepted"
+
+[[phases]]
+name = "Inbound"
+order = 1
+[[phases.tasks]]
+slug = "router"
+title = "Router"
+goal = "Stand up the inbound router."
+implements = ["webhook-reception"]
+"#;
+    let plan = Plan::from_toml(toml).expect("plan parses");
+    let resolved = plan.resolve_tasks().expect("resolves");
+    plan.validate_capabilities(&resolved).expect("validates");
+
+    let artifacts = generation::generate_all(&plan).expect("generation");
+
+    // One capability file per capability.
+    assert_eq!(artifacts.capabilities.len(), 1);
+    let (filename, body) = &artifacts.capabilities[0];
+    assert_eq!(filename, "webhook-reception.md");
+    assert!(body.contains("Inbound Webhook Reception"));
+    assert!(body.contains("Accepts and validates inbound webhooks."));
+    assert!(body.contains("**WHEN**"));
+    assert!(body.contains("**THEN**"));
+    assert!(body.contains("202 Accepted"));
+
+    // IMPLEMENTATION_PLAN.md gains a Capabilities section.
+    assert!(artifacts.plan_doc.contains("## Capabilities"));
+    assert!(artifacts.plan_doc.contains("webhook-reception.md"));
+
+    // The referencing task file inlines scenarios under ## Implements.
+    let router = artifacts
+        .tasks
+        .iter()
+        .find(|(_, body)| body.contains("# T01 — Router"))
+        .expect("T01 router task exists");
+    assert!(router.1.contains("## Implements"));
+    assert!(router.1.contains("valid-signature"));
+    assert!(router.1.contains("202 Accepted"));
+
+    // The orchestrator learns about capabilities on Setup.
+    assert!(artifacts.orchestrator_vscode.contains("capabilities/"));
+    assert!(artifacts.orchestrator_vscode.contains("1 capability"));
+
+    // write_artifacts emits capabilities/<name>.md to disk.
+    let tmp = TempDir::new().expect("temp dir");
+    let project_path = tmp.path().to_path_buf();
+    generation::write_artifacts(
+        &FsAdapter,
+        &project_path,
+        &artifacts,
+        &TargetSet::vscode_only(),
+    )
+    .expect("write");
+
+    let cap_file = project_path
+        .join("capabilities")
+        .join("webhook-reception.md");
+    assert!(cap_file.exists(), "capability file must be written");
+    let on_disk = std::fs::read_to_string(&cap_file).expect("read");
+    assert!(on_disk.contains("202 Accepted"));
+}
+
+#[test]
+fn validate_capabilities_rejects_unknown_reference() {
+    let toml = r#"
+[project]
+name = "kestrel"
+path = "/tmp/kestrel"
+description = "Webhook relay"
+language = "rust"
+
+[[phases]]
+name = "Inbound"
+order = 1
+[[phases.tasks]]
+slug = "router"
+title = "Router"
+goal = "Stand up the inbound router."
+implements = ["missing-capability"]
+"#;
+    let plan = Plan::from_toml(toml).expect("plan parses");
+    let resolved = plan.resolve_tasks().expect("resolves");
+    let err = plan
+        .validate_capabilities(&resolved)
+        .expect_err("must reject");
+    assert!(err.to_string().contains("missing-capability"));
+}
+
+#[test]
+fn capabilities_omitted_when_plan_has_none() {
+    // A plan without `[[capabilities]]` must not create a capabilities/
+    // directory and must not reference one from IMPLEMENTATION_PLAN.md.
+    let plan = load_example_plan();
+    let artifacts = generation::generate_all(&plan).expect("generation");
+    assert!(artifacts.capabilities.is_empty());
+    assert!(!artifacts.plan_doc.contains("## Capabilities"));
+
+    let tmp = TempDir::new().expect("temp dir");
+    let project_path = tmp.path().to_path_buf();
+    generation::write_artifacts(
+        &FsAdapter,
+        &project_path,
+        &artifacts,
+        &TargetSet::vscode_only(),
+    )
+    .expect("write");
+    assert!(
+        !project_path.join("capabilities").exists(),
+        "capabilities/ must not be created when plan has no capabilities"
+    );
+}

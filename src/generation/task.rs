@@ -69,6 +69,27 @@ pub fn render_with(tera: &Tera, plan: &Plan, task: &ResolvedTask) -> Result<Stri
     };
     ctx.insert("depends_on_desc", &depends_on_desc);
 
+    // Capabilities this task implements — inlined so the subagent sees the
+    // requirements and scenarios without opening separate files. Each linked
+    // capability is serialized as `{ name, title, requirements, scenarios }`.
+    let linked = crate::generation::capability::linked_for_task(plan, task);
+    let linked_json: Vec<serde_json::Value> = linked
+        .iter()
+        .map(|cap| {
+            serde_json::json!({
+                "name": cap.name,
+                "title": cap.title,
+                "requirements": cap.requirements,
+                "scenarios": cap.scenarios.iter().map(|s| serde_json::json!({
+                    "name": s.name,
+                    "when": s.when,
+                    "then": s.then,
+                })).collect::<Vec<_>>(),
+            })
+        })
+        .collect();
+    ctx.insert("linked_capabilities", &linked_json);
+
     // Conventional commit message template
     let commit_message = format!(
         "feat({}): implement {}",
