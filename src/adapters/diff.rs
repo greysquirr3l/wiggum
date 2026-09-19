@@ -273,6 +273,7 @@ mod tests {
             phase_name: "Phase 1".into(),
             phase_order: 1,
             kind: TaskKind::default(),
+            implements: vec![],
         };
         let diff = diff_task(&task, &task);
         assert!(diff.is_empty());

@@ -76,6 +76,24 @@ pub fn render_with(tera: &Tera, plan: &Plan, tasks: &[ResolvedTask]) -> Result<S
 
     ctx.insert("phases", &phases);
 
+    // Capabilities — emitted as a `## Capabilities` section listing each
+    // capability with its title and a link to its file. Scenarios are not
+    // inlined here because the plan doc is a high-level overview.
+    let capabilities_json: Vec<serde_json::Value> = plan
+        .capabilities
+        .iter()
+        .map(|cap| {
+            serde_json::json!({
+                "name": cap.name,
+                "title": cap.title,
+                "description": cap.description,
+                "requirements": cap.requirements,
+                "scenario_count": cap.scenarios.len(),
+            })
+        })
+        .collect();
+    ctx.insert("capabilities", &capabilities_json);
+
     tera.render("plan_doc.md", &ctx)
         .map_err(|e| WiggumError::Template(e.to_string()))
 }

@@ -2,6 +2,7 @@ pub mod agent_rules;
 pub mod agents_md;
 pub mod background_auditor;
 pub mod budget;
+pub mod capability;
 pub mod claude;
 pub mod clean;
 pub mod evaluator;
@@ -37,6 +38,10 @@ pub struct GeneratedArtifacts {
     pub agents_md: Option<String>,
     /// Structured JSON task feature/criteria registry (`features.json`).
     pub features_json: String,
+    /// Behavioural contracts (`capabilities/<name>.md`). Empty when the
+    /// plan has no `[[capabilities]]` entries — `write_artifacts` skips
+    /// creating the directory in that case.
+    pub capabilities: Vec<(String, String)>, // (filename, content)
 
     // ── VSCode target ───────────────────────────────────────────────────
     /// `.vscode/orchestrator.prompt.md`. Always rendered for the vscode target.
@@ -124,6 +129,7 @@ pub fn generate_all(plan: &Plan) -> Result<GeneratedArtifacts> {
 
     let agents_md = Some(agents_md::render(plan)?);
     let features_json = features::render(plan, &resolved)?;
+    let capabilities = capability::render_all(plan)?;
     let evaluator_vscode = evaluator::render(plan, &resolved)?;
     let evaluator_opencode = evaluator::render_opencode(plan, &resolved)?;
     let planner_vscode = planner::render(plan)?;
@@ -142,6 +148,7 @@ pub fn generate_all(plan: &Plan) -> Result<GeneratedArtifacts> {
         tasks,
         agents_md,
         features_json,
+        capabilities,
         orchestrator_vscode,
         evaluator_vscode,
         planner_vscode,
@@ -188,6 +195,7 @@ pub fn generate_all_with_overrides(plan: &Plan, project_path: &Path) -> Result<G
 
     let agents_md = Some(agents_md::render_with(&tera, plan)?);
     let features_json = features::render(plan, &resolved)?;
+    let capabilities = capability::render_all(plan)?;
     let evaluator_vscode = evaluator::render_with(&tera, plan, &resolved)?;
     let evaluator_opencode = evaluator::render_opencode_with(&tera, plan, &resolved)?;
     let planner_vscode = planner::render_with(&tera, plan)?;
@@ -206,6 +214,7 @@ pub fn generate_all_with_overrides(plan: &Plan, project_path: &Path) -> Result<G
         tasks,
         agents_md,
         features_json,
+        capabilities,
         orchestrator_vscode,
         evaluator_vscode,
         planner_vscode,
@@ -250,6 +259,16 @@ pub fn write_artifacts(
     writer.ensure_dir(&tasks_dir)?;
     for (filename, content) in &artifacts.tasks {
         writer.write_file(&tasks_dir.join(filename), content)?;
+    }
+
+    // Capabilities — written when the plan defines any. The directory is
+    // only created if at least one capability file is emitted.
+    if !artifacts.capabilities.is_empty() {
+        let capabilities_dir = project_path.join("capabilities");
+        writer.ensure_dir(&capabilities_dir)?;
+        for (filename, content) in &artifacts.capabilities {
+            writer.write_file(&capabilities_dir.join(filename), content)?;
+        }
     }
 
     if let Some(agents_md) = &artifacts.agents_md {

@@ -157,6 +157,7 @@ mod tests {
             phase_name: "Phase 1".to_string(),
             phase_order: 1,
             kind: TaskKind::default(),
+            implements: vec![],
         }
     }
 

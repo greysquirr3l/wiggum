@@ -59,6 +59,9 @@ project/
 ├── features.json
 ├── BUDGET.md                       # per-task token estimates + thresholds
 ├── RUN_LOG.md                      # empty iteration log scaffold
+├── capabilities/                   # only when [[capabilities]] are declared
+│   ├── {slug}.md                   # one file per capability
+│   └── ...
 └── tasks/
     ├── T01-{slug}.md
     ├── T02-{slug}.md
@@ -141,6 +144,38 @@ wiggum watch
 ## Example plan
 
 See [`reference/example-plan.toml`](reference/example-plan.toml) for a fully annotated plan covering all supported fields — project metadata, preflight commands, orchestrator persona and rules, multiple phases with dependency wiring, and per-task hints, test hints, must-haves, and gates.
+
+## Capabilities
+
+A **capability** is a behavioural contract the system must satisfy, independent
+of any particular phase or task. Each `[[capabilities]]` entry renders to its
+own `capabilities/<name>.md` file; tasks reference capabilities via
+`implements = ["<name>"]`, which inlines the linked scenarios into the task
+file under `## Implements`.
+
+```toml
+[[capabilities]]
+name        = "webhook-reception"
+title       = "Inbound Webhook Reception"
+description = "Accepts and validates inbound webhook deliveries."
+
+[[capabilities.scenarios]]
+name = "valid-signature"
+when = "POST /webhook receives a request with a valid HMAC signature"
+then = "the server returns 202 Accepted and persists the event"
+
+[[phases.tasks]]
+slug      = "router"
+title     = "Webhook router"
+goal      = "Stand up the inbound router."
+implements = ["webhook-reception"]
+```
+
+The orchestrator reads every file in `capabilities/` on Setup so it has the
+full contract picture before dispatching subagents. Lint rules flag
+unused capabilities (`capability-unused`) and capabilities with no
+scenarios (`capability-no-scenarios`). See
+[`docs/capabilities.md`](docs/capabilities.md) for the full reference.
 
 Execution strategies supported in `[orchestrator].strategy`:
 

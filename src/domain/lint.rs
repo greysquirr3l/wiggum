@@ -60,6 +60,9 @@ pub fn lint_plan(plan: &Plan, resolved: &[ResolvedTask]) -> Vec<Diagnostic> {
     lint_orphan_task(resolved, &mut diagnostics);
     lint_missing_arch(plan, &mut diagnostics);
     lint_wide_fan_out(resolved, &mut diagnostics);
+    lint_capability_unused(plan, &mut diagnostics);
+    lint_capability_no_scenarios(plan, &mut diagnostics);
+    lint_capability_no_requirements(plan, &mut diagnostics);
 
     diagnostics.sort_by_key(|d| d.severity);
     diagnostics.reverse(); // errors first
@@ -355,6 +358,69 @@ fn lint_wide_fan_out(tasks: &[ResolvedTask], out: &mut Vec<Diagnostic>) {
     }
 }
 
+/// Warning: A capability is declared but no task references it via
+/// `implements = [...]`. Dead capability — the contract exists but no
+/// task is accountable for satisfying it.
+fn lint_capability_unused(plan: &Plan, out: &mut Vec<Diagnostic>) {
+    if plan.capabilities.is_empty() {
+        return;
+    }
+    let referenced: std::collections::HashSet<&str> = plan
+        .phases
+        .iter()
+        .flat_map(|p| p.tasks.iter())
+        .flat_map(|t| t.implements.iter())
+        .map(String::as_str)
+        .collect();
+    for cap in &plan.capabilities {
+        if !referenced.contains(cap.name.as_str()) {
+            out.push(Diagnostic {
+                severity: Severity::Warning,
+                rule: "capability-unused",
+                message: format!(
+                    "capability `{}` is declared but no task has `implements = [...]` referencing it",
+                    cap.name
+                ),
+            });
+        }
+    }
+}
+
+/// Warning: A capability has no `[[capabilities.scenarios]]` entries.
+/// Scenarios are the machine-readable acceptance contract; without them
+/// the evaluator has nothing to verify against.
+fn lint_capability_no_scenarios(plan: &Plan, out: &mut Vec<Diagnostic>) {
+    for cap in &plan.capabilities {
+        if cap.scenarios.is_empty() {
+            out.push(Diagnostic {
+                severity: Severity::Warning,
+                rule: "capability-no-scenarios",
+                message: format!(
+                    "capability `{}` has no scenarios — the evaluator cannot verify completion",
+                    cap.name
+                ),
+            });
+        }
+    }
+}
+
+/// Info: A capability has no `requirements` bullets. Requirements are
+/// the prose contract; scenarios are the testable form. Both are useful.
+fn lint_capability_no_requirements(plan: &Plan, out: &mut Vec<Diagnostic>) {
+    for cap in &plan.capabilities {
+        if cap.requirements.is_empty() {
+            out.push(Diagnostic {
+                severity: Severity::Info,
+                rule: "capability-no-requirements",
+                message: format!(
+                    "capability `{}` has no requirements — consider adding prose bullets",
+                    cap.name
+                ),
+            });
+        }
+    }
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::indexing_slicing)]
 mod tests {
@@ -385,6 +451,7 @@ mod tests {
             integration: IntegrationConfig::default(),
             style: StyleConfig::default(),
             targets: crate::domain::plan::TargetConfig::default(),
+            capabilities: Vec::new(),
             phases: vec![Phase {
                 name: "Phase 1".to_string(),
                 order: 1,
@@ -408,6 +475,7 @@ mod tests {
                 phase_name: "Phase 1".to_string(),
                 phase_order: 1,
                 kind: t.kind,
+                implements: t.implements,
             })
             .collect();
         (plan, resolved)
@@ -425,6 +493,7 @@ mod tests {
             gate: None,
             evaluation_criteria: Vec::new(),
             kind: TaskKind::default(),
+            implements: Vec::new(),
         }
     }
 
@@ -472,6 +541,7 @@ mod tests {
                     gate: None,
                     evaluation_criteria: Vec::new(),
                     kind: TaskKind::default(),
+                    implements: Vec::new(),
                 }
             })
             .collect();
@@ -494,6 +564,7 @@ mod tests {
                 gate: None,
                 evaluation_criteria: Vec::new(),
                 kind: TaskKind::default(),
+                implements: Vec::new(),
             },
             TaskDef {
                 slug: "domain".to_string(),
@@ -506,6 +577,7 @@ mod tests {
                 gate: None,
                 evaluation_criteria: Vec::new(),
                 kind: TaskKind::default(),
+                implements: Vec::new(),
             },
         ];
         let (plan, resolved) = make_plan(tasks, Some("hexagonal".to_string()));

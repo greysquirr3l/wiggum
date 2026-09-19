@@ -138,6 +138,7 @@ pub fn build_plan_from_scan(scan: &ScanResult, project_path: &Path) -> Plan {
         integration: crate::domain::plan::IntegrationConfig::default(),
         style: crate::domain::plan::StyleConfig::default(),
         targets: crate::domain::plan::TargetConfig::default(),
+        capabilities: Vec::new(),
         phases: vec![Phase {
             name: "TODO — rename this phase".to_string(),
             order: 1,
@@ -152,6 +153,7 @@ pub fn build_plan_from_scan(scan: &ScanResult, project_path: &Path) -> Plan {
                 gate: None,
                 evaluation_criteria: vec![],
                 kind: TaskKind::default(),
+                implements: Vec::new(),
             }],
         }],
     };

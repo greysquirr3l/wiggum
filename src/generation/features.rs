@@ -117,6 +117,7 @@ mod tests {
             integration: IntegrationConfig::default(),
             style: StyleConfig::default(),
             targets: crate::domain::plan::TargetConfig::default(),
+            capabilities: Vec::new(),
             phases: vec![Phase {
                 name: "Foundation".to_string(),
                 order: 1,
@@ -131,6 +132,7 @@ mod tests {
                     gate: None,
                     evaluation_criteria: vec!["README.md exists".to_string()],
                     kind: TaskKind::default(),
+                    implements: Vec::new(),
                 }],
             }],
         };
@@ -148,6 +150,7 @@ mod tests {
             phase_name: "Foundation".to_string(),
             phase_order: 1,
             kind: TaskKind::default(),
+            implements: vec![],
         }];
         (plan, tasks)
     }

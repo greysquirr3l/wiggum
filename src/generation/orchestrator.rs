@@ -70,6 +70,12 @@ pub fn render_with(tera: &Tera, plan: &Plan, tasks: &[ResolvedTask]) -> Result<S
         serde_json::to_value(&groups).unwrap_or(serde_json::Value::Array(Vec::new()));
     ctx.insert("parallel_groups", &groups_value);
 
+    // Capabilities — emit a count and the capability directory path so the
+    // orchestrator knows where to find them when a task's `## Implements`
+    // section links out.
+    ctx.insert("capability_count", &plan.capabilities.len());
+    ctx.insert("has_capabilities", &(!plan.capabilities.is_empty()));
+
     // Contract review gate (requires evaluator).
     let contract_review = plan.evaluator.as_ref().is_some_and(|e| e.contract_review);
     ctx.insert("contract_review", &contract_review);

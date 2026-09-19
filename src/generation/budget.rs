@@ -282,6 +282,7 @@ mod tests {
             phase_name: "P1".into(),
             phase_order: 1,
             kind: crate::domain::plan::TaskKind::default(),
+            implements: vec![],
         }
     }
 
@@ -305,6 +306,7 @@ mod tests {
             integration: IntegrationConfig::default(),
             style: StyleConfig::default(),
             targets: TargetConfig::default(),
+            capabilities: Vec::new(),
             phases: vec![Phase {
                 name: "P1".into(),
                 order: 1,
@@ -319,6 +321,7 @@ mod tests {
                     gate: None,
                     evaluation_criteria: vec![],
                     kind: crate::domain::plan::TaskKind::default(),
+                    implements: Vec::new(),
                 }],
             }],
         }

@@ -74,6 +74,7 @@ mod tests {
             integration: IntegrationConfig::default(),
             style: StyleConfig::default(),
             targets: crate::domain::plan::TargetConfig::default(),
+            capabilities: Vec::new(),
             phases: vec![Phase {
                 name: "Foundation".to_string(),
                 order: 1,
@@ -88,6 +89,7 @@ mod tests {
                     gate: None,
                     evaluation_criteria: vec![],
                     kind: TaskKind::default(),
+                    implements: Vec::new(),
                 }],
             }],
         }

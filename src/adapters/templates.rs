@@ -52,6 +52,7 @@ impl From<TaskTemplate> for TaskDef {
             gate: None,
             evaluation_criteria: tmpl.evaluation_criteria,
             kind: TaskKind::default(),
+            implements: Vec::new(),
         }
     }
 }

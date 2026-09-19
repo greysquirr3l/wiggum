@@ -44,6 +44,7 @@ pub fn run_init(output_plan: Option<&Path>) -> Result<(Plan, PathBuf)> {
         integration: crate::domain::plan::IntegrationConfig::default(),
         style: crate::domain::plan::StyleConfig::default(),
         targets: crate::domain::plan::TargetConfig::default(),
+        capabilities: Vec::new(),
         phases,
     };
     plan.preflight = plan.preflight.with_defaults(language);
@@ -240,6 +241,7 @@ fn prompt_tasks_for_phase(phase_name: &str, existing_phases: &[Phase]) -> Result
             gate: None,
             evaluation_criteria: Vec::new(),
             kind: TaskKind::default(),
+            implements: Vec::new(),
         });
 
         task_num += 1;

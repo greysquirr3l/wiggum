@@ -103,6 +103,30 @@ name        = "architectural-boundaries"
 weight      = 30
 description = "The domain module has no I/O dependencies (no tokio, no reqwest, no sqlx imports)."
 
+# ─── Capabilities ─────────────────────────────────────────────────────────────
+# Behavioural contracts the system must satisfy. Each capability renders to
+# `capabilities/<name>.md` and is referenced from any task that implements
+# it via `implements = ["<name>"]`. Scenarios are the machine-readable
+# acceptance contract — the evaluator parses them back out of task files
+# to verify completion. See `docs/capabilities.md` for the full reference.
+#
+# [[capabilities]]
+# name        = "webhook-reception"
+# title       = "Inbound Webhook Reception"
+# description = "Accepts and validates inbound webhook deliveries before fanning out to subscribers."
+# [[capabilities.requirements]]
+# value = "MUST validate the HMAC-SHA256 signature on every inbound POST before persisting the event."
+# [[capabilities.requirements]]
+# value = "MUST return 202 Accepted within 200ms p95 for a valid request."
+# [[capabilities.scenarios]]
+# name = "valid-signature"
+# when = "POST /webhook receives a request with a valid HMAC-SHA256 signature"
+# then = "the server returns 202 Accepted and persists the event via the EventStore port"
+# [[capabilities.scenarios]]
+# name = "invalid-signature"
+# when = "POST /webhook receives a request with a tampered payload or wrong secret"
+# then = "the server returns 400 Bad Request and never persists the event"
+
 # ─── Phase 1: Workspace Scaffold ──────────────────────────────────────────────
 
 [[phases]]

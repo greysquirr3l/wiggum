@@ -200,6 +200,7 @@ fn cmd_generate(
     let sorted = validate_dag(&resolved)?;
     plan.validate_gates_and_evaluator(&resolved)?;
     validate_gates(&plan, &resolved)?;
+    plan.validate_capabilities(&resolved)?;
     info!(
         "Plan validated: {} phases, {} tasks",
         plan.phases.len(),
