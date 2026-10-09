@@ -808,6 +808,7 @@ mod tests {
                 phase_order: 1,
                 kind: TaskKind::Feature,
                 implements: Vec::new(),
+                anchors: vec![],
             })
             .collect();
 

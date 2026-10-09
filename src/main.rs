@@ -592,7 +592,13 @@ fn cmd_validate(plan_path: &Path, run_lint: bool) -> wiggum::error::Result<()> {
     }
 
     if run_lint {
-        let diagnostics = lint::lint_plan(&plan, &resolved);
+        let mut diagnostics = lint::lint_plan(&plan, &resolved);
+        // Anchor drift checks need filesystem access, so they run separately
+        // from the pure `lint_plan` rules. No-ops when the plan has no anchors.
+        let root = PathBuf::from(&plan.project.path);
+        diagnostics.extend(wiggum::domain::anchors::lint_anchors(&resolved, &root));
+        diagnostics.sort_by_key(|d| std::cmp::Reverse(d.severity));
+
         if diagnostics.is_empty() {
             println!("\n✅ Lint: no issues");
         } else {

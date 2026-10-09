@@ -879,13 +879,18 @@ fn tool_lint_plan(args: &Value) -> Result<String> {
     let _ = validate_dag(&resolved)?;
 
     let diagnostics = lint::lint_plan(&plan, &resolved);
-    if diagnostics.is_empty() {
+    // Anchor drift checks need filesystem access; no-op when no anchors exist.
+    let mut all = diagnostics;
+    let root = std::path::PathBuf::from(&plan.project.path);
+    all.extend(crate::domain::anchors::lint_anchors(&resolved, &root));
+
+    if all.is_empty() {
         return Ok("Lint: no issues found.".to_string());
     }
 
-    let summary = lint::summarize(&diagnostics);
+    let summary = lint::summarize(&all);
     let mut lines = vec![format!("Lint: {}", lint::format_summary(&summary))];
-    for d in &diagnostics {
+    for d in &all {
         lines.push(format!("  [{}] {}: {}", d.severity, d.rule, d.message));
     }
     Ok(lines.join("\n"))

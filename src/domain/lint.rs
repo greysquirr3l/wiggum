@@ -476,6 +476,7 @@ mod tests {
                 phase_order: 1,
                 kind: t.kind,
                 implements: t.implements,
+                anchors: vec![],
             })
             .collect();
         (plan, resolved)
@@ -494,6 +495,7 @@ mod tests {
             evaluation_criteria: Vec::new(),
             kind: TaskKind::default(),
             implements: Vec::new(),
+            anchors: vec![],
         }
     }
 
@@ -542,6 +544,7 @@ mod tests {
                     evaluation_criteria: Vec::new(),
                     kind: TaskKind::default(),
                     implements: Vec::new(),
+                    anchors: vec![],
                 }
             })
             .collect();
@@ -565,6 +568,7 @@ mod tests {
                 evaluation_criteria: Vec::new(),
                 kind: TaskKind::default(),
                 implements: Vec::new(),
+                anchors: vec![],
             },
             TaskDef {
                 slug: "domain".to_string(),
@@ -578,6 +582,7 @@ mod tests {
                 evaluation_criteria: Vec::new(),
                 kind: TaskKind::default(),
                 implements: Vec::new(),
+                anchors: vec![],
             },
         ];
         let (plan, resolved) = make_plan(tasks, Some("hexagonal".to_string()));

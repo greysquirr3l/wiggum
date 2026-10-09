@@ -133,6 +133,7 @@ mod tests {
                     evaluation_criteria: vec!["README.md exists".to_string()],
                     kind: TaskKind::default(),
                     implements: Vec::new(),
+                    anchors: vec![],
                 }],
             }],
         };
@@ -151,6 +152,7 @@ mod tests {
             phase_order: 1,
             kind: TaskKind::default(),
             implements: vec![],
+            anchors: vec![],
         }];
         (plan, tasks)
     }

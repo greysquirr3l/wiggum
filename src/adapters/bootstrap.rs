@@ -154,6 +154,7 @@ pub fn build_plan_from_scan(scan: &ScanResult, project_path: &Path) -> Plan {
                 evaluation_criteria: vec![],
                 kind: TaskKind::default(),
                 implements: Vec::new(),
+                anchors: Vec::new(),
             }],
         }],
     };

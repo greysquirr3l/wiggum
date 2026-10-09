@@ -158,6 +158,7 @@ mod tests {
             phase_order: 1,
             kind: TaskKind::default(),
             implements: vec![],
+            anchors: vec![],
         }
     }
 

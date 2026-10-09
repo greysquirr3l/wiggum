@@ -242,6 +242,7 @@ fn prompt_tasks_for_phase(phase_name: &str, existing_phases: &[Phase]) -> Result
             evaluation_criteria: Vec::new(),
             kind: TaskKind::default(),
             implements: Vec::new(),
+            anchors: Vec::new(),
         });
 
         task_num += 1;

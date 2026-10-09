@@ -440,6 +440,119 @@ pub struct TaskDef {
     /// `capabilities/<name>.md` and lists the relevant scenarios.
     #[serde(default)]
     pub implements: Vec<String>,
+    /// Verified source locations this task touches, relative to
+    /// `[project].path`. Purely optional — a plan with no anchors is
+    /// fully valid. When present they are rendered into the task file
+    /// as a `## Code Anchors` section and drift-checked by `validate
+    /// --lint` (see [`crate::domain::anchors`]).
+    #[serde(default)]
+    pub anchors: Vec<Anchor>,
+}
+
+/// What a task intends to do at an anchored location.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum AnchorRole {
+    /// Read the location for context; do not edit it.
+    #[default]
+    Read,
+    /// This task will edit the anchored region.
+    Modify,
+    /// The file does not exist yet; this task creates it.
+    Create,
+}
+
+impl std::fmt::Display for AnchorRole {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Read => write!(f, "read"),
+            Self::Modify => write!(f, "modify"),
+            Self::Create => write!(f, "create"),
+        }
+    }
+}
+
+/// A verified source location a task is grounded in.
+///
+/// Anchors are the mechanism behind the `file:line` citations in a spec —
+/// they pin a task to real code so the implementer subagent starts at a
+/// known location instead of grepping, and so drift is detectable when the
+/// code moves underneath the plan.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct Anchor {
+    /// Path relative to `[project].path`. Absolute paths and paths that
+    /// escape the project root are rejected by the anchor lint rules.
+    pub path: String,
+    /// Optional inclusive line range, e.g. `"42-80"` or a bare `"42"`.
+    /// A bare line renders as `42`. Omit to anchor the whole file.
+    #[serde(default)]
+    pub lines: Option<String>,
+    /// What this task does here. Defaults to `read`.
+    #[serde(default)]
+    pub role: AnchorRole,
+    /// Free-form note explaining why this location matters, e.g. the
+    /// symbol the subagent should extend.
+    #[serde(default)]
+    pub note: Option<String>,
+}
+
+impl Anchor {
+    /// Parse `lines` into an inclusive `(start, end)` pair.
+    ///
+    /// Accepts `"42"`, `"42-80"` and `"80-42"` (normalised). Returns `None`
+    /// when `lines` is absent.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` if the range is not a positive 1-based line, a single
+    /// line, or a two-part range.
+    pub fn line_range(&self) -> Result<Option<(u32, u32)>> {
+        let Some(raw) = self.lines.as_deref() else {
+            return Ok(None);
+        };
+        let raw = raw.trim();
+        if raw.is_empty() {
+            return Err(WiggumError::Validation(format!(
+                "anchor `{}` has an empty `lines` value — omit the field to anchor the whole file",
+                self.path
+            )));
+        }
+        if let Some((start, end)) = raw.split_once('-') {
+            let (start, end) = (parse_line(start)?, parse_line(end)?);
+            Ok(Some((start.min(end), start.max(end))))
+        } else {
+            let start = parse_line(raw)?;
+            Ok(Some((start, start)))
+        }
+    }
+
+    /// Render the anchor as a compact `path:lines` citation, e.g.
+    /// `src/auth/sessions.rs:42-80`. Falls back to the bare path when the
+    /// range is unparseable so display never fails.
+    #[must_use]
+    pub fn citation(&self) -> String {
+        match self.line_range() {
+            Ok(Some((s, e))) if s == e => format!("{}:{s}", self.path),
+            Ok(Some((s, e))) => format!("{}:{s}-{e}", self.path),
+            _ => self.path.clone(),
+        }
+    }
+}
+
+/// Parse a single 1-based line number, returning a clear error on bad input.
+fn parse_line(raw: &str) -> Result<u32> {
+    let trimmed = raw.trim();
+    let n = trimmed.parse::<u32>().map_err(|_| {
+        WiggumError::Validation(format!(
+            "`{trimmed}` is not a line number — use \"42\" or \"42-80\""
+        ))
+    })?;
+    if n == 0 {
+        return Err(WiggumError::Validation(
+            "line numbers are 1-based; `0` is not a valid anchor".to_string(),
+        ));
+    }
+    Ok(n)
 }
 
 /// A resolved task with its assigned number (T01, T02, ...).
@@ -464,6 +577,33 @@ pub struct ResolvedTask {
     /// Capability names this task implements. Carried over from
     /// `TaskDef::implements`; validated by `Plan::validate_capabilities`.
     pub implements: Vec<String>,
+    /// Verified source locations carried over from `TaskDef::anchors`.
+    /// Optional; drift-checked by `crate::domain::anchors`.
+    pub anchors: Vec<Anchor>,
+}
+
+impl ResolvedTask {
+    /// Build a resolved task from its definition, stamped with its number
+    /// and owning phase.
+    fn from_def(task: &TaskDef, number: u32, phase: &Phase) -> Self {
+        Self {
+            number,
+            slug: task.slug.clone(),
+            title: task.title.clone(),
+            goal: task.goal.clone(),
+            depends_on: task.depends_on.clone(),
+            hints: task.hints.clone(),
+            test_hints: task.test_hints.clone(),
+            must_haves: task.must_haves.clone(),
+            gate: task.gate.clone(),
+            evaluation_criteria: task.evaluation_criteria.clone(),
+            phase_name: phase.name.clone(),
+            phase_order: phase.order,
+            kind: task.kind,
+            implements: task.implements.clone(),
+            anchors: task.anchors.clone(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -882,22 +1022,7 @@ impl Plan {
 
         for phase in &phases {
             for task in &phase.tasks {
-                resolved.push(ResolvedTask {
-                    number,
-                    slug: task.slug.clone(),
-                    title: task.title.clone(),
-                    goal: task.goal.clone(),
-                    depends_on: task.depends_on.clone(),
-                    hints: task.hints.clone(),
-                    test_hints: task.test_hints.clone(),
-                    must_haves: task.must_haves.clone(),
-                    gate: task.gate.clone(),
-                    evaluation_criteria: task.evaluation_criteria.clone(),
-                    phase_name: phase.name.clone(),
-                    phase_order: phase.order,
-                    kind: task.kind,
-                    implements: task.implements.clone(),
-                });
+                resolved.push(ResolvedTask::from_def(task, number, phase));
                 number += 1;
             }
         }
@@ -1269,6 +1394,7 @@ fn security_hardening_task(
         phase_order,
         kind: TaskKind::Audit,
         implements: Vec::new(),
+        anchors: Vec::new(),
     }
 }
 
@@ -1324,6 +1450,7 @@ fn integration_wiring_task(
         phase_order,
         kind: TaskKind::Audit,
         implements: Vec::new(),
+        anchors: Vec::new(),
     }
 }
 
@@ -1385,6 +1512,7 @@ fn stub_cleanup_task(
         phase_order,
         kind: TaskKind::Audit,
         implements: Vec::new(),
+        anchors: Vec::new(),
     }
 }
 

@@ -40,7 +40,20 @@ pub fn render_with(tera: &Tera, plan: &Plan, task: &ResolvedTask) -> Result<Stri
     ctx.insert("evaluation_criteria", &task.evaluation_criteria);
     ctx.insert("avoid_god_files", &plan.style.avoid_god_files);
 
-    // Language profile data
+    // Code anchors — serialized so the template can render `path:lines`
+    // citations without needing the Anchor type's methods.
+    let anchors: Vec<serde_json::Value> = task
+        .anchors
+        .iter()
+        .map(|a| {
+            serde_json::json!({
+                "citation": a.citation(),
+                "role": a.role.to_string(),
+                "note": a.note,
+            })
+        })
+        .collect();
+    ctx.insert("anchors", &anchors);
     let profile = plan.project.language.profile();
     ctx.insert("build_success_phrase", profile.build_success_phrase);
     ctx.insert("test_file_pattern", profile.test_file_pattern);

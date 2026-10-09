@@ -1011,3 +1011,180 @@ fn capabilities_omitted_when_plan_has_none() {
         "capabilities/ must not be created when plan has no capabilities"
     );
 }
+
+// ─── Task anchors ───────────────────────────────────────────────────────────
+
+/// Build a minimal single-task plan, optionally with anchors.
+fn anchor_plan(anchors_toml: &str, root: &std::path::Path) -> Plan {
+    let toml = format!(
+        r#"
+[project]
+name = "anchor-test"
+description = "Anchor fixture."
+language = "rust"
+path = "{}"
+
+[preflight]
+build = "cargo build"
+test = "cargo test"
+lint = "cargo clippy"
+
+[[phases]]
+name = "Phase 1"
+order = 1
+
+[[phases.tasks]]
+slug = "wire-thing"
+title = "Wire the thing"
+goal = "Connect the thing."
+hints = ["Follow the existing wiring."]
+test_hints = ["Add a test."]
+{anchors_toml}
+"#,
+        root.display(),
+    );
+    Plan::from_toml(&toml).expect("parse")
+}
+
+#[test]
+fn plan_without_anchors_parses_and_renders_unchanged() {
+    // Back-compat: a plan that never mentions anchors must be fully valid and
+    // must not gain a Code Anchors section.
+    let tmp = TempDir::new().expect("temp dir");
+    let plan = anchor_plan("", tmp.path());
+    let resolved = plan.resolve_tasks().expect("resolve");
+    assert!(resolved[0].anchors.is_empty());
+
+    let diags = wiggum::domain::anchors::lint_anchors(&resolved, tmp.path());
+    assert!(
+        diags.is_empty(),
+        "expected no anchor diagnostics, got {diags:?}"
+    );
+
+    let artifacts = generation::generate_all(&plan).expect("generation");
+    let task_body = artifacts
+        .tasks
+        .iter()
+        .find(|(_, body)| body.contains("Wire the thing"))
+        .map(|(_, body)| body.clone())
+        .expect("task file for wire-thing");
+    assert!(
+        !task_body.contains("## Code Anchors"),
+        "no anchors declared means no Code Anchors section"
+    );
+}
+
+#[test]
+fn anchors_parse_from_toml() {
+    let tmp = TempDir::new().expect("temp dir");
+    let plan = anchor_plan(
+        r#"
+[[phases.tasks.anchors]]
+path = "src/main.rs"
+lines = "1-3"
+role = "modify"
+note = "the entry point"
+[[phases.tasks.anchors]]
+path = "src/lib.rs"
+role = "read"
+"#,
+        tmp.path(),
+    );
+    let resolved = plan.resolve_tasks().expect("resolve");
+    let anchors = &resolved[0].anchors;
+    assert_eq!(anchors.len(), 2);
+    assert_eq!(anchors[0].path, "src/main.rs");
+    assert_eq!(anchors[0].citation(), "src/main.rs:1-3");
+    assert_eq!(anchors[0].role.to_string(), "modify");
+    // role defaults to `read` when omitted
+    assert_eq!(anchors[1].role.to_string(), "read");
+    assert_eq!(anchors[1].citation(), "src/lib.rs");
+}
+
+#[test]
+fn anchors_render_into_task_file() {
+    let tmp = TempDir::new().expect("temp dir");
+    let plan = anchor_plan(
+        r#"
+[[phases.tasks.anchors]]
+path = "src/main.rs"
+lines = "1-3"
+role = "modify"
+note = "the entry point"
+[[phases.tasks.anchors]]
+path = "src/lib.rs"
+role = "create"
+note = "new library module"
+"#,
+        tmp.path(),
+    );
+    let artifacts = generation::generate_all(&plan).expect("generation");
+    let task_body = artifacts
+        .tasks
+        .iter()
+        .find(|(_, body)| body.contains("Wire the thing"))
+        .map(|(_, body)| body.clone())
+        .expect("task file");
+
+    assert!(task_body.contains("## Code Anchors"));
+    assert!(task_body.contains("`src/main.rs:1-3`"));
+    assert!(task_body.contains("**modify**"));
+    assert!(task_body.contains("the entry point"));
+    // A file-level anchor renders without a line range.
+    assert!(task_body.contains("`src/lib.rs`"));
+    assert!(task_body.contains("**create**"));
+}
+
+#[test]
+fn anchor_drift_is_reported_when_file_moves() {
+    let tmp = TempDir::new().expect("temp dir");
+    std::fs::create_dir_all(tmp.path().join("src")).expect("mkdir");
+    std::fs::write(tmp.path().join("src/main.rs"), "fn main() {}\n").expect("write");
+
+    let plan = anchor_plan(
+        r#"
+[[phases.tasks.anchors]]
+path = "src/main.rs"
+lines = "400-500"
+role = "modify"
+note = "region that no longer exists"
+"#,
+        tmp.path(),
+    );
+    let resolved = plan.resolve_tasks().expect("resolve");
+    let diags = wiggum::domain::anchors::lint_anchors(&resolved, tmp.path());
+
+    assert_eq!(
+        diags
+            .iter()
+            .filter(|d| d.rule == "anchor-line-drift")
+            .count(),
+        1,
+        "expected one drift warning, got {diags:?}"
+    );
+}
+
+#[test]
+fn anchor_on_deleted_file_is_an_error() {
+    let tmp = TempDir::new().expect("temp dir");
+    let plan = anchor_plan(
+        r#"
+[[phases.tasks.anchors]]
+path = "src/vanished.rs"
+role = "modify"
+note = "file was deleted"
+"#,
+        tmp.path(),
+    );
+    let resolved = plan.resolve_tasks().expect("resolve");
+    let diags = wiggum::domain::anchors::lint_anchors(&resolved, tmp.path());
+
+    assert_eq!(
+        diags
+            .iter()
+            .filter(|d| d.rule == "anchor-file-missing")
+            .count(),
+        1,
+        "expected one missing-file error, got {diags:?}"
+    );
+}

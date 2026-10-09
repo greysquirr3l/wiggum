@@ -4,6 +4,29 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- **Task code anchors — `[[phases.tasks.anchors]]`** — an optional `path` /
+  `lines` / `role` / `note` block that pins a task to a verified location in
+  the target repo. Anchored tasks render a `## Code Anchors` section into the
+  task file, so the implementer subagent starts at a known location instead of
+  grepping for it. `role` is `read` (default), `modify`, or `create`; `lines`
+  accepts `"42"` or `"42-80"` and is omitted to anchor a whole file. **Entirely
+  opt-in** — a plan with no anchors parses, validates, lints, and generates
+  exactly as before, with no `## Code Anchors` section emitted.
+- **Anchor drift checks in `wiggum validate --lint` and MCP
+  `wiggum_lint_plan`** — anchors are resolved against the project on disk, which
+  makes "the plan says X" checkable. Missing files and directory anchors are
+  **errors**; line ranges past EOF, malformed `lines`, and paths that escape
+  `[project].path` are **warnings**; `create`-role anchors whose file already
+  exists and notes-less anchors are **info**. These run separately from the
+  pure `lint_plan` rules because they need filesystem access, and they no-op
+  entirely when a plan declares no anchors. Diagnostics do not block
+  generation — `validate --lint` reports them and `generate` proceeds.
+  See `docs/anchors.html`.
+
 ## [0.19.1] - 2026-09-19
 
 ### Fixed
