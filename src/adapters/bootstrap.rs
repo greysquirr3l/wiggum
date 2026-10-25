@@ -617,7 +617,7 @@ mod tests {
         assert_eq!(plan.project.language, Language::Rust);
         assert_eq!(plan.project.architecture.as_deref(), Some("hexagonal"));
         assert_eq!(plan.orchestrator.rules, vec!["rule one"]);
-        assert!(!plan.preflight.build.is_empty());
+        assert_ne!(plan.preflight.build, "");
         assert_eq!(plan.phases.len(), 1);
         assert_eq!(plan.phases[0].tasks.len(), 1);
     }
@@ -803,7 +803,7 @@ mod tests {
     fn new_languages_fallback_to_dir_name() {
         let dir = setup_temp_dir();
         let (name, desc) = extract_manifest_info(dir.path(), Language::Python);
-        assert!(!name.is_empty());
-        assert!(desc.is_empty());
+        assert_ne!(name, "");
+        assert_eq!(desc, "");
     }
 }

@@ -994,7 +994,11 @@ fn capabilities_omitted_when_plan_has_none() {
     // directory and must not reference one from IMPLEMENTATION_PLAN.md.
     let plan = load_example_plan();
     let artifacts = generation::generate_all(&plan).expect("generation");
-    assert!(artifacts.capabilities.is_empty());
+    assert!(
+        artifacts.capabilities.is_empty(),
+        "expected no capability artifacts, got {:?}",
+        artifacts.capabilities
+    );
     assert!(!artifacts.plan_doc.contains("## Capabilities"));
 
     let tmp = TempDir::new().expect("temp dir");

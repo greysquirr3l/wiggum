@@ -193,7 +193,7 @@ mod tests {
         let tasks: Vec<ResolvedTask> = vec![];
         let result = validate_dag(&tasks);
         assert!(result.is_ok());
-        assert!(result.unwrap().is_empty());
+        assert!(result.unwrap().is_empty(), "expected no DAG errors");
     }
 
     #[test]
