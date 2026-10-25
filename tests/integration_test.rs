@@ -1020,13 +1020,17 @@ fn capabilities_omitted_when_plan_has_none() {
 
 /// Build a minimal single-task plan, optionally with anchors.
 fn anchor_plan(anchors_toml: &str, root: &std::path::Path) -> Plan {
+    // Serialise the path through the `toml` crate rather than interpolating
+    // it raw: on Windows a temp path contains backslashes, and `\U` is an
+    // invalid escape in a TOML basic string.
+    let path = toml::Value::String(root.display().to_string()).to_string();
     let toml = format!(
         r#"
 [project]
 name = "anchor-test"
 description = "Anchor fixture."
 language = "rust"
-path = "{}"
+path = {path}
 
 [preflight]
 build = "cargo build"
@@ -1045,9 +1049,22 @@ hints = ["Follow the existing wiring."]
 test_hints = ["Add a test."]
 {anchors_toml}
 "#,
-        root.display(),
     );
     Plan::from_toml(&toml).expect("parse")
+}
+
+#[test]
+fn anchor_plan_toml_handles_windows_paths() {
+    // On Windows a temp path contains backslashes, and `\U` is not a valid
+    // escape inside a TOML basic string — so a raw-interpolated path makes
+    // the whole plan unparseable. Backslashes are legal filename characters
+    // on Unix, so this reproduces the Windows failure on every platform.
+    let root = PathBuf::from(r"C:\Users\RUNNER~1\AppData\Local\Temp\.tmpX");
+    let plan = anchor_plan("", &root);
+    assert_eq!(
+        plan.project.path,
+        r"C:\Users\RUNNER~1\AppData\Local\Temp\.tmpX"
+    );
 }
 
 #[test]
