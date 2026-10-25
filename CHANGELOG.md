@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-10-24
+
 ### Added
 
 - **Task code anchors — `[[phases.tasks.anchors]]`** — an optional `path` /
@@ -27,11 +29,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
   generation — `validate --lint` reports them and `generate` proceeds.
   See `docs/anchors.html`.
 
-## [0.19.1] - 2026-09-19
-
 ### Fixed
 
 - **CI: auto-tag workflow now detects release commits on squash-merge** — the `auto-tag.yml` gate used to check the head commit subject for `chore(release):*`. That matched on plain merge commits but **broke when a release commit was squash-merged** — GitHub uses the PR title as the squash subject, dropping the inner `chore(release):` prefix. Result on PR #105 (v0.19.0): the gate skipped, v0.19.0 had to be tagged by hand. Switched the gate to inspect the **diff** (`git diff HEAD~1 HEAD -- Cargo.toml | grep -E '^\+version = '`) so it fires for squash, merge, and rebase alike. A secondary subject filter rejects `ci(*)`, `chore(deps)`, and `chore(deps/*)` so dependabot Cargo.toml rewrites don't trip the gate.
+- **Windows: anchored paths with a root but no drive prefix escaped the project root** — `resolve_anchor_path` rejected absolute paths with `Path::is_absolute`, which on Windows requires *both* a drive prefix and a root. `/etc/passwd` has a root but no prefix, so it was treated as relative and joined onto the project root — landing outside it, and reporting `anchor-file-missing` instead of `anchor-escapes-root`. The check now inspects path components directly and rejects any `RootDir` or `Prefix`, so every absolute shape is caught on every platform.
+
+### Changed
+
+- **MSRV 1.95.0 → 1.99.0** — `rust-version` and the `RUST_VERSION` pin in the CI, release, and security workflows now target Rust 1.99.0. The crate needed no source changes for the new toolchain beyond the lint fixes below; the `dead_code_pub_in_binary` deny in `src/main.rs` was previously gated behind `cfg(rust_version_gte = "1.97")`, a nightly-only cfg that never evaluated on stable, so the lint was dormant. It is now applied unconditionally, which also removes the need for `#![allow(unexpected_cfgs)]`.
+- **Release folded the planned v0.19.1 into v0.20.0** — v0.19.1 was never published; its only change (the auto-tag gate fix above) ships here instead. The version takes a minor bump because this release adds the anchors feature, matching the project's convention of reserving patch releases for fixes.
+- **Dependency roll-up (10 updates)** — `cc` 1.4.5→1.4.7, `cfg-if` 1.0.4→1.0.5, `toml_edit` 0.25.13→0.25.15, `unicode-ident` 1.0.24→1.0.26, `zerocopy` 0.8.56→0.8.57, plus `actions/attest-build-provenance`, `actions/deploy-pages` 5.0.0→5.0.1, and `ossf/scorecard-action` 2.4.3→2.4.4.
 
 ## [0.19.0] - 2026-09-19
 
