@@ -36,7 +36,16 @@ use crate::domain::plan::{Anchor, AnchorRole, ResolvedTask};
 fn resolve_anchor_path(root: &Path, anchor_path: &str) -> Option<PathBuf> {
     let candidate = Path::new(anchor_path);
 
-    if candidate.is_absolute() {
+    // Reject anything that is not project-relative. `Path::is_absolute` is
+    // not sufficient on its own: on Windows it requires a drive prefix, so
+    // `/etc/passwd` (a root with no prefix) and `C:foo` (a prefix with no
+    // root) both report `false` yet still escape the project root when
+    // joined. Inspecting the components catches every shape — `RootDir` on
+    // Unix, `RootDir` or `Prefix` on Windows — regardless of platform.
+    if candidate
+        .components()
+        .any(|c| matches!(c, Component::RootDir | Component::Prefix(_)))
+    {
         return None;
     }
     if candidate
@@ -338,6 +347,21 @@ mod tests {
     fn absolute_path_is_rejected() {
         let dir = tempfile::tempdir().unwrap();
         let task = task_with(vec![anchor("/etc/passwd", None, AnchorRole::Read)]);
+        let diags = lint_anchors(&[task], dir.path());
+        assert_eq!(diags.first().map(|d| d.rule), Some("anchor-escapes-root"));
+    }
+
+    /// A path with a root but no drive prefix is *not* absolute on Windows,
+    /// where `Path::is_absolute` requires a prefix. It still escapes the
+    /// project root, so it must be rejected on every platform.
+    #[test]
+    fn rooted_path_without_prefix_is_rejected() {
+        let dir = tempfile::tempdir().unwrap();
+        let task = task_with(vec![anchor(
+            "//server/share/file.rs",
+            None,
+            AnchorRole::Read,
+        )]);
         let diags = lint_anchors(&[task], dir.path());
         assert_eq!(diags.first().map(|d| d.rule), Some("anchor-escapes-root"));
     }
