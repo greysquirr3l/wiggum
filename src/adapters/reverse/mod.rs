@@ -257,6 +257,8 @@ fn apply_hints_to_plan(plan: &mut Plan, h: &hints::Hints) {
                         gate: t.gate.clone(),
                         evaluation_criteria: Vec::new(),
                         kind: crate::domain::plan::TaskKind::default(),
+                        implements: Vec::new(),
+                        anchors: Vec::new(),
                     })
                     .collect(),
             };
@@ -423,6 +425,7 @@ mod tests {
             integration: IntegrationConfig::default(),
             style: StyleConfig::default(),
             targets: TargetConfig::default(),
+            capabilities: Vec::new(),
             phases: Vec::new(),
         }
     }

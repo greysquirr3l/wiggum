@@ -34,6 +34,7 @@ fn empty_plan() -> wiggum::domain::plan::Plan {
         integration: IntegrationConfig::default(),
         style: StyleConfig::default(),
         targets: TargetConfig::default(),
+        capabilities: Vec::new(),
         phases: Vec::new(),
     }
 }

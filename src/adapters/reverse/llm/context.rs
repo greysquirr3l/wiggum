@@ -258,6 +258,9 @@ mod tests {
     fn readme_excerpt_returns_empty_when_absent() {
         let dir = tempfile::TempDir::new().unwrap();
         let excerpt = read_readme_excerpt(dir.path(), 1024).unwrap();
-        assert!(excerpt.is_empty());
+        assert!(
+            excerpt.is_empty(),
+            "expected no README excerpt, got {excerpt:?}"
+        );
     }
 }
