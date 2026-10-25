@@ -1,8 +1,8 @@
 [package]
 name = "wiggum"
-version = "0.19.1"
+version = "0.20.0"
 edition = "2024"
-rust-version = "1.95.0"
+rust-version = "1.99.0"
 description = "Agentic implementation scaffold generator for dependency-aware AI coding workflows"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/greysquirr3l/wiggum"
