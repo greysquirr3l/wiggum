@@ -7,8 +7,8 @@
 //! placeholder phases the deterministic scan produced.
 //!
 //! Two providers are supported today:
-//! - [`anthropic`] — Anthropic Claude (api.anthropic.com)
-//! - [`minimax`]  — `MiniMax` (api.minimax.io/anthropic, Anthropic-shaped)
+//! - `anthropic` — Anthropic Claude (api.anthropic.com)
+//! - `minimax` — `MiniMax` (api.minimax.io/anthropic, Anthropic-shaped)
 //!
 //! Both speak the same JSON wire format (Anthropic Messages API), so the
 //! request/response machinery is shared in [`client::AnthropicMessagesClient`].
