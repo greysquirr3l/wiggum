@@ -10,19 +10,19 @@ where the work happens.
 
 ## Why they exist
 
-A task goal like *"extend the retry logic in the delivery worker"* sends the
+A task goal like _"extend the retry logic in the delivery worker"_ sends the
 implementer subagent hunting. It greps, finds three plausible sites, picks one,
 and may produce a plausible-looking change to the wrong file.
 
 An anchor replaces the guess with a citation:
 
-````toml
+```toml
 [[phases.tasks.anchors]]
 path = "src/adapters/queue.rs"
 lines = "88-140"
 role = "modify"
 note = "the exponential-backoff loop — replace the fixed 30s sleep"
-````
+```
 
 The subagent starts at a known location. It also has a cheap way to notice when
 its instructions have gone stale: if the cited region no longer looks like the
@@ -54,12 +54,12 @@ note = "new module — compute the next delay from the attempt count"
 
 ### Fields
 
-| Field   | Required | Type   | Description |
-| ------- | -------- | ------ | ----------- |
-| `path`  | yes      | string | Path **relative to `[project].path`**. Absolute paths and paths containing `..` are rejected. |
+| Field   | Required | Type   | Description                                                                                                            |
+| ------- | -------- | ------ | ---------------------------------------------------------------------------------------------------------------------- |
+| `path`  | yes      | string | Path **relative to `[project].path`**. Absolute paths and paths containing `..` are rejected.                          |
 | `lines` | no       | string | Inclusive 1-based range: `"42"` or `"42-80"`. Reversed input (`"80-42"`) is normalised. Omit to anchor the whole file. |
-| `role`  | no       | string | `read` (default), `modify`, or `create`. |
-| `note`  | no       | string | Why this location matters — the symbol to extend, the behaviour to change. |
+| `role`  | no       | string | `read` (default), `modify`, or `create`.                                                                               |
+| `note`  | no       | string | Why this location matters — the symbol to extend, the behaviour to change.                                             |
 
 `role` drives the checks: `create` asserts the file does **not** exist yet;
 `read` and `modify` assert it does.
@@ -69,7 +69,7 @@ note = "new module — compute the next delay from the attempt count"
 Anchors are inlined into the generated task file under a `## Code Anchors`
 section, so the subagent sees them without opening anything else:
 
-````markdown
+```markdown
 ## Code Anchors
 
 Start here before searching. These locations were verified against the codebase
@@ -77,7 +77,7 @@ when the plan was written; if one no longer matches, trust the code over the pla
 
 - `src/adapters/queue.rs:88-140` — **modify**: the fixed 30s sleep and the retry counter around it
 - `src/domain/backoff.rs` — **create**: new module — compute the next delay from the attempt count
-````
+```
 
 Tasks with no anchors get no such section.
 
@@ -86,18 +86,18 @@ Tasks with no anchors get no such section.
 `wiggum validate --lint` resolves every anchor against the project on disk. This
 is what turns "the plan says X" into something checkable.
 
-| Condition | Rule | Severity |
-| --------- | ---- | -------- |
-| `path` is empty | `anchor-empty-path` | error |
-| File missing (`read`/`modify`) | `anchor-file-missing` | error |
-| Path is a directory | `anchor-is-directory` | error |
-| Path is absolute or escapes the project root | `anchor-escapes-root` | warning |
-| Line range ends past the last line | `anchor-line-drift` | warning |
-| `lines` is not parseable | `anchor-bad-lines` | warning |
-| File not readable as UTF-8 | `anchor-unreadable` | info |
-| `role = "create"` but the file already exists | `anchor-already-created` | info |
-| No `note` supplied | `anchor-no-note` | info |
-| `[project].path` does not exist | `anchor-root-missing` | warning (reported once) |
+| Condition                                     | Rule                     | Severity                |
+| --------------------------------------------- | ------------------------ | ----------------------- |
+| `path` is empty                               | `anchor-empty-path`      | error                   |
+| File missing (`read`/`modify`)                | `anchor-file-missing`    | error                   |
+| Path is a directory                           | `anchor-is-directory`    | error                   |
+| Path is absolute or escapes the project root  | `anchor-escapes-root`    | warning                 |
+| Line range ends past the last line            | `anchor-line-drift`      | warning                 |
+| `lines` is not parseable                      | `anchor-bad-lines`       | warning                 |
+| File not readable as UTF-8                    | `anchor-unreadable`      | info                    |
+| `role = "create"` but the file already exists | `anchor-already-created` | info                    |
+| No `note` supplied                            | `anchor-no-note`         | info                    |
+| `[project].path` does not exist               | `anchor-root-missing`    | warning (reported once) |
 
 ```console
 $ wiggum validate plan.toml --lint
@@ -138,9 +138,9 @@ it.
 
 Capabilities and anchors answer different questions:
 
-- A **capability** says *what must be true* of the system — `WHEN ... THEN ...`
+- A **capability** says _what must be true_ of the system — `WHEN ... THEN ...`
   scenarios, invariant across tasks and phases.
-- An **anchor** says *where in the code* a specific task does its work.
+- An **anchor** says _where in the code_ a specific task does its work.
 
 They compose: a task can implement a capability _and_ anchor to the region it
 edits. Anchors are per-task and usually short-lived; capabilities are

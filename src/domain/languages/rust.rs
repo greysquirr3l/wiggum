@@ -77,8 +77,8 @@ pub static PROFILE: &LanguageProfile = &LanguageProfile {
     ],
 
     // Mirrors `~/Projects/nick-v2.md` (Rust Standards, supersedes the
-    // original `nick.md`) and the Rust 1.78→1.98 catchup guide at
-    // `~/Projects/rust/rust-docs/rust-catchup-1.78-1.98.md`. Opt-in via
+    // original `nick.md`) and the Rust 1.78→1.99 catchup guide at
+    // `~/Projects/rust/rust-docs/rust-catchup-1.78-1.99.md`. Opt-in via
     // `[style] strict = true` in the plan TOML. The goal is to keep the
     // generated Rust genuinely idiomatic — no panic-shaped code paths, no
     // silenced clippy lints, DDD-lite hexagonal layout with narrow port
@@ -101,7 +101,7 @@ pub static PROFILE: &LanguageProfile = &LanguageProfile {
         "Deterministic domain APIs: pass time / clock / RNG into domain functions explicitly rather than calling `Utc::now()`, `Instant::now()`, or `rand::thread_rng()` inside them.",
         "Prefer `LazyLock` (stable since 1.80) over `lazy_static!` for static initialisation.",
         "Doc comments (`///`) on public items must include `# Examples`, `# Errors`, and `# Panics` sections where the function can fail in any of those ways.",
-        // ── New 15 rules from nick-v2.md + rust-catchup-1.78-1.98.md ──
+        // ── New 15 rules from nick-v2.md + rust-catchup-1.78-1.99.md ──
         "Use DDD-lite hexagonal layout for multi-crate projects: standardise on `src/{domain,ports,application,adapters}` and keep workspace crate count intentionally low; cohesive crates beat fine-grained splits.",
         "Each command/query handler defines a narrow port trait covering only the methods it uses (1–3 max). Compose via supertraits (`trait Foo: Read + Write {}`) when a handler genuinely needs multiple methods — never share a wide 'Repository' trait across handlers.",
         "Keep security predicates (e.g. `can_user_see_x`) as pure domain functions with default-deny. The port interface lives in the handler; the security rule lives in `domain/`.",

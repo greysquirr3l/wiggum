@@ -786,8 +786,8 @@ pub struct StyleConfig {
     /// `#[cfg(unix)]` cross-platform hygiene) plus the original
     /// panic-free baseline (no `.unwrap()` / `.expect()` in production,
     /// no index slicing, no `#[allow(clippy::...)]` suppressions, prefer
-    /// `.is_multiple_of(n)`, etc.). The Rust 1.78→1.98 catchup guide at
-    /// `~/Projects/rust/rust-docs/rust-catchup-1.78-1.98.md` is the source
+    /// `.is_multiple_of(n)`, etc.). The Rust 1.78→1.99 catchup guide at
+    /// `~/Projects/rust/rust-docs/rust-catchup-1.78-1.99.md` is the source
     /// of truth for the toolchain version that ships these features. For
     /// Go, TypeScript, Python, Java, C#, Kotlin, Swift, Ruby, Elixir,
     /// and PHP the rulesets follow the profiles in
