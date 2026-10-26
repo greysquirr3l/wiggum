@@ -470,7 +470,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -1257,9 +1257,9 @@ dependencies = [
 
 [[package]]
 name = "protocol-droid"
-version = "0.5.2"
+version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fd865fed65f43f3cbeb08f65bad252c955a4488c3dde6f652306e9b86e4ff3aa"
+checksum = "85bdb1767a3898edab3a89aefc4459f6f9bde16b4f333f7dc69b7d2deca1b649"
 dependencies = [
  "arc-swap",
  "hmac",
@@ -1275,9 +1275,9 @@ dependencies = [
 
 [[package]]
 name = "protocol-droid-macros"
-version = "0.5.2"
+version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "efd932596725920d0d9afd4f649c1b894340ce99ecd814b560b0e876526ade81"
+checksum = "0f52ab12cbe338723bb7b2a0fef5fa31d0d017c4261f9971fd98b152021a1c38"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1286,9 +1286,9 @@ dependencies = [
 
 [[package]]
 name = "protocol-droid-schema"
-version = "0.5.2"
+version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4eb253c967c1a3966e988b7f335caa6848e72476d162f11f238b125d5f8cfc87"
+checksum = "421cd5a4a25c75dd018601445bcafe3d82dc218964bffcbb6181ba6e66cc742e"
 dependencies = [
  "serde",
  "serde_json",
@@ -1350,7 +1350,7 @@ dependencies = [
  "once_cell",
  "socket2",
  "tracing",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -1561,7 +1561,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -1920,7 +1920,7 @@ dependencies = [
  "getrandom 0.4.3",
  "once_cell",
  "rustix",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -2407,7 +2407,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
