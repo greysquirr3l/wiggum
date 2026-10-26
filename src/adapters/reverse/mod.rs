@@ -98,9 +98,7 @@ pub fn run_reverse(opts: &ReverseOptions) -> Result<PathBuf> {
         drop(clone.guard);
     }
 
-    let (plan, scan_summary) = result?;
-
-    bootstrap::print_scan_summary(&scan_summary, Path::new("<repo>"));
+    let plan = result?;
 
     let toml_content = toml::to_string_pretty(&plan)
         .map_err(|e| WiggumError::Validation(format!("serialize plan: {e}")))?;
@@ -125,7 +123,7 @@ fn generate_plan(
     repo_path: &Path,
     hints_path: Option<&Path>,
     opts: &ReverseOptions,
-) -> Result<(Plan, ScanResult)> {
+) -> Result<Plan> {
     let mut scan = bootstrap::scan_project(repo_path)?;
 
     let loaded_hints = if let Some(path) = hints_path {
@@ -150,6 +148,13 @@ fn generate_plan(
     // for project.path; the user will override it via their plan once generated.
     // But we want it to reflect the actual repo they're targeting, so overwrite:
     plan.project.path = "<repo>".to_string();
+
+    // The scan summary is printed here, before the LLM pass, and the scan is
+    // not handed back alongside the plan. The LLM pass is where the API key
+    // enters the picture and the plan it produces is derived from that call
+    // — so a plan and a scan returned together would carry the key into the
+    // summary that gets printed.
+    bootstrap::print_scan_summary(&scan, Path::new("<repo>"));
 
     // Optional LLM pass — replaces the placeholder phases with intelligent ones.
     if let Some(provider_str) = &opts.llm {
@@ -193,7 +198,7 @@ fn generate_plan(
         }
     }
 
-    Ok((plan, scan))
+    Ok(plan)
 }
 
 /// Apply hint overrides to the raw scan result.

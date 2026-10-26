@@ -36,8 +36,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
   — the LLM client holds the key, and both the scan and the plan were handed to
   the same calls, which the taint analysis reads as the key reaching the
   summary that gets printed. The prompt is rendered before the key is resolved,
-  the model's answer is returned rather than merged in place, and the phases
-  are assigned by the caller, so the key travels with nothing else.
+  the model's answer is returned rather than merged in place, the phases are
+  assigned by the caller, and the scan is printed before the LLM pass rather
+  than returned next to the plan — so the key travels with nothing else.
 
 ## [0.21.0] - 2026-10-25
 
