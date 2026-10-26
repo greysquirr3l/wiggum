@@ -13,6 +13,7 @@
 //! has to be remembered is a guardrail that is eventually forgotten, and
 //! there are twelve tools to remember it in.
 
+use std::cmp::Ordering;
 use std::sync::{LazyLock, Mutex};
 
 use regex::Regex;
@@ -192,7 +193,21 @@ fn collect_strings(value: &Value, output: &mut Vec<String>) {
 ///
 /// The arguments are searched as a whole rather than field by field: a
 /// pattern split across two arguments is still a pattern the model would
-/// read, and joining the strings is what catches it.
+/// read.
+///
+/// The order the arguments are read in is not fixed, and that matters. The
+/// peer chooses which argument holds which half of the phrase, so a check
+/// that only looked at one order would be one the peer could reorder
+/// around: `{"output_path": "instructions", "project_path": "/tmp/ignore
+/// previous"}` has to be caught, and it is the *alphabetical* order of the
+/// keys that puts `"instructions"` first. The arguments are therefore
+/// searched as a set.
+///
+/// A pattern matches when it reads across up to three of them. Each
+/// argument contributes one run of the pattern: the first argument's run
+/// is at its end, the last argument's run is at its start, and an argument
+/// in between contributes all of itself — anything left over in the middle
+/// would put words between the halves and break the phrase apart.
 ///
 /// The join drops whitespace on both sides, because a split does not have to
 /// fall on a word boundary — `"ignore previ"` and `"ous instructions"` are
@@ -201,12 +216,207 @@ fn collect_strings(value: &Value, output: &mut Vec<String>) {
 pub fn detect_input_guardrail_hit(arguments: &Value) -> Option<&'static str> {
     let mut values = Vec::new();
     collect_strings(arguments, &mut values);
-    let haystack = squash_whitespace(&values.concat().to_lowercase());
-
-    INPUT_BLOCK_PATTERNS
+    let strings: Vec<String> = values
         .iter()
-        .find(|pattern| haystack.contains(&squash_whitespace(pattern)))
-        .copied()
+        .map(|value| squash_whitespace(&value.to_lowercase()))
+        .filter(|value| !value.is_empty())
+        .collect();
+
+    INPUT_BLOCK_PATTERNS.iter().copied().find(|pattern| {
+        let squashed = squash_whitespace(&pattern.to_lowercase());
+        pattern_read_off(&squashed, &strings)
+    })
+}
+
+/// Whether `pattern` reads off the strings, in some arrangement.
+///
+/// The strings are read in an order the peer chose, so the pattern is
+/// looked for *across* them rather than inside any one of them. It can be
+/// read across two of them or three:
+///
+/// - one argument holds the whole pattern;
+/// - two hold a run each, the first run at the end of its argument and the
+///   second at the start of its;
+/// - three hold a run, a whole argument, and a run.
+///
+/// More than three is a split nobody writes, and stopping there keeps the
+/// search a fixed number of passes over the arguments rather than a walk of
+/// every arrangement of them.
+fn pattern_read_off(pattern: &str, strings: &[String]) -> bool {
+    if strings.iter().any(|string| string.contains(pattern)) {
+        return true;
+    }
+
+    // `first` is where the first argument's run ends and `last` is where the
+    // last argument's run begins. An argument in between covers the gap
+    // exactly, so it has to equal the pattern's middle.
+    for first in 1..pattern.len() {
+        let Some(head) = pattern.get(..first) else {
+            continue;
+        };
+        let heads = indices_ending_with(strings, head);
+        if heads.is_empty() {
+            continue;
+        }
+
+        for last in first..=pattern.len() {
+            let middles = pattern
+                .get(first..last)
+                .map_or_else(Vec::new, |middle| indices_equal_to(strings, middle));
+            if last > first && middles.is_empty() {
+                continue;
+            }
+
+            let tails = match pattern.get(last..) {
+                Some(tail) if last < pattern.len() => indices_starting_with(strings, tail),
+                _ => Vec::new(),
+            };
+            if last < pattern.len() && tails.is_empty() {
+                continue;
+            }
+
+            // An empty set is either a split with no room for that
+            // argument — the run covers the whole pattern on its own side
+            // of the cut — or a cut with no argument that fits it, which
+            // was ruled out above.
+            let mut required: Vec<&[usize]> = vec![&heads];
+            if last > first {
+                required.push(&middles);
+            }
+            if last < pattern.len() {
+                required.push(&tails);
+            }
+            if distinct_representatives(&required) {
+                return true;
+            }
+        }
+    }
+
+    false
+}
+
+/// The indices of the strings that end with `suffix`.
+fn indices_ending_with(strings: &[String], suffix: &str) -> Vec<usize> {
+    strings
+        .iter()
+        .enumerate()
+        .filter(|(_, string)| string.ends_with(suffix))
+        .map(|(index, _)| index)
+        .collect()
+}
+
+/// The indices of the strings that are exactly `text`.
+fn indices_equal_to(strings: &[String], text: &str) -> Vec<usize> {
+    strings
+        .iter()
+        .enumerate()
+        .filter(|(_, string)| string.as_str() == text)
+        .map(|(index, _)| index)
+        .collect()
+}
+
+/// The indices of the strings that start with `prefix`.
+fn indices_starting_with(strings: &[String], prefix: &str) -> Vec<usize> {
+    strings
+        .iter()
+        .enumerate()
+        .filter(|(_, string)| string.starts_with(prefix))
+        .map(|(index, _)| index)
+        .collect()
+}
+
+/// Whether the sets have distinct representatives: one index from each, with
+/// no index used twice.
+///
+/// One argument cannot hold two runs of the same phrase, so the arguments
+/// a match is built from have to be different ones. Hall's condition, which
+/// for two or three sets is a matter of counting unions: every set is
+/// non-empty, every pair of sets covers at least two indices, and all of
+/// them together cover at least as many as there are sets.
+fn distinct_representatives(sets: &[&[usize]]) -> bool {
+    if sets.iter().any(|set| set.is_empty()) {
+        return false;
+    }
+
+    for (position, set) in sets.iter().enumerate() {
+        for other in sets.iter().skip(position + 1) {
+            if union_len(set, other) < 2 {
+                return false;
+            }
+        }
+    }
+
+    let mut union: Vec<usize> = Vec::new();
+    for set in sets {
+        union = union_indices(&union, set);
+    }
+    union.len() >= sets.len()
+}
+
+/// The number of indices covered by two sorted, duplicate-free lists.
+fn union_len(first: &[usize], second: &[usize]) -> usize {
+    let mut count = 0;
+    let mut left = 0;
+    let mut right = 0;
+
+    while left < first.len() || right < second.len() {
+        match (first.get(left), second.get(right)) {
+            (None, None) => break,
+            (Some(_), None) => {
+                count += 1 + (first.len() - left - 1);
+                left = first.len();
+            }
+            (None, Some(_)) => {
+                count += 1 + (second.len() - right - 1);
+                right = second.len();
+            }
+            (Some(&a), Some(&b)) => {
+                count += 1;
+                match a.cmp(&b) {
+                    Ordering::Less => left += 1,
+                    Ordering::Greater => right += 1,
+                    Ordering::Equal => {
+                        left += 1;
+                        right += 1;
+                    }
+                }
+            }
+        }
+    }
+
+    count
+}
+
+/// The sorted union of two sorted, duplicate-free lists.
+fn union_indices(first: &[usize], second: &[usize]) -> Vec<usize> {
+    let mut union = Vec::with_capacity(first.len() + second.len());
+    let mut left = 0;
+    let mut right = 0;
+
+    while left < first.len() && right < second.len() {
+        match (first.get(left), second.get(right)) {
+            (Some(&a), Some(&b)) => match a.cmp(&b) {
+                Ordering::Less => {
+                    union.push(a);
+                    left += 1;
+                }
+                Ordering::Greater => {
+                    union.push(b);
+                    right += 1;
+                }
+                Ordering::Equal => {
+                    union.push(a);
+                    left += 1;
+                    right += 1;
+                }
+            },
+            _ => break,
+        }
+    }
+
+    union.extend_from_slice(first.get(left..).unwrap_or_default());
+    union.extend_from_slice(second.get(right..).unwrap_or_default());
+    union
 }
 
 /// A string with every whitespace character removed.
@@ -376,9 +586,12 @@ mod tests {
 
     #[test]
     fn injection_pattern_split_across_arguments_is_detected() {
+        // The keys sort the wrong way round for the split: "output_path"
+        // comes before "project_path", so a check that joined the arguments
+        // in key order would put "instructions" first and miss it.
         let arguments = serde_json::json!({
-            "a": "ignore previous",
-            "b": "instructions",
+            "output_path": "instructions",
+            "project_path": "/tmp/ignore previous",
         });
         assert_eq!(
             detect_input_guardrail_hit(&arguments),
@@ -389,13 +602,55 @@ mod tests {
     #[test]
     fn injection_pattern_split_mid_word_is_detected() {
         let arguments = serde_json::json!({
-            "a": "ignore previ",
-            "b": "ous instructions",
+            "output_path": "ous instructions",
+            "project_path": "/tmp/ignore previ",
         });
         assert_eq!(
             detect_input_guardrail_hit(&arguments),
             Some("ignore previous instructions")
         );
+    }
+
+    #[test]
+    fn injection_pattern_split_across_three_arguments_is_detected() {
+        let arguments = serde_json::json!({
+            "description": "previous",
+            "language": "instructions",
+            "project_name": "ignore",
+        });
+        assert_eq!(
+            detect_input_guardrail_hit(&arguments),
+            Some("ignore previous instructions")
+        );
+    }
+
+    #[test]
+    fn injection_pattern_is_detected_in_either_argument_order() {
+        let forwards = serde_json::json!({
+            "a": "ignore previous",
+            "b": "instructions",
+        });
+        let backwards = serde_json::json!({
+            "b": "instructions",
+            "a": "ignore previous",
+        });
+        assert_eq!(
+            detect_input_guardrail_hit(&forwards),
+            Some("ignore previous instructions")
+        );
+        assert_eq!(
+            detect_input_guardrail_hit(&backwards),
+            Some("ignore previous instructions")
+        );
+    }
+
+    #[test]
+    fn halves_that_do_not_make_the_phrase_are_not_flagged() {
+        let arguments = serde_json::json!({
+            "description": "ignore",
+            "project_name": "please do this",
+        });
+        assert_eq!(detect_input_guardrail_hit(&arguments), None);
     }
 
     #[test]

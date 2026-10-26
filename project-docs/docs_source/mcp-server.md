@@ -66,7 +66,7 @@ Each tool's `inputSchema` is derived from its Rust signature rather than written
 
 MCP `tools/call` execution includes a baseline guardrail pipeline:
 
-- **Input guardrail**: blocks mutating tools when arguments contain common prompt-injection patterns (for example, attempts to override instructions or request exfiltration). The arguments are searched as a whole, so a pattern split across two arguments — or split mid-word — is still caught.
+- **Input guardrail**: blocks mutating tools when arguments contain common prompt-injection patterns (for example, attempts to override instructions or request exfiltration). The arguments are searched as a set rather than in any fixed order, so a pattern split across two or three arguments — or split mid-word — is still caught whatever order the arguments arrive in.
 - **Output redaction**: redacts common sensitive values in tool output text before returning content to the caller (emails, SSN format, bearer tokens, and basic secret-assignment patterns).
 - **Output hard block**: blocks responses that still contain high-risk secret markers (for example private key headers).
 - **Security events**: emits structured security events via `tracing` with event type, tool name, and detail for incident investigation.

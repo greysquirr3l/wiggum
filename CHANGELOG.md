@@ -32,13 +32,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
     negotiated onto** (`2024-11-05` through `2025-11-25`) rather than one
     hardcoded revision. The revision in use is settled between the server and
     the peer, so the range is the fact the server can actually state.
-- **MCP guardrails: a prompt-injection pattern split across two arguments is
+- **MCP guardrails: a prompt-injection pattern split across arguments is
   now caught** — the input guardrail joined the argument strings with a
   newline, so `"ignore previous"` in one argument and `"instructions"` in
   another never matched the pattern, even though the doc comment said the
-  arguments were "searched as a whole". The haystack is now compared with
-  whitespace removed on both sides, which also catches a pattern split
-  mid-word (`"ignore previ"` + `"ous instructions"`).
+  arguments were "searched as a whole". The arguments are now searched as a
+  set, so the pattern is caught however the arguments are ordered: the peer
+  chooses which argument holds which half, and a check that assumed one
+  order was one the peer could reorder around. A pattern may be split
+  across two or three arguments, and the comparison drops whitespace on
+  both sides, which also catches a pattern split mid-word (`"ignore previ"` +
+  `"ous instructions"`).
 
 ### Fixed
 
