@@ -283,6 +283,7 @@ mod tests {
             phase_order: 1,
             kind: crate::domain::plan::TaskKind::default(),
             implements: vec![],
+            anchors: vec![],
         }
     }
 
@@ -322,6 +323,7 @@ mod tests {
                     evaluation_criteria: vec![],
                     kind: crate::domain::plan::TaskKind::default(),
                     implements: Vec::new(),
+                    anchors: vec![],
                 }],
             }],
         }

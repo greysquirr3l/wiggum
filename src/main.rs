@@ -1,14 +1,10 @@
-#![cfg_attr(
-    rust_version_gte = "1.97",
-    deny(dead_code_pub_in_binary),
-    // T13 — deny-by-default for unused `pub` items in this binary crate
-    // (warn-by-default in Cargo 1.97+). Catches dead `pub fn`s in main.rs
-    // that would otherwise pass CI but contribute nothing.
-)]
-// `rust_version_gte` is a nightly-only cfg flag; allow the lint so
-// stable toolchains don't fail. The cfg_attr above is a no-op on stable
-// anyway.
-#![allow(unexpected_cfgs)]
+// T13 — deny-by-default for unused `pub` items in this binary crate
+// (warn-by-default in Cargo 1.97+). Catches dead `pub fn`s in main.rs
+// that would otherwise pass CI but contribute nothing.
+//
+// The lint is stable as of Rust 1.97, so it is applied unconditionally —
+// the MSRV is 1.99.
+#![deny(dead_code_pub_in_binary)]
 
 use std::path::{Path, PathBuf};
 use std::process;
@@ -592,7 +588,13 @@ fn cmd_validate(plan_path: &Path, run_lint: bool) -> wiggum::error::Result<()> {
     }
 
     if run_lint {
-        let diagnostics = lint::lint_plan(&plan, &resolved);
+        let mut diagnostics = lint::lint_plan(&plan, &resolved);
+        // Anchor drift checks need filesystem access, so they run separately
+        // from the pure `lint_plan` rules. No-ops when the plan has no anchors.
+        let root = PathBuf::from(&plan.project.path);
+        diagnostics.extend(wiggum::domain::anchors::lint_anchors(&resolved, &root));
+        diagnostics.sort_by_key(|d| std::cmp::Reverse(d.severity));
+
         if diagnostics.is_empty() {
             println!("\n✅ Lint: no issues");
         } else {

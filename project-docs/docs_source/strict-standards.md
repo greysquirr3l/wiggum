@@ -27,14 +27,14 @@ strict = false
 
 Each language profile defines a `strict_rules` array that is injected as a new section in the generated prompts only when `strict = true`. The rules are language-specific but share a common theme: they encode the modern, security-centric baseline that the language's toolchain makes possible when fully engaged.
 
-For Rust, strict mode mirrors the rules in your project's `nick-v2.md` (the personal standards file; supersedes the original `nick.md`). New rules are sourced from the Rust 1.78→1.98 catchup guide at `~/Projects/rust/rust-docs/rust-catchup-1.78-1.98.md`. For every other language, the ruleset is documented in the companion file `docs/strict-lints.md` at the root of the wiggum repo.
+For Rust, strict mode mirrors the rules in your project's `nick-v2.md` (the personal standards file; supersedes the original `nick.md`). New rules are sourced from the Rust 1.78→1.99 catchup guide at `~/Projects/rust/rust-docs/rust-catchup-1.78-1.99.md`. For every other language, the ruleset is documented in the companion file `docs/strict-lints.md` at the root of the wiggum repo.
 
 ## What strict mode adds for Rust (1.95+)
 
 The Rust strict_rules array is sourced from two documents:
 
 - **`~/Projects/nick-v2.md`** — DDD-lite hexagonal layout, narrow port traits, `AuthContext` + idempotency keys, `with_tx` transaction boundaries, object-safe async port traits, CLI input parsing at adapter boundaries, the strengthened `#[expect]` rule, OWASP web security defaults.
-- **`rust-catchup-1.78-1.98.md`** — Rust 1.95+ syntax (`if let` arm guards, let chains on 2024 edition), `std::io::pipe()` + `Vec::extract_if` (1.87+), the 1.97 `pin!` deref coercion soundness fix, `deny(dead_code_pub_in_binary)` for tight binaries, cross-platform `#[cfg(unix)]` hygiene.
+- **`rust-catchup-1.78-1.99.md`** — Rust 1.95+ syntax (`if let` arm guards, let chains on 2024 edition), `std::io::pipe()` + `Vec::extract_if` (1.87+), the 1.97 `pin!` deref coercion soundness fix, `deny(dead_code_pub_in_binary)` for tight binaries, cross-platform `#[cfg(unix)]` hygiene.
 
 ### Code snippets for surprising new rules
 

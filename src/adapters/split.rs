@@ -289,6 +289,7 @@ fn build_split_tasks(original: &TaskDef, split: &SplitPlan) -> Vec<TaskDef> {
                 },
                 kind: original.kind,
                 implements: Vec::new(),
+                anchors: Vec::new(),
             }
         })
         .collect()
@@ -434,6 +435,7 @@ mod tests {
             evaluation_criteria: Vec::new(),
             kind: TaskKind::default(),
             implements: Vec::new(),
+            anchors: vec![],
         }
     }
 

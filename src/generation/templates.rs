@@ -540,6 +540,15 @@ const TASK_TEMPLATE: &str = r#"{% if gate %}
 {% endfor %}{% endif %}
 {% endfor %}
 {% endif %}
+{% if anchors | length > 0 %}
+## Code Anchors
+
+Start here before searching. These locations were verified against the codebase
+when the plan was written; if one no longer matches, trust the code over the plan.
+
+{% for a in anchors %}- `{{ a.citation }}` — **{{ a.role }}**{% if a.note %}: {{ a.note }}{% endif %}
+{% endfor %}
+{% endif %}
 ## Project Context
 
 - Project: `{{ project_name }}` — {{ project_description }}

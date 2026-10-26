@@ -274,6 +274,7 @@ mod tests {
             phase_order: 1,
             kind: TaskKind::default(),
             implements: vec![],
+            anchors: vec![],
         };
         let diff = diff_task(&task, &task);
         assert!(diff.is_empty());

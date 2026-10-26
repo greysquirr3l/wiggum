@@ -4,6 +4,44 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+## [0.20.0] - 2026-10-24
+
+### Added
+
+- **Task code anchors — `[[phases.tasks.anchors]]`** — an optional `path` /
+  `lines` / `role` / `note` block that pins a task to a verified location in
+  the target repo. Anchored tasks render a `## Code Anchors` section into the
+  task file, so the implementer subagent starts at a known location instead of
+  grepping for it. `role` is `read` (default), `modify`, or `create`; `lines`
+  accepts `"42"` or `"42-80"` and is omitted to anchor a whole file. **Entirely
+  opt-in** — a plan with no anchors parses, validates, lints, and generates
+  exactly as before, with no `## Code Anchors` section emitted.
+- **Anchor drift checks in `wiggum validate --lint` and MCP
+  `wiggum_lint_plan`** — anchors are resolved against the project on disk, which
+  makes "the plan says X" checkable. Missing files and directory anchors are
+  **errors**; line ranges past EOF, malformed `lines`, and paths that escape
+  `[project].path` are **warnings**; `create`-role anchors whose file already
+  exists and notes-less anchors are **info**. These run separately from the
+  pure `lint_plan` rules because they need filesystem access, and they no-op
+  entirely when a plan declares no anchors. Diagnostics do not block
+  generation — `validate --lint` reports them and `generate` proceeds.
+  See `docs/anchors.html`.
+
+### Fixed
+
+- **CI: auto-tag workflow now detects release commits on squash-merge** — the `auto-tag.yml` gate used to check the head commit subject for `chore(release):*`. That matched on plain merge commits but **broke when a release commit was squash-merged** — GitHub uses the PR title as the squash subject, dropping the inner `chore(release):` prefix. Result on PR #105 (v0.19.0): the gate skipped, v0.19.0 had to be tagged by hand. Switched the gate to inspect the **diff** (`git diff HEAD~1 HEAD -- Cargo.toml | grep -E '^\+version = '`) so it fires for squash, merge, and rebase alike. A secondary subject filter rejects `ci(*)`, `chore(deps)`, and `chore(deps/*)` so dependabot Cargo.toml rewrites don't trip the gate.
+- **Windows: anchored paths with a root but no drive prefix escaped the project root** — `resolve_anchor_path` rejected absolute paths with `Path::is_absolute`, which on Windows requires *both* a drive prefix and a root. `/etc/passwd` has a root but no prefix, so it was treated as relative and joined onto the project root — landing outside it, and reporting `anchor-file-missing` instead of `anchor-escapes-root`. The check now inspects path components directly and rejects any `RootDir` or `Prefix`, so every absolute shape is caught on every platform.
+- **Windows: the anchor test fixture emitted invalid TOML** — the fixture interpolated the project root into `path = "..."`, but a Windows temp path contains backslashes and `\U` is not a valid escape in a TOML basic string, so the plan failed to parse before the anchors were ever read. The path is now quoted through the `toml` crate. The product itself was never affected — `wiggum init` and `wiggum bootstrap` serialise the plan with `toml::to_string_pretty`, which escapes correctly.
+- **Security: tokio 1.53.1 → 1.54.1 (RUSTSEC-2026-0386)** — `tokio::io::unix::AsyncFd` provides safe constructors that accept any `T: AsRawFd`, so safe code could close or replace a registered file descriptor while the `AsyncFd` was still alive. Tokio's I/O driver then deregisters the reused descriptor and frees the first registration, leaving the original file description registered in `epoll` — a use-after-free when a readiness event fires. The `Cargo.toml` floor moves to 1.53.3 (the first patched release in the 1.53 line) so a future resolve cannot land on a vulnerable 1.52.x. `cargo deny check advisories` was failing on this before the bump.
+
+### Changed
+
+- **MSRV 1.95.0 → 1.99.0** — `rust-version` and the `RUST_VERSION` pin in the CI, release, and security workflows now target Rust 1.99.0. The crate needed no source changes for the new toolchain beyond the lint fixes below; the `dead_code_pub_in_binary` deny in `src/main.rs` was previously gated behind `cfg(rust_version_gte = "1.97")`, a nightly-only cfg that never evaluated on stable, so the lint was dormant. It is now applied unconditionally, which also removes the need for `#![allow(unexpected_cfgs)]`.
+- **Release folded the planned v0.19.1 into v0.20.0** — v0.19.1 was never published; its only change (the auto-tag gate fix above) ships here instead. The version takes a minor bump because this release adds the anchors feature, matching the project's convention of reserving patch releases for fixes.
+- **Dependency roll-up (10 updates)** — `cc` 1.4.5→1.4.7, `cfg-if` 1.0.4→1.0.5, `toml_edit` 0.25.13→0.25.15, `unicode-ident` 1.0.24→1.0.26, `zerocopy` 0.8.56→0.8.57, plus `actions/attest-build-provenance`, `actions/deploy-pages` 5.0.0→5.0.1, and `ossf/scorecard-action` 2.4.3→2.4.4.
+
 ## [0.19.0] - 2026-09-19
 
 ### Added

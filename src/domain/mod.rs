@@ -1,3 +1,4 @@
+pub mod anchors;
 pub mod check;
 pub mod dag;
 pub mod hints;

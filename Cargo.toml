@@ -1,8 +1,8 @@
 [package]
 name = "wiggum"
-version = "0.19.0"
+version = "0.20.0"
 edition = "2024"
-rust-version = "1.95.0"
+rust-version = "1.99.0"
 description = "Agentic implementation scaffold generator for dependency-aware AI coding workflows"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/greysquirr3l/wiggum"
@@ -61,7 +61,7 @@ tera = "1"
 petgraph = "0.8"
 
 # Async runtime (MCP server)
-tokio = { version = "1.52.3", features = ["full"] }
+tokio = { version = "1.53.3", features = ["full"] }
 
 # Error handling
 thiserror = "2"

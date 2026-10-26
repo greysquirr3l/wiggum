@@ -166,7 +166,7 @@ goal = "g"
 "#;
         let plan = Plan::from_toml(toml).unwrap();
         let out = render_all(&plan).unwrap();
-        assert!(out.is_empty());
+        assert!(out.is_empty(), "expected no capability files, got {out:?}");
     }
 
     #[test]

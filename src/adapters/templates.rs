@@ -53,6 +53,7 @@ impl From<TaskTemplate> for TaskDef {
             evaluation_criteria: tmpl.evaluation_criteria,
             kind: TaskKind::default(),
             implements: Vec::new(),
+            anchors: Vec::new(),
         }
     }
 }

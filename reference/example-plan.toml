@@ -127,6 +127,28 @@ description = "The domain module has no I/O dependencies (no tokio, no reqwest, 
 # when = "POST /webhook receives a request with a tampered payload or wrong secret"
 # then = "the server returns 400 Bad Request and never persists the event"
 
+# ─── Code Anchors ─────────────────────────────────────────────────────────────
+# Optional. An anchor pins a task to a verified location in the target repo
+# so the implementer subagent starts at a known spot instead of grepping.
+# `wiggum validate --lint` then reports drift when the code moves out from
+# under the plan. Entirely opt-in — plans with no anchors are unaffected.
+#
+# Paths are relative to [project].path. `role` is read | modify | create
+# (default read). `lines` accepts "42" or "42-80" and is optional.
+#
+# Severity: missing file = error; line range past EOF = warning; `create`
+# on an existing file = info. See `docs/anchors.md` for the full reference.
+#
+# [[phases.tasks.anchors]]
+# path = "src/domain/ports.rs"
+# lines = "12-48"
+# role = "read"
+# note = "EventStore trait — implement this rather than adding a concrete store"
+# [[phases.tasks.anchors]]
+# path = "src/adapters/sqlite_store.rs"
+# role = "create"
+# note = "new file; implements EventStore over a SQLite queue"
+
 # ─── Phase 1: Workspace Scaffold ──────────────────────────────────────────────
 
 [[phases]]

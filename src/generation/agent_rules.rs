@@ -130,6 +130,7 @@ mod tests {
                     evaluation_criteria: vec![],
                     kind: TaskKind::default(),
                     implements: Vec::new(),
+                    anchors: vec![],
                 }],
             }],
         }
