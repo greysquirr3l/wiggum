@@ -6,6 +6,40 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Added
+
+- **`wiggum reverse <url> --hints <file>`** — clone a remote git repo to a tempdir, scan it with the same heuristics as `wiggum bootstrap`, then merge user hints into a generated `plan.toml`. Hints can be TOML (structured: `[project]`, `[orchestrator]`, `[[phase]]`) or Markdown (freeform `## Rules` bullets become orchestrator rules). Inspired by [filiksyos/gitreverse](https://github.com/filiksyos/gitreverse) but emits a structured Wiggum `plan.toml` instead of a single vibe-coding prompt. Reference examples in `reference/example-hints.toml` and `reference/example-hints.md`.
+- **`wiggum reverse --subdir <path>`** — scope the clone to a single subfolder of the repo (e.g. a monorepo subpackage). Uses `git clone --filter=blob:none --sparse` + `git sparse-checkout set <subdir>` for speed. GitHub URLs with `/tree/<branch>/<path>` also work without the explicit flag.
+- **`wiggum reverse --llm <provider>`** — replace the deterministic skeleton with an LLM-driven phase decomposition. Providers: `anthropic` (api.anthropic.com) and `minimax` (api.minimax.io/anthropic — Anthropic-shaped). Reads `<PROVIDER>_API_KEY` from the env by default; override with `--api-key` or `--llm-model`. Default models: `claude-sonnet-4-5` for Anthropic, `MiniMax-M3` for MiniMax. The LLM pass honours any phases you declared in your hints TOML — your structure wins over the model's.
+- **`wiggum reverse --github-api`** — prefer the GitHub REST API for fetching repo metadata/tree/files (falls back to `git clone` on rate limit / non-GitHub URL / missing token).
+
+### Dependencies
+
+- `reqwest = "0.12"` (rustls-tls) and `async-trait = "0.1"` added for the LLM HTTP client.
+
+### Fixed
+
+- **`wiggum reverse` no longer lets a cloned repository drive the terminal** —
+  the scan summary prints the name, description and architecture read from the
+  scanned project's manifest, and under `wiggum reverse` those come from a
+  repository somebody else wrote. A manifest description carrying escape
+  sequences can clear the screen, colour the output, or set the clipboard
+  (`OSC 52`) of whoever runs the command. Control characters are stripped
+  before anything is printed.
+- **The URL passed to `git clone` is one argument, not several** — the clone
+  used to split the command line on whitespace, so a URL containing a space
+  turned its tail into `git` options. `git` has options that run commands
+  (`--upload-pack=<cmd>` is how it decides what to run on the far end of a
+  local or ssh transport). The URL now goes after `--`, and a `--subdir` that
+  starts with `-` is refused rather than read as an option.
+- **The API key no longer shares a call with the scanned project or the plan**
+  — the LLM client holds the key, and both the scan and the plan were handed to
+  the same calls, which the taint analysis reads as the key reaching the
+  summary that gets printed. The prompt is rendered before the key is resolved,
+  the model's answer is returned rather than merged in place, the phases are
+  assigned by the caller, and the scan is printed before the LLM pass rather
+  than returned next to the plan — so the key travels with nothing else.
+
 ## [0.21.0] - 2026-10-25
 
 ### Changed
@@ -116,7 +150,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - **Plan quality scorecard at scaffold time** — `wiggum generate` prints the 5-dimension `wiggum check` scorecard after writing artifacts. Suppressable via `--no-summary`. (PR #93)
 - **Mandatory evaluator for non-trivial plans** — `[orchestrator] require_evaluator` auto-derives to true when the plan has ≥4 tasks or any slug matches a security-sensitive keyword (`auth`, `payment`, `billing`, `crypto`, `credential`, `webhook`, `secret`, `key`, `token`, `sign`, `signature`, `kdf`, `hash`). Without an `[evaluator]` block, `wiggum validate` errors with a fix-pointing message. Opt out with `require_evaluator = false` and `wiggum generate` prints a visible warning.
 - **Gates for security-sensitive tasks** — `[orchestrator] gates: Vec<String>` with auto-derive from slug/title keywords. `validate_gates` errors when a gated task doesn't declare its matching `gate = "<category>"` field.
-- **Gate banner in task files** — gated task files emit a `⛔ GATE` blockquote _above_ the H1 so the orchestrator stops before scanning into the task body. PROGRESS.md rows for gated tasks are prefixed with `[GATE]`.
+- **Gate banner in task files** — gated task files emit a `⛔ GATE` blockquote *above* the H1 so the orchestrator stops before scanning into the task body. PROGRESS.md rows for gated tasks are prefixed with `[GATE]`.
 - **`Next: …` hint** — single ≤80-char line telling the user what to do next (review gates / add evaluator / open ORCHESTRATOR.md). Decision-tree based on plan state.
 - **`BUDGET.md`** — universal scaffold artifact with per-task token table (`[CRITICAL]`/`[WARN]` markers), summary metrics, threshold table, daily cap, and a Cost tiers section (noop / report / action + suggested daily cap).
 - **`RUN_LOG.md`** — universal scaffold artifact with empty per-iteration table and How-to-use section.
@@ -353,7 +387,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 ### Added
 
 - `Strategy::Complete` — a new execution strategy that treats every task as a finished deliverable: root-cause fix (no workarounds), tests including failure-path coverage, documentation updates in the same task, and a full preflight pass. The strategy contract is baked into the generated orchestrator prompt, each task file, and AGENTS.md.
-  - _Inspired by Gary Tam's (Y Combinator) "complete it right, end-to-end" execution standard for AI-assisted development._
+  - *Inspired by Gary Tam's (Y Combinator) "complete it right, end-to-end" execution standard for AI-assisted development.*
 - `[style] avoid_god_files` guidance is now injected into individual task files (not just the orchestrator prompt) as a **File Structure** section, reminding subagents to keep module scope narrow on every task.
 - MCP `tools/call` execution now runs a baseline security guardrail pipeline on every invocation:
   - Input prompt-injection blocking for mutating tools

@@ -127,6 +127,56 @@ pub enum Command {
         force: bool,
     },
 
+    /// Reverse a remote Git repo into a plan skeleton + apply user hints
+    Reverse {
+        /// Remote git URL (any URL `git clone` accepts)
+        url: String,
+
+        /// Optional hints file (`.toml` for structured, `.md` for freeform)
+        #[arg(long)]
+        hints: Option<PathBuf>,
+
+        /// Path to write the generated plan TOML (defaults to `./plan.toml`)
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+
+        /// Overwrite existing plan file without prompting
+        #[arg(long)]
+        force: bool,
+
+        /// Keep the cloned tempdir after generation (for debugging)
+        #[arg(long)]
+        keep_tmp: bool,
+
+        /// Scope the clone (and the LLM context) to a specific subfolder of the repo.
+        /// For GitHub URLs the subfolder can also be encoded in the URL itself
+        /// (`.../tree/<branch>/<subdir>`); this flag overrides whatever the URL implies.
+        #[arg(long)]
+        subdir: Option<String>,
+
+        /// Prefer the GitHub REST API for fetching repo metadata/tree/files.
+        /// Falls back to `git clone` if the API is unavailable (rate limit,
+        /// non-GitHub URL, missing token, etc.).
+        #[arg(long)]
+        github_api: bool,
+
+        /// Use an LLM to generate intelligent phases + tasks instead of the
+        /// skeleton the deterministic scan produces. Provider = `anthropic` or
+        /// `minimax`. Requires `<PROVIDER>_API_KEY` (e.g. `ANTHROPIC_API_KEY`,
+        /// `MINIMAX_API_KEY`) in the environment unless `--api-key` is set.
+        #[arg(long, value_parser = ["anthropic", "minimax"])]
+        llm: Option<String>,
+
+        /// Override the LLM model (default: `claude-sonnet-4-5` for anthropic,
+        /// `MiniMax-M3` for minimax).
+        #[arg(long)]
+        llm_model: Option<String>,
+
+        /// Override the LLM API key (otherwise read from `<PROVIDER>_API_KEY`).
+        #[arg(long)]
+        api_key: Option<String>,
+    },
+
     /// Remove all wiggum-generated artifacts from a project
     Clean {
         /// Path to the plan TOML file

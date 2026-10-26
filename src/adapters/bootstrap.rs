@@ -394,19 +394,31 @@ fn extract_agents_md_rules(content: &str, rules: &mut Vec<String>) {
     }
 }
 
-fn print_scan_summary(scan: &ScanResult, project_path: &Path) {
+/// Print what the scan found.
+///
+/// The values printed here come from the scanned project's own files, and
+/// `wiggum reverse` scans a repository it cloned from somewhere else — so
+/// the name and description are whatever the remote author put there. A
+/// terminal reads escape sequences as commands: `ESC ] 52` sets the
+/// clipboard, `ESC [ 2J` clears the screen. They are stripped before
+/// anything is printed, so a repository cannot drive the terminal of
+/// whoever runs the command on it.
+pub fn print_scan_summary(scan: &ScanResult, project_path: &Path) {
     println!(
         "🦝 wiggum bootstrap — scanning {}\n",
-        project_path.display()
+        sanitize_for_terminal(&project_path.display().to_string())
     );
     println!("  Detected:");
     println!("    Language:     {}", scan.language);
-    println!("    Name:         {}", scan.name);
+    println!("    Name:         {}", sanitize_for_terminal(&scan.name));
     if !scan.description.is_empty() {
-        println!("    Description:  \"{}\"", scan.description);
+        println!(
+            "    Description:  \"{}\"",
+            sanitize_for_terminal(&scan.description)
+        );
     }
     if let Some(ref arch) = scan.architecture {
-        println!("    Architecture: {arch}");
+        println!("    Architecture: {}", sanitize_for_terminal(arch));
     }
     if scan.has_tests {
         println!("    Tests:        found");
@@ -417,6 +429,18 @@ fn print_scan_summary(scan: &ScanResult, project_path: &Path) {
     if !scan.rules.is_empty() {
         println!("    Rules:        {} inferred", scan.rules.len());
     }
+}
+
+/// A string with every control character removed.
+///
+/// Control characters are the ones a terminal acts on rather than shows:
+/// C0 (including ESC), DEL, and the C1 range. Tab and newline are left
+/// alone — they are not escape sequences, and a manifest description does
+/// not normally carry them anyway.
+fn sanitize_for_terminal(text: &str) -> String {
+    text.chars()
+        .filter(|c| !c.is_control() || *c == '\t' || *c == '\n')
+        .collect()
 }
 
 #[cfg(test)]
@@ -645,6 +669,26 @@ mod tests {
         assert!(result.is_err());
     }
 
+    #[test]
+    fn terminal_sanitizer_strips_escape_sequences() {
+        // OSC 52 sets the clipboard; ESC [ 2J clears the screen.
+        let hostile = "evil\u{1b}]52;c;cHduCg==\u{7}\u{1b}[2Jname";
+        let clean = sanitize_for_terminal(hostile);
+        assert_eq!(clean, "evil]52;c;cHduCg==[2Jname");
+        assert!(!clean.contains('\u{1b}'));
+        assert!(!clean.contains('\u{7}'));
+    }
+
+    #[test]
+    fn terminal_sanitizer_strips_c1_control_characters() {
+        let hostile = "a\u{9b}31mred\u{9b}0m";
+        assert_eq!(sanitize_for_terminal(hostile), "a31mred0m");
+    }
+
+    #[test]
+    fn terminal_sanitizer_keeps_tab_and_newline() {
+        assert_eq!(sanitize_for_terminal("a\tb\nc"), "a\tb\nc");
+    }
     #[test]
     fn scan_project_fails_on_no_language() {
         let dir = setup_temp_dir();
