@@ -4,19 +4,19 @@
 
 # Pass this file with `wiggum reverse <url> --hints example-hints.md` to
 
-# append freeform rules to the orchestrator's rule list.
+# append freeform rules to the orchestrator's rule list
 
 #
 
 # Only `## Rules` (and aliases `## Code style`, `## Orchestrator Rules`)
 
-# sections are extracted. Everything else is ignored.
+# sections are extracted. Everything else is ignored
 
 #
 
 # For structured overrides (language, architecture, persona, phases) use
 
-# `example-hints.toml` instead.
+# `example-hints.toml` instead
 
 # Project notes
 

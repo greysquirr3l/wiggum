@@ -149,7 +149,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - **Plan quality scorecard at scaffold time** — `wiggum generate` prints the 5-dimension `wiggum check` scorecard after writing artifacts. Suppressable via `--no-summary`. (PR #93)
 - **Mandatory evaluator for non-trivial plans** — `[orchestrator] require_evaluator` auto-derives to true when the plan has ≥4 tasks or any slug matches a security-sensitive keyword (`auth`, `payment`, `billing`, `crypto`, `credential`, `webhook`, `secret`, `key`, `token`, `sign`, `signature`, `kdf`, `hash`). Without an `[evaluator]` block, `wiggum validate` errors with a fix-pointing message. Opt out with `require_evaluator = false` and `wiggum generate` prints a visible warning.
 - **Gates for security-sensitive tasks** — `[orchestrator] gates: Vec<String>` with auto-derive from slug/title keywords. `validate_gates` errors when a gated task doesn't declare its matching `gate = "<category>"` field.
-- **Gate banner in task files** — gated task files emit a `⛔ GATE` blockquote _above_ the H1 so the orchestrator stops before scanning into the task body. PROGRESS.md rows for gated tasks are prefixed with `[GATE]`.
+- **Gate banner in task files** — gated task files emit a `⛔ GATE` blockquote *above* the H1 so the orchestrator stops before scanning into the task body. PROGRESS.md rows for gated tasks are prefixed with `[GATE]`.
 - **`Next: …` hint** — single ≤80-char line telling the user what to do next (review gates / add evaluator / open ORCHESTRATOR.md). Decision-tree based on plan state.
 - **`BUDGET.md`** — universal scaffold artifact with per-task token table (`[CRITICAL]`/`[WARN]` markers), summary metrics, threshold table, daily cap, and a Cost tiers section (noop / report / action + suggested daily cap).
 - **`RUN_LOG.md`** — universal scaffold artifact with empty per-iteration table and How-to-use section.
@@ -386,7 +386,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 ### Added
 
 - `Strategy::Complete` — a new execution strategy that treats every task as a finished deliverable: root-cause fix (no workarounds), tests including failure-path coverage, documentation updates in the same task, and a full preflight pass. The strategy contract is baked into the generated orchestrator prompt, each task file, and AGENTS.md.
-  - _Inspired by Gary Tam's (Y Combinator) "complete it right, end-to-end" execution standard for AI-assisted development._
+  - *Inspired by Gary Tam's (Y Combinator) "complete it right, end-to-end" execution standard for AI-assisted development.*
 - `[style] avoid_god_files` guidance is now injected into individual task files (not just the orchestrator prompt) as a **File Structure** section, reminding subagents to keep module scope narrow on every task.
 - MCP `tools/call` execution now runs a baseline security guardrail pipeline on every invocation:
   - Input prompt-injection blocking for mutating tools

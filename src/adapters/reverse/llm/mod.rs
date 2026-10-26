@@ -3,7 +3,8 @@
 //! When the user passes `--llm anthropic` (or `--llm minimax`), the reverse
 //! command sends the detected project context (manifest, README, top-level
 //! tree, hints) to the LLM and asks it to emit a structured `plan.toml` shape
-//! in JSON. We then translate that JSON back into a [`Plan`] and replace the
+//! in JSON. We then translate that JSON back into a
+//! [`crate::domain::plan::Plan`] and replace the
 //! placeholder phases the deterministic scan produced.
 //!
 //! Two providers are supported today:
