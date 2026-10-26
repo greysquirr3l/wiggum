@@ -5,9 +5,12 @@
 //! behind each one, so wiggum does not carry a second description of the
 //! wire format and cannot fall out of date with the spec.
 //!
-//! What lives here is the part that is wiggum's: the tools (in
-//! [`tools`]), the guardrails applied to them (in [`guardrail`]), and the
-//! wiring that puts the two together.
+//! What lives here is the part that is wiggum's: the tools, the guardrails
+//! applied to them, and the wiring that puts the two together. The tools
+//! live in a private `tools` module and the guardrails in a private
+//! `guardrail` module — neither is part of wiggum's public surface, because
+//! the public surface of an MCP server is the protocol it speaks, not the
+//! functions behind it.
 //!
 //! # How the guardrails are applied
 //!
