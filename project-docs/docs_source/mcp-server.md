@@ -2,7 +2,9 @@
 
 Wiggum can run as an [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server, allowing AI agents to invoke Wiggum's capabilities mid-session.
 
-The server implements **MCP protocol version `2025-11-25`** over stdio transport (newline-delimited JSON).
+The server speaks the **MCP protocol revisions `2024-11-05` through `2025-11-25`** over stdio transport (newline-delimited JSON). The revision is negotiated per session: the server answers `initialize` with the revision it settled on, and gates the rest of the session on that revision — a peer that offers `2024-11-05` is not sent features that revision does not have.
+
+The wire format, the JSON-RPC framing, and the version negotiation are [protocol-droid](https://crates.io/crates/protocol-droid)'s, so wiggum does not carry a second description of them and cannot fall out of date with the specification.
 
 ## Starting the server
 
@@ -50,7 +52,7 @@ This enables agents to generate plans and task scaffolds directly within a codin
 
 The server handles all required lifecycle messages:
 
-- `initialize` — responds with `protocolVersion: "2025-11-25"` and tool capabilities
+- `initialize` — responds with the negotiated `protocolVersion` and the capabilities that revision has
 - `notifications/initialized` and `notifications/cancelled` — silently acknowledged (no response, per spec)
 - `ping` — responds with an empty result at any lifecycle phase
 - `tools/list` — returns the full tool catalogue
@@ -58,11 +60,13 @@ The server handles all required lifecycle messages:
 
 Unknown methods return JSON-RPC error `-32601`. Tool execution errors are returned as tool results with `isError: true` rather than protocol errors, so agents can self-correct.
 
+Each tool's `inputSchema` is derived from its Rust signature rather than written by hand, so the schema a peer sees and the arguments the tool reads cannot drift apart.
+
 ## Runtime security guardrails
 
 MCP `tools/call` execution includes a baseline guardrail pipeline:
 
-- **Input guardrail**: blocks mutating tools when arguments contain common prompt-injection patterns (for example, attempts to override instructions or request exfiltration).
+- **Input guardrail**: blocks mutating tools when arguments contain common prompt-injection patterns (for example, attempts to override instructions or request exfiltration). The arguments are searched as a whole, so a pattern split across two arguments — or split mid-word — is still caught.
 - **Output redaction**: redacts common sensitive values in tool output text before returning content to the caller (emails, SSN format, bearer tokens, and basic secret-assignment patterns).
 - **Output hard block**: blocks responses that still contain high-risk secret markers (for example private key headers).
 - **Security events**: emits structured security events via `tracing` with event type, tool name, and detail for incident investigation.
