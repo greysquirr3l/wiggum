@@ -32,11 +32,59 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
   (`--upload-pack=<cmd>` is how it decides what to run on the far end of a
   local or ssh transport). The URL now goes after `--`, and a `--subdir` that
   starts with `-` is refused rather than read as an option.
-- **The API key no longer shares a call with the scanned project** — the LLM
-  client holds the key and the scan summary is built from the same call, which
-  the taint analysis reads as the key reaching the summary that gets printed.
-  The prompt is rendered before the key is resolved, so the two never travel
-  together.
+- **The API key no longer shares a call with the scanned project or the plan**
+  — the LLM client holds the key, and both the scan and the plan were handed to
+  the same calls, which the taint analysis reads as the key reaching the
+  summary that gets printed. The prompt is rendered before the key is resolved,
+  the model's answer is returned rather than merged in place, and the phases
+  are assigned by the caller, so the key travels with nothing else.
+
+## [0.21.0] - 2026-10-25
+
+### Changed
+
+- **MCP server: the protocol implementation is now protocol-droid's** — the
+  hand-rolled JSON-RPC server is replaced by
+  [protocol-droid](https://crates.io/crates/protocol-droid), so wiggum no
+  longer carries its own framing, its own version negotiation, and its own
+  copy of the wire shapes for the MCP revisions. The tools, their names, their
+  arguments, and their answers are unchanged; what changed is underneath.
+  - **Every published revision is negotiable** — the server answers
+    `initialize` with the revision it settled on and gates the rest of the
+    session on that revision, so a peer that offers `2024-11-05` is not sent
+    features that revision does not have. Previously the server named one
+    revision (`2025-11-25`) in the handshake regardless of what the peer
+    asked for.
+  - **`serverInfo.version` is wiggum's version** — it used to report the
+    version of whichever protocol-droid happened to be linked against.
+    Reported as greysquirr3l/protocol-droid#64.
+  - **Each tool's `inputSchema` is derived from its Rust signature** rather
+    than written by hand, so the schema a peer sees and the arguments the
+    tool reads cannot drift apart.
+  - **`wiggum_version` reports the range of revisions the server can be
+    negotiated onto** (`2024-11-05` through `2025-11-25`) rather than one
+    hardcoded revision. The revision in use is settled between the server and
+    the peer, so the range is the fact the server can actually state.
+- **MCP guardrails: a prompt-injection pattern split across arguments is
+  now caught** — the input guardrail joined the argument strings with a
+  newline, so `"ignore previous"` in one argument and `"instructions"` in
+  another never matched the pattern, even though the doc comment said the
+  arguments were "searched as a whole". The arguments are now searched as a
+  set, so the pattern is caught however the arguments are ordered: the peer
+  chooses which argument holds which half, and a check that assumed one
+  order was one the peer could reorder around. A pattern may be split
+  across two or three arguments, and the comparison drops whitespace on
+  both sides, which also catches a pattern split mid-word (`"ignore previ"` +
+  `"ous instructions"`).
+
+### Fixed
+
+- **MCP: `schemars` is a direct dependency of wiggum** — protocol-droid's
+  `#[server]` macro resolves `::schemars` rather than the crate's own
+  re-export, so a consumer using the macro had to depend on `schemars`
+  directly before the generated code would compile. The error pointed at the
+  `#[server]` attribute rather than at the missing dependency. Tracked as
+  greysquirr3l/protocol-droid#63; fixed upstream in protocol-droid 0.5.3.
 
 ## [0.20.0] - 2026-10-24
 

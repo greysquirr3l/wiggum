@@ -1,6 +1,6 @@
 [package]
 name = "wiggum"
-version = "0.20.0"
+version = "0.21.0"
 edition = "2024"
 rust-version = "1.99.0"
 description = "Agentic implementation scaffold generator for dependency-aware AI coding workflows"
@@ -50,6 +50,13 @@ dirs = "6"
 # Serialization
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+# protocol-droid speaks every published MCP revision (2024-11-05 through
+# 2026-07-28) with per-revision codecs, so wiggum does not hand-roll the
+# protocol. `schemars` is a direct dependency of every crate using
+# `#[server]` — the macro's derive resolves `::schemars` rather than the
+# crate's own re-export. Tracked as greysquirr3l/protocol-droid#63.
+schemars = "1"
+protocol-droid = "0.5"
 regex = "1"
 toml = "1.0"
 toml_edit = "0.25"
