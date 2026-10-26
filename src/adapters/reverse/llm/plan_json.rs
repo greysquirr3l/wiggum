@@ -8,7 +8,7 @@ use std::collections::HashSet;
 
 use serde::{Deserialize, Serialize};
 
-use crate::domain::plan::{Plan, TaskDef, TaskKind};
+use crate::domain::plan::{Phase, TaskDef, TaskKind};
 use crate::error::{Result, WiggumError};
 
 /// Top-level shape the LLM must emit.
@@ -117,10 +117,17 @@ fn is_kebab_case(s: &str) -> bool {
 ///
 /// Preserves the project / orchestrator / preflight that the deterministic
 /// scan already filled in; only the phase + task list is rewritten.
-pub fn apply_llm_plan(plan: &mut Plan, llm: &LlmPlan) {
+/// Build the plan's phases from what the model returned.
+///
+/// The phases are *returned* rather than written into the plan here. The
+/// model's answer is derived from the API call, so handing it and a
+/// `&mut Plan` to the same call taints the whole plan — and with it the
+/// scan the plan was built from, which is what the summary prints. The
+/// caller assigns the phases instead, which taints the phases and nothing
+/// else.
+pub fn phases_from_llm_plan(llm: &LlmPlan) -> Vec<Phase> {
     let mut next_order: u32 = 1;
-    let new_phases: Vec<_> = llm
-        .phases
+    llm.phases
         .iter()
         .map(|p| crate::domain::plan::Phase {
             order: {
@@ -148,9 +155,7 @@ pub fn apply_llm_plan(plan: &mut Plan, llm: &LlmPlan) {
                 })
                 .collect(),
         })
-        .collect();
-
-    plan.phases = new_phases;
+        .collect()
 }
 
 /// Pull a JSON object out of a string that might have surrounding prose or
@@ -266,7 +271,7 @@ mod tests {
     }
 
     #[test]
-    fn apply_llm_plan_replaces_phases() {
+    fn phases_from_llm_plan_replaces_phases() {
         let mut plan = make_test_plan();
         let llm = LlmPlan {
             phases: vec![LlmPhase {
@@ -281,7 +286,7 @@ mod tests {
                 }],
             }],
         };
-        apply_llm_plan(&mut plan, &llm);
+        plan.phases = phases_from_llm_plan(&llm);
         assert_eq!(plan.phases.len(), 1);
         assert_eq!(plan.phases[0].name, "Phase A");
         assert_eq!(plan.phases[0].tasks[0].slug, "task-1");

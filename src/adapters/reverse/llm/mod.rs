@@ -23,7 +23,6 @@ pub mod prompt;
 
 use std::sync::Arc;
 
-use crate::domain::plan::Plan;
 use crate::error::Result;
 
 use self::client::{AnthropicMessagesClient, LlmClient, LlmProvider, LlmResponse};
@@ -109,11 +108,11 @@ pub fn build_client(provider: Provider, api_key: String) -> Arc<dyn LlmClient> {
 
 /// Run the LLM-driven phase decomposition and merge the result into `plan`.
 ///
-/// The prompt is rendered by the caller and handed over already built. That
-/// is not just a convenience: the client holds the API key, so passing the
-/// scanned project in alongside it would put a secret-bearing value and the
-/// data that gets printed in the same call, and the taint analysis reads
-/// that as the key reaching the summary that `wiggum reverse` prints.
+/// The prompt is rendered by the caller and handed over already built, and
+/// the parsed plan is returned rather than written into the caller's plan.
+/// Both for the same reason: the client holds the API key, so passing the
+/// scanned project or the plan alongside it in the same call is read as the
+/// key reaching the summary that `wiggum reverse` prints.
 ///
 /// # Errors
 ///
@@ -123,15 +122,13 @@ pub async fn decompose_into_plan(
     client: Arc<dyn LlmClient>,
     system_msg: &str,
     user_msg: &str,
-    plan: &mut Plan,
-) -> Result<LlmResponse> {
+) -> Result<(LlmResponse, plan_json::LlmPlan)> {
     let model = std::env::var("WIGGUM_LLM_MODEL").unwrap_or_else(|_| "default".to_string());
     let response = client
         .complete(LlmProvider::AnthropicMessages, &model, system_msg, user_msg)
         .await?;
 
     let parsed = plan_json::parse_llm_plan(&response.text)?;
-    plan_json::apply_llm_plan(plan, &parsed);
 
-    Ok(response)
+    Ok((response, parsed))
 }

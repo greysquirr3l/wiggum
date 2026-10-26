@@ -181,7 +181,7 @@ fn mock_client_with_plan_replaces_phases() {
 
     let parsed = plan_json::parse_llm_plan(&response.text).expect("parse llm");
     let mut plan = empty_plan();
-    plan_json::apply_llm_plan(&mut plan, &parsed);
+    plan.phases = plan_json::phases_from_llm_plan(&parsed);
 
     assert_eq!(plan.phases.len(), 1);
     assert_eq!(plan.phases[0].name, "Generated Phase");

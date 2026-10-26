@@ -175,12 +175,13 @@ fn generate_plan(
                 .clone()
                 .unwrap_or_else(|| provider.default_model().to_string());
             println!("  🧠 LLM phase decomposition via {provider} ({model})…");
-            let resp = rt.block_on(llm::decompose_into_plan(
-                client,
-                &system_msg,
-                &user_msg,
-                &mut plan,
-            ))?;
+            let (resp, parsed) =
+                rt.block_on(llm::decompose_into_plan(client, &system_msg, &user_msg))?;
+            // The phases are assigned rather than merged in place: the model's
+            // answer is derived from the API call, so handing it and a
+            // `&mut Plan` to the same call taints the whole plan, and with it
+            // the scan the plan was built from — which is what gets printed.
+            plan.phases = llm::plan_json::phases_from_llm_plan(&parsed);
             println!(
                 "     ↳ {} input + {} output tokens",
                 resp.input_tokens, resp.output_tokens
