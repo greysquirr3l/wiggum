@@ -161,6 +161,13 @@ fn generate_plan(
                 .map_err(|e| {
                     WiggumError::Validation(format!("build tokio runtime for LLM call: {e}"))
                 })?;
+            // The prompt is built before the key is resolved on purpose: the
+            // client carries the key, so the scanned project must not travel
+            // into the same call, or the key reads as though it reached the
+            // summary this command prints.
+            let ctx = llm::context::gather_context(repo_path, &scan, loaded_hints.as_ref())?;
+            let user_msg = llm::prompt::render_user_prompt(&ctx);
+            let system_msg = llm::prompt::render_system_prompt();
             let key = provider.resolve_api_key(opts.api_key.as_deref())?;
             let client = llm::build_client(provider, key);
             let model = opts
@@ -170,9 +177,8 @@ fn generate_plan(
             println!("  🧠 LLM phase decomposition via {provider} ({model})…");
             let resp = rt.block_on(llm::decompose_into_plan(
                 client,
-                repo_path,
-                &scan,
-                loaded_hints.as_ref(),
+                &system_msg,
+                &user_msg,
                 &mut plan,
             ))?;
             println!(
@@ -277,7 +283,10 @@ fn is_bootstrap_placeholder_phase(p: &Phase) -> bool {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::indexing_slicing)]
+#[expect(
+    clippy::indexing_slicing,
+    reason = "test code unwraps deliberately: a failing assertion should panic and fail the test, not return an error the test would have to handle"
+)]
 mod tests {
     use super::*;
     use crate::adapters::reverse::hints::{

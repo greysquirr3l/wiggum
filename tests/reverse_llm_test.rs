@@ -5,7 +5,12 @@
 //! 2. The JSON parser is tolerant of markdown fences + surrounding prose.
 //! 3. The Plan is replaced by the LLM's output on success.
 
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing)]
+#![expect(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    reason = "test code unwraps deliberately: a failing assertion should panic and fail the test, not return an error the test would have to handle"
+)]
 
 use std::path::PathBuf;
 use std::sync::Arc;

@@ -178,7 +178,11 @@ fn extract_json(text: &str) -> String {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::indexing_slicing)]
+#[expect(
+    clippy::unwrap_used,
+    clippy::indexing_slicing,
+    reason = "test code unwraps deliberately: a failing assertion should panic and fail the test, not return an error the test would have to handle"
+)]
 mod tests {
     use super::*;
 

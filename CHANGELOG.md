@@ -17,6 +17,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 - `reqwest = "0.12"` (rustls-tls) and `async-trait = "0.1"` added for the LLM HTTP client.
 
+### Fixed
+
+- **`wiggum reverse` no longer lets a cloned repository drive the terminal** —
+  the scan summary prints the name, description and architecture read from the
+  scanned project's manifest, and under `wiggum reverse` those come from a
+  repository somebody else wrote. A manifest description carrying escape
+  sequences can clear the screen, colour the output, or set the clipboard
+  (`OSC 52`) of whoever runs the command. Control characters are stripped
+  before anything is printed.
+- **The URL passed to `git clone` is one argument, not several** — the clone
+  used to split the command line on whitespace, so a URL containing a space
+  turned its tail into `git` options. `git` has options that run commands
+  (`--upload-pack=<cmd>` is how it decides what to run on the far end of a
+  local or ssh transport). The URL now goes after `--`, and a `--subdir` that
+  starts with `-` is refused rather than read as an option.
+- **The API key no longer shares a call with the scanned project** — the LLM
+  client holds the key and the scan summary is built from the same call, which
+  the taint analysis reads as the key reaching the summary that gets printed.
+  The prompt is rendered before the key is resolved, so the two never travel
+  together.
+
 ## [0.20.0] - 2026-10-24
 
 ### Added

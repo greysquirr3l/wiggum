@@ -37,7 +37,7 @@ pub struct ClonedRepo {
 /// - [`WiggumError::Validation`] if `git` is not installed, the URL fails to
 ///   clone, or the resulting directory is missing the expected layout.
 pub fn clone_shallow(url: &str) -> Result<ClonedRepo> {
-    run_git(&[&format!("clone --depth=1 --single-branch {url}")], None)
+    run_git(&["clone", "--depth=1", "--single-branch", "--", url], None)
 }
 
 /// Clone only the requested subfolder of a remote repo.
@@ -56,11 +56,25 @@ pub fn clone_sparse_subdir(url: &str, subdir: &str) -> Result<ClonedRepo> {
             "subdir must be a non-empty path".to_string(),
         ));
     }
+    // A subdir that starts with `-` would be read by `git sparse-checkout`
+    // as an option rather than a path. The subdir can come from the URL, so
+    // it is checked rather than assumed.
+    if subdir.starts_with('-') {
+        return Err(WiggumError::Validation(format!(
+            "subdir must not start with '-': {subdir}"
+        )));
+    }
 
     let cloned = run_git(
-        &[&format!(
-            "clone --depth=1 --filter=blob:none --single-branch --sparse {url}"
-        )],
+        &[
+            "clone",
+            "--depth=1",
+            "--filter=blob:none",
+            "--single-branch",
+            "--sparse",
+            "--",
+            url,
+        ],
         None,
     )?;
 
@@ -86,38 +100,37 @@ pub fn clone_sparse_subdir(url: &str, subdir: &str) -> Result<ClonedRepo> {
 
 /// Run a `git` command and wrap the tempdir ownership in a `ClonedRepo`.
 ///
-/// `cmdline` is a single string that is split on whitespace (no shell
-/// expansion, so URLs with spaces must quote them). `cwd` overrides the
-/// current directory when needed.
-fn run_git(cmdline: &[&str], cwd: Option<&std::path::Path>) -> Result<ClonedRepo> {
+/// `args` are passed to `git` one for one. They are *not* split on
+/// whitespace: a URL is one argument, and a URL is whatever the user
+/// pasted. Splitting it would turn the tail of a URL with a space in it
+/// into `git` options — and `git` has options that run commands
+/// (`--upload-pack=<cmd>` is how git decides what to run on the far end of
+/// a local or ssh transport). The URL therefore goes after `--`, which
+/// tells `git` that what follows is not an option.
+///
+/// `cwd` overrides the current directory when needed.
+fn run_git(args: &[&str], cwd: Option<&std::path::Path>) -> Result<ClonedRepo> {
     let guard = TempDir::new()
         .map_err(|e| WiggumError::Validation(format!("create tempdir for clone: {e}")))?;
 
-    for line in cmdline {
-        let parts: Vec<&str> = line.split_whitespace().collect();
-        if parts.is_empty() {
-            continue;
-        }
-
-        // The first token is the `git` subcommand (e.g. `clone`, `sparse-checkout`),
-        // not the binary name. We always invoke the `git` binary directly.
-        let mut cmd = Command::new("git");
-        cmd.args(&parts);
-        cmd.arg(guard.path());
-        if let Some(dir) = cwd {
-            cmd.current_dir(dir);
-        }
-        let status = cmd.status().map_err(|e| {
-            WiggumError::Validation(format!(
-                "failed to invoke `git {line}`: {e}. Is git installed and on PATH?"
-            ))
-        })?;
-        if !status.success() {
-            let code = status.code().unwrap_or(-1);
-            return Err(WiggumError::Validation(format!(
-                "`git {line}` exited with status {code}. Check the URL and your credentials."
-            )));
-        }
+    let mut cmd = Command::new("git");
+    cmd.args(args);
+    cmd.arg(guard.path());
+    if let Some(dir) = cwd {
+        cmd.current_dir(dir);
+    }
+    let status = cmd.status().map_err(|e| {
+        WiggumError::Validation(format!(
+            "failed to invoke `git {}`: {e}. Is git installed and on PATH?",
+            args.join(" ")
+        ))
+    })?;
+    if !status.success() {
+        let code = status.code().unwrap_or(-1);
+        return Err(WiggumError::Validation(format!(
+            "`git {}` exited with status {code}. Check the URL and your credentials.",
+            args.join(" ")
+        )));
     }
 
     let path = guard.path().to_path_buf();
@@ -160,7 +173,6 @@ pub fn parse_github_subdir(url: &str) -> Option<String> {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::indexing_slicing)]
 mod tests {
     use super::*;
 
@@ -179,6 +191,12 @@ mod tests {
     #[test]
     fn clone_sparse_subdir_rejects_empty_subdir() {
         let result = clone_sparse_subdir("https://example.com/repo.git", "");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn clone_sparse_subdir_rejects_subdir_that_looks_like_an_option() {
+        let result = clone_sparse_subdir("https://example.com/repo.git", "--stdin");
         assert!(result.is_err());
     }
 

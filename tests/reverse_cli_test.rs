@@ -4,7 +4,11 @@
 //! `assert_cmd`. Network-free: uses a `file://` URL to point at the local
 //! repo so no GitHub auth or rate limits are involved.
 
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing)]
+#![expect(
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    reason = "test code unwraps deliberately: a failing assertion should panic and fail the test, not return an error the test would have to handle"
+)]
 
 use std::path::PathBuf;
 use std::process::Command as StdCommand;

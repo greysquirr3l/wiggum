@@ -55,7 +55,6 @@ use crate::error::{Result, WiggumError};
 
 /// Top-level hints container.
 #[derive(Debug, Clone, Default)]
-#[allow(clippy::struct_excessive_bools)] // fine for a config struct
 pub struct Hints {
     pub project: ProjectHints,
     pub orchestrator: OrchestratorHints,
@@ -328,7 +327,11 @@ fn parse_failure_action(s: &str) -> Result<FailureAction> {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::indexing_slicing)]
+#[expect(
+    clippy::unwrap_used,
+    clippy::indexing_slicing,
+    reason = "test code unwraps deliberately: a failing assertion should panic and fail the test, not return an error the test would have to handle"
+)]
 mod tests {
     use super::*;
     use std::path::PathBuf;

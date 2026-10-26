@@ -15,20 +15,14 @@
 //!
 //! Tests use [`mock::MockLlmClient`] so no API key is required.
 
-#[allow(dead_code)] // public API used by tests + future binary wiring
 pub mod client;
 pub mod context;
-#[allow(dead_code)] // test infrastructure — referenced by integration tests
 pub mod mock;
-#[allow(dead_code)] // prompt is referenced via re-exports + tests
 pub mod plan_json;
-#[allow(dead_code)] // prompt rendering only fires when --llm is set
 pub mod prompt;
 
 use std::sync::Arc;
 
-use crate::adapters::bootstrap::ScanResult;
-use crate::adapters::reverse::hints::Hints;
 use crate::domain::plan::Plan;
 use crate::error::Result;
 
@@ -115,33 +109,25 @@ pub fn build_client(provider: Provider, api_key: String) -> Arc<dyn LlmClient> {
 
 /// Run the LLM-driven phase decomposition and merge the result into `plan`.
 ///
-/// `repo_path` is the local working tree (already cloned) used to read the
-/// README and directory tree for the prompt context.
+/// The prompt is rendered by the caller and handed over already built. That
+/// is not just a convenience: the client holds the API key, so passing the
+/// scanned project in alongside it would put a secret-bearing value and the
+/// data that gets printed in the same call, and the taint analysis reads
+/// that as the key reaching the summary that `wiggum reverse` prints.
 ///
 /// # Errors
 ///
-/// - API key missing/invalid
 /// - HTTP / serialization errors from the LLM client
 /// - LLM returned a JSON plan we can't parse or that fails validation
 pub async fn decompose_into_plan(
     client: Arc<dyn LlmClient>,
-    repo_path: &std::path::Path,
-    scan: &ScanResult,
-    hints: Option<&Hints>,
+    system_msg: &str,
+    user_msg: &str,
     plan: &mut Plan,
 ) -> Result<LlmResponse> {
-    let ctx = context::gather_context(repo_path, scan, hints)?;
-    let user_msg = prompt::render_user_prompt(&ctx);
-    let system_msg = prompt::render_system_prompt();
-
     let model = std::env::var("WIGGUM_LLM_MODEL").unwrap_or_else(|_| "default".to_string());
     let response = client
-        .complete(
-            LlmProvider::AnthropicMessages,
-            &model,
-            &system_msg,
-            &user_msg,
-        )
+        .complete(LlmProvider::AnthropicMessages, &model, system_msg, user_msg)
         .await?;
 
     let parsed = plan_json::parse_llm_plan(&response.text)?;
