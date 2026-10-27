@@ -1259,9 +1259,9 @@ dependencies = [
 
 [[package]]
 name = "protocol-droid"
-version = "0.5.3"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "85bdb1767a3898edab3a89aefc4459f6f9bde16b4f333f7dc69b7d2deca1b649"
+checksum = "c3805b5589048abf4cb64b6ec3bae4243cf9dd6ecf9188bc7889f4ca57ff5903"
 dependencies = [
  "arc-swap",
  "hmac",
@@ -1277,9 +1277,9 @@ dependencies = [
 
 [[package]]
 name = "protocol-droid-macros"
-version = "0.5.3"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0f52ab12cbe338723bb7b2a0fef5fa31d0d017c4261f9971fd98b152021a1c38"
+checksum = "3fb98726457237fadbe30db64032617144c75bcba3b97cd6ab35ef647c50fadd"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1288,9 +1288,9 @@ dependencies = [
 
 [[package]]
 name = "protocol-droid-schema"
-version = "0.5.3"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "421cd5a4a25c75dd018601445bcafe3d82dc218964bffcbb6181ba6e66cc742e"
+checksum = "16fd66cea20d9e63eee827ae6e0ec56cb4a93220a76061cbe03563431fae9851"
 dependencies = [
  "serde",
  "serde_json",

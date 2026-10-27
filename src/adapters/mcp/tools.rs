@@ -30,7 +30,7 @@
 
 use std::path::PathBuf;
 
-use protocol_droid::application::server::Server;
+use protocol_droid::application::server::{RequestContext, Server};
 
 use crate::adapters::fs::FsAdapter;
 use crate::domain::dag::validate_dag;
@@ -192,22 +192,27 @@ fn negotiable_protocol_range() -> String {
 impl WiggumTools {
     /// Return wiggum version metadata (package, git SHA, MCP protocol).
     ///
-    /// The protocol line names the *range* of revisions this server can be
-    /// negotiated onto, not one revision, because the revision in use is
-    /// settled between the server and the peer and the server does not get to
-    /// choose it. A peer that wants to know whether wiggum can talk to it
-    /// needs the range; a peer that wants to know which revision it settled
-    /// on already has it — it is the `protocolVersion` in the handshake
-    /// result.
+    /// The protocol line names the revision this session actually settled
+    /// on. A server used to report the *range* of revisions it could be
+    /// negotiated onto, because a session could not tell which revision it
+    /// was speaking — `PeerSession::negotiated` reported the transport's
+    /// ceiling rather than the negotiated revision, so a handler had no
+    /// honest answer to give. protocol-droid 0.7.0 fixed that, and the
+    /// revision is read from the session rather than guessed.
     ///
-    /// The range is read from protocol-droid rather than written here, so it
-    /// moves when protocol-droid's set of revisions moves.
+    /// The range is still reported alongside it: a peer that wants to know
+    /// whether wiggum can talk to it needs the range, not the one revision
+    /// this particular session happens to be on.
+    ///
+    /// Both are read from protocol-droid rather than written here, so they
+    /// move when protocol-droid's set of revisions moves.
     #[protocol_droid::tool]
-    async fn wiggum_version() -> Result<String> {
+    async fn wiggum_version(ctx: RequestContext) -> Result<String> {
         let git_sha = option_env!("WIGGUM_GIT_SHA").unwrap_or("unknown");
         Ok(format!(
-            "wiggum {}\nGit SHA: {git_sha}\nMCP protocol: {}",
+            "wiggum {}\nGit SHA: {git_sha}\nMCP protocol: {}\nNegotiable: {}",
             env!("CARGO_PKG_VERSION"),
+            ctx.peer().negotiated().as_wire(),
             negotiable_protocol_range()
         ))
     }

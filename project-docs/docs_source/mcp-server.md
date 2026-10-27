@@ -62,6 +62,8 @@ Unknown methods return JSON-RPC error `-32601`. Tool execution errors are return
 
 Each tool's `inputSchema` is derived from its Rust signature rather than written by hand, so the schema a peer sees and the arguments the tool reads cannot drift apart.
 
+`wiggum_version` reports the revision the session actually settled on, not the newest revision the build could speak — a session knows what it negotiated, and a peer that asks an older revision is answered about that revision. The range it can be negotiated onto is reported alongside it.
+
 ## Runtime security guardrails
 
 MCP `tools/call` execution includes a baseline guardrail pipeline:
