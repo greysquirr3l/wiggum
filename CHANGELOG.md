@@ -6,6 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Changed
+
+- **`wiggum_version` now reports the revision the session settled on** — it
+  named the *range* of revisions wiggum can be negotiated onto, because a
+  session could not tell which revision it was speaking: `PeerSession::negotiated`
+  answered with the transport's ceiling rather than the negotiated revision.
+  protocol-droid 0.7.0 fixed that upstream (greysquirr3l/protocol-droid#66),
+  so the tool now reports the revision in use and keeps the range alongside it.
+
+  This was not only cosmetic upstream: a `2024-11-05` peer was being sent
+  `2025-11-25` shapes, and a client that sent the revision it had just
+  negotiated was answered `400`.
+
+### Dependencies
+
+- `protocol-droid` 0.5 → 0.7.
+
 ## [0.22.0] - 2026-10-25
 
 ### Added
