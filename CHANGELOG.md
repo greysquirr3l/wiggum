@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [0.23.0] - 2026-10-27
+
 ### Changed
 
 - **`wiggum_version` now reports the revision the session settled on** — it
@@ -19,9 +21,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
   `2025-11-25` shapes, and a client that sent the revision it had just
   negotiated was answered `400`.
 
+  Both of those are fixed by the dependency bump, so a peer on an older
+  revision now gets shapes its schema can parse and a client that
+  asserts the revision it negotiated is accepted.
+
 ### Dependencies
 
-- `protocol-droid` 0.5 → 0.7.
+- `protocol-droid` 0.5 → 0.7. `build_server` returns a protocol-droid
+  `Server`, so the crate's public API moves with it.
 
 ## [0.22.0] - 2026-10-25
 
