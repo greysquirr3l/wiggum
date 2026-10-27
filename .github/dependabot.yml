@@ -38,3 +38,17 @@ updates:
       prefix: "ci(actions)"
     labels:
       - github-actions
+    # One PR for the codeql-action bumps.
+    #
+    # CodeQL refuses to run when the steps in a workflow disagree about the
+    # action version: "Loaded a configuration file for version '4.37.0', but
+    # running version '4.39.1'. All steps in a workflow that use
+    # `github/codeql-action` must use the same version to work correctly."
+    # Dependabot treats each `uses:` line as a separate dependency, so
+    # without this group a single bump to codeql-action arrives as three
+    # PRs — one per step — and none of them passes CI. Grouping them makes
+    # the bump land as one PR that touches all three steps together.
+    groups:
+      codeql:
+        patterns:
+          - "github/codeql-action/*"

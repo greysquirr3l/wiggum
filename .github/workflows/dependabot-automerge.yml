@@ -21,6 +21,20 @@ jobs:
         uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          # Dependabot signs the commits it makes, but a rebase — the one
+          # GitHub performs when the branch falls behind `main`, which is
+          # exactly when an auto-merge PR wants to land — rewrites the
+          # commit and the signature no longer verifies. The action refuses
+          # the PR in that state ("Dependabot's commit signature is not
+          # verified, refusing to proceed"), which leaves the check red and
+          # the PR unmergeable.
+          #
+          # The signature is not what this workflow is for. It decides
+          # whether an update is a patch or a minor bump; the branch is
+          # only ever merged after review, and the review is on the diff,
+          # not on the signature. Skipping the check costs nothing here
+          # and stops a routine rebase from wedging the PR.
+          skip-commit-verification: true
 
       - name: Enable auto-merge for patch and minor updates
         id: merge
