@@ -44,6 +44,21 @@ evaluation_criteria = [
 ]
 ```
 
+## Per-task verification commands
+
+`verify` lists shell commands that must exit zero for a task to count as done. Each command is rendered as a `Verify:` checkbox in the task file's Exit Criteria, and the orchestrator's independent verification step runs them after preflight:
+
+```toml
+[[phases.tasks]]
+slug = "domain-model"
+title = "Define domain entities"
+goal = "Create the core domain types and traits"
+depends_on = ["project-setup"]
+verify = ["cargo test --test domain_model"]
+```
+
+`wiggum validate --lint` warns (`no-verification`) about tasks that have no `verify`, `evaluation_criteria` or `must_haves`, and reports `evaluation_criteria` entries that contain no backtick span, path, file name or number as `weak-criteria` (info). `wiggum check` scores the share of tasks with a `verify` command as the Verifiability dimension.
+
 Four default criteria are added to every task automatically: build succeeds, all tests pass, linter clean, and implementation matches goal.
 
 ## Target selection
@@ -75,4 +90,4 @@ Before generating, score your plan with `wiggum check`:
 wiggum check plan.toml
 ```
 
-This evaluates the plan on five dimensions (granularity, dependency health, coverage, richness, and token budget) and prints actionable suggestions. Plans scoring below 7/10 exit with a non-zero status so they can be caught in CI.
+This evaluates the plan on its quality dimensions (granularity, dependency health, coverage, richness, token budget, harness complexity, and verifiability) and prints actionable suggestions. Plans scoring below 7/10 exit with a non-zero status so they can be caught in CI.

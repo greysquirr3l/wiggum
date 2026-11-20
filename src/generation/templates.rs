@@ -237,7 +237,11 @@ Repeat until all tasks (T01–T{{ task_count_padded }}) in PROGRESS.md are `[x]`
    ```bash
    {{ preflight_build }} && {{ preflight_test }} && {{ preflight_lint }}
    ```
-   Do not accept a task as done if preflight fails, regardless of what the subagent reports.{% if has_evaluator %}
+   Then run every command listed as `Verify:` in the task file's Exit Criteria, from the
+   repository root. Each must exit zero.{% if verify_tasks %}
+   Commands by task:{% for vt in verify_tasks %}
+   - T{{ vt.number }}: {% for c in vt.commands %}`{{ c }}`{% if not loop.last %}, {% endif %}{% endfor %}{% endfor %}{% endif %}
+   Do not accept a task as done if preflight or any verify command fails, regardless of what the subagent reports.{% if has_evaluator %}
 9. **Spawn the evaluator** — start the evaluator agent (`.vscode/evaluator.prompt.md`) with
    the task context. Wait for it to return a PASS verdict before proceeding.{% if evaluator_model %}
    When invoking `#tool:agent/runSubagent` for the evaluator, pass
@@ -751,7 +755,8 @@ If none are found, move on.
 {% if audit_cmd %}- [ ] `{{ audit_cmd }}` reports no vulnerabilities
 {% endif %}- [ ] Implementation matches the goal described above
 - [ ] No unresolved TODO/FIXME/HACK markers that belong to this task's scope
-{% if evaluation_criteria %}
+{% if verify %}{% for cmd in verify %}- [ ] Verify: `{{ cmd }}` exits with status 0
+{% endfor %}{% endif %}{% if evaluation_criteria %}
 {% for criterion in evaluation_criteria %}- [ ] {{ criterion }}
 {% endfor %}{% endif %}
 
@@ -1251,7 +1256,11 @@ Repeat until all tasks (T01–T{{ task_count_padded }}) in `PROGRESS.md` are `[x
    {{ preflight_build }} && {{ preflight_test }} && {{ preflight_lint }}
    ```
 
-   Do not accept a task as done if preflight fails, regardless of what the subagent reports.
+   Then run every command listed as `Verify:` in the task file's Exit Criteria, from the
+   repository root. Each must exit zero.{% if verify_tasks %}
+   Commands by task:{% for vt in verify_tasks %}
+   - T{{ vt.number }}: {% for c in vt.commands %}`{{ c }}`{% if not loop.last %}, {% endif %}{% endfor %}{% endfor %}{% endif %}
+   Do not accept a task as done if preflight or any verify command fails, regardless of what the subagent reports.
 {% if has_evaluator %}
 9. **Spawn the evaluator** — dispatch the `evaluator` subagent via `task` (see
    `.opencode/agents/evaluator.md`) with the task slug and goal. Wait for a PASS verdict
@@ -1521,7 +1530,7 @@ For each `[ ]` task whose dependencies are `[x]`:
 2. **Claim.** Mark `[~]` in `PROGRESS.md`.
 3. **Extract context.** Copy the full **Accumulated Learnings**, **Codebase State**, and **Completion Standard** sections out of `PROGRESS.md`.
 4. **Dispatch implementation.** Spawn a `general` subagent via `task(subagent_type="general", prompt=<SUBAGENT_PROMPT with injected context>)`. The subagent implements and runs preflight.
-5. **Independent preflight.** Orchestrator runs the same preflight itself. If it fails, the subagent's `[x]` claim is rejected — mark `[!]` and retry.
+5. **Independent preflight.** Orchestrator runs the same preflight itself, then every `Verify:` command listed in the task file's Exit Criteria (each must exit zero){% if verify_tasks %}: {% for vt in verify_tasks %}T{{ vt.number }} {% for c in vt.commands %}`{{ c }}`{% if not loop.last %}, {% endif %}{% endfor %}{% if not loop.last %}; {% endif %}{% endfor %}{% endif %}. If any fails, the subagent's `[x]` claim is rejected — mark `[!]` and retry.
 6. **Evaluator.** Spawn `evaluator` subagent. Weighted rubric must score ≥ {{ pass_threshold }}/10; hard-fail mode on.
 7. **Background auditor.** Spawn `background-auditor` subagent. Findings are recorded in `PROGRESS.md` notes.
 8. **Verify.** Confirm the task is `[x]` in `PROGRESS.md`. If not, mark `[!]` and continue to the next task (failures don't block unrelated tasks).

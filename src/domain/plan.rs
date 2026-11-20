@@ -430,6 +430,11 @@ pub struct TaskDef {
     /// must pass before the task can be marked complete.
     #[serde(default)]
     pub evaluation_criteria: Vec<String>,
+    /// Shell commands that must exit zero for the task to count as done.
+    /// Rendered into the task's Exit Criteria and re-run by the
+    /// orchestrator's independent verification step.
+    #[serde(default)]
+    pub verify: Vec<String>,
     /// Task archetype — influences template variant and exit criteria.
     /// Defaults to `feature` when omitted.
     #[serde(default)]
@@ -570,6 +575,8 @@ pub struct ResolvedTask {
     pub gate: Option<String>,
     /// Evaluator exit criteria carried over from `TaskDef`.
     pub evaluation_criteria: Vec<String>,
+    /// Verification commands carried over from `TaskDef::verify`.
+    pub verify: Vec<String>,
     pub phase_name: String,
     pub phase_order: u32,
     /// Task archetype, propagated from `TaskDef`.
@@ -597,6 +604,7 @@ impl ResolvedTask {
             must_haves: task.must_haves.clone(),
             gate: task.gate.clone(),
             evaluation_criteria: task.evaluation_criteria.clone(),
+            verify: task.verify.clone(),
             phase_name: phase.name.clone(),
             phase_order: phase.order,
             kind: task.kind,
@@ -1390,6 +1398,7 @@ fn security_hardening_task(
             "File upload test rejects .exe/.sh/.php and oversized files".to_string(),
             "SSRF test confirms internal metadata URLs are blocked".to_string(),
         ],
+        verify: vec![],
         phase_name,
         phase_order,
         kind: TaskKind::Audit,
@@ -1446,6 +1455,7 @@ fn integration_wiring_task(
             "Integration test passes exercising the primary user flow end-to-end".to_string(),
             "Manual trace confirms each feature's wiring from entry to implementation".to_string(),
         ],
+        verify: vec![],
         phase_name,
         phase_order,
         kind: TaskKind::Audit,
@@ -1508,6 +1518,7 @@ fn stub_cleanup_task(
             "All previously-stubbed functions now have real implementations with tests".to_string(),
             "Test suite passes with full coverage of formerly-stubbed code paths".to_string(),
         ],
+        verify: vec![],
         phase_name,
         phase_order,
         kind: TaskKind::Audit,

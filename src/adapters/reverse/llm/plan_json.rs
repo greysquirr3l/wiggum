@@ -149,6 +149,7 @@ pub fn phases_from_llm_plan(llm: &LlmPlan) -> Vec<Phase> {
                     must_haves: Vec::new(),
                     gate: t.gate.clone(),
                     evaluation_criteria: Vec::new(),
+                    verify: Vec::new(),
                     kind: TaskKind::default(),
                     implements: Vec::new(),
                     anchors: Vec::new(),

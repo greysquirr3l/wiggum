@@ -38,6 +38,7 @@ pub fn render_with(tera: &Tera, plan: &Plan, task: &ResolvedTask) -> Result<Stri
     ctx.insert("strategy", &plan.orchestrator.strategy.to_string());
     ctx.insert("kind", &task.kind.to_string());
     ctx.insert("evaluation_criteria", &task.evaluation_criteria);
+    ctx.insert("verify", &task.verify);
     ctx.insert("avoid_god_files", &plan.style.avoid_god_files);
 
     // Code anchors — serialized so the template can render `path:lines`

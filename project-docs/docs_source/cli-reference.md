@@ -34,7 +34,7 @@ wiggum generate <plan> [OPTIONS]
 
 ## `wiggum check`
 
-Score the quality of a plan file before generating. Unlike `validate --lint`, which checks structural correctness, `check` scores the _substance_ of a plan on five dimensions and produces concrete improvement suggestions. The same score is now printed at the end of `wiggum generate` so the quality signal lands at the moment it matters most — right after scaffolding. Pass `--no-summary` to suppress it.
+Score the quality of a plan file before generating. Unlike `validate --lint`, which checks structural correctness, `check` scores the _substance_ of a plan on seven dimensions and produces concrete improvement suggestions. The same score is now printed at the end of `wiggum generate` so the quality signal lands at the moment it matters most — right after scaffolding. Pass `--no-summary` to suppress it.
 
 ```bash
 wiggum check <plan> [--json]
@@ -45,7 +45,7 @@ wiggum check <plan> [--json]
 | `<plan>` | Path to the plan TOML file                            |
 | `--json` | Output results as JSON instead of human-readable text |
 
-The six scoring dimensions are:
+The seven scoring dimensions are:
 
 | Dimension              | What it measures                                                                                                                        |
 | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
@@ -55,6 +55,7 @@ The six scoring dimensions are:
 | **Richness**           | Presence of hints, must-haves, evaluation criteria                                                                                      |
 | **Token budget**       | Estimated prompt size across all generated artifacts                                                                                    |
 | **Harness complexity** | Whether the evaluator harness matches plan scale — penalises over-engineered harnesses on tiny plans and rewards high criteria coverage |
+| **Verifiability**      | Share of tasks with at least one `verify` command                                                                                       |
 
 Each dimension scores 0–10. The overall score is a weighted composite. Plans scoring **≥ 7** are considered healthy; `wiggum check` exits with a non-zero status if the plan is below this threshold.
 

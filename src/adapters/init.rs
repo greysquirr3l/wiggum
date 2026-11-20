@@ -240,6 +240,7 @@ fn prompt_tasks_for_phase(phase_name: &str, existing_phases: &[Phase]) -> Result
             must_haves: Vec::new(),
             gate: None,
             evaluation_criteria: Vec::new(),
+            verify: Vec::new(),
             kind: TaskKind::default(),
             implements: Vec::new(),
             anchors: Vec::new(),

@@ -270,6 +270,7 @@ mod tests {
             must_haves: vec![],
             gate: None,
             evaluation_criteria: vec![],
+            verify: vec![],
             phase_name: "Phase 1".into(),
             phase_order: 1,
             kind: TaskKind::default(),

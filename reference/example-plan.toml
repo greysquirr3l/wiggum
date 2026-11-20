@@ -170,6 +170,7 @@ hints = [
 test_hints = [
     "CI must pass: green build + clippy with -D warnings + cargo test.",
 ]
+verify    = ["cargo build"]
 must_haves = [
     "Cargo.toml with edition = \"2024\"",
     ".github/workflows/ci.yml runs cargo build, clippy, and test",
@@ -202,6 +203,7 @@ test_hints = [
     "Unit-test RetryPolicy::next_delay(attempt) for exponential backoff correctness.",
     "Test that WebhookEvent rejects an empty source string.",
 ]
+verify    = ["cargo test domain"]
 must_haves = [
     "All domain types derive Serialize/Deserialize",
     "Port traits are object-safe",
@@ -229,6 +231,7 @@ test_hints = [
     "Test: wrong secret fails.",
     "Test: missing header (empty string) returns false when a secret is configured.",
 ]
+verify    = ["cargo test signature"]
 must_haves = [
     "Constant-time comparison — no timing side-channel",
     "Function is pure (no I/O, no side effects)",
@@ -261,6 +264,7 @@ test_hints = [
     "Integration test: POST with an invalid signature → 400 Bad Request.",
     "Integration test: GET /healthz → 200 OK.",
 ]
+verify    = ["cargo test router"]
 must_haves = [
     "Raw body read before JSON deserialization",
     "Secrets never logged",
@@ -292,6 +296,7 @@ test_hints = [
     "Use wiremock to simulate a failing downstream — assert retry count matches the target's RetryPolicy.",
     "Assert sign-then-verify round-trip: sign outbound payload, validate with the same secret.",
 ]
+verify    = ["cargo test dispatcher"]
 must_haves = [
     "TLS via rustls, not native-tls",
     "Retry count and final outcome persisted to DeliveryLog",
@@ -314,6 +319,7 @@ test_hints = [
     "Test save-then-load round-trip for WebhookEvent.",
     "Test that failed delivery status is recorded correctly.",
 ]
+verify    = ["cargo test sqlite"]
 must_haves = [
     "All SQL uses compile-time checked query macros",
     "Migrations applied automatically at startup",
@@ -342,6 +348,7 @@ test_hints = [
     "Test that a non-HTTPS target URL fails validation outside dev mode.",
     "Test that missing required fields produce clear error messages.",
 ]
+verify    = ["cargo test config"]
 must_haves = [
     "Config validated at startup — process exits with a clear error message if invalid",
     "No secrets in the committed default config file",
@@ -364,6 +371,7 @@ test_hints = [
     "CLI integration test: kestrel validate-config --config tests/fixtures/valid.toml → exit 0.",
     "CLI integration test: kestrel validate-config --config tests/fixtures/invalid.toml → exit 1 with message.",
 ]
+verify    = ["cargo run -- --help"]
 must_haves = [
     "All three subcommands present and functional",
     "Startup log line includes version and bound address",

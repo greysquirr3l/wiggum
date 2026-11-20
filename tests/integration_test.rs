@@ -637,14 +637,14 @@ fn patterns_save_multiple_sorted_by_timestamp() {
 // ─── check / score_plan ───────────────────────────────────────────────────────
 
 #[test]
-fn check_score_plan_has_six_dimensions() {
+fn check_score_plan_has_seven_dimensions() {
     let plan = load_example_plan();
     let resolved = plan.resolve_tasks().expect("resolve");
     let score = score_plan(&plan, &resolved);
     assert_eq!(
         score.dimensions.len(),
-        6,
-        "Expected exactly 6 scoring dimensions"
+        7,
+        "Expected exactly 7 scoring dimensions"
     );
 }
 
@@ -1208,4 +1208,39 @@ note = "file was deleted"
         1,
         "expected one missing-file error, got {diags:?}"
     );
+}
+
+#[test]
+fn task_verify_commands_reach_task_file_and_orchestrators() {
+    let mut plan = load_example_plan();
+    let task = plan
+        .phases
+        .iter_mut()
+        .flat_map(|p| p.tasks.iter_mut())
+        .find(|t| t.slug == "domain-model")
+        .expect("fixture has domain-model");
+    task.verify = vec!["cargo test --test foo".to_string()];
+
+    let artifacts = generation::generate_all(&plan).expect("Generation failed");
+
+    let (_, task_file) = artifacts
+        .tasks
+        .iter()
+        .find(|(name, _)| name == "T02-domain-model.md")
+        .expect("T02 task file");
+    assert!(
+        task_file.contains("- [ ] Verify: `cargo test --test foo` exits with status 0"),
+        "task file must list the verify command in Exit Criteria:\n{task_file}"
+    );
+
+    for (name, orchestrator) in [
+        ("vscode", &artifacts.orchestrator_vscode),
+        ("opencode", &artifacts.orchestrator_opencode),
+        ("root", &artifacts.orchestrator_root),
+    ] {
+        assert!(
+            orchestrator.contains("`cargo test --test foo`"),
+            "{name} orchestrator verify step must name the command"
+        );
+    }
 }

@@ -42,6 +42,7 @@ depends_on = ["domain-model", "database-adapter"]
 | `must_haves` | No | Hard exit criteria the task must satisfy |
 | `gate` | No | Precondition the orchestrator must verify before starting this task |
 | `evaluation_criteria` | No | Verifiable criteria scored by the [evaluator](./plan-preflight.md#evaluator-configuration) agent |
+| `verify` | No | Shell commands that must exit zero; listed in the task's Exit Criteria and run by the orchestrator after preflight |
 
 ## Task kinds
 

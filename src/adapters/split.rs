@@ -286,6 +286,11 @@ fn build_split_tasks(original: &TaskDef, split: &SplitPlan) -> Vec<TaskDef> {
                 } else {
                     vec![]
                 },
+                verify: if i == last {
+                    original.verify.clone()
+                } else {
+                    vec![]
+                },
                 kind: original.kind,
                 implements: Vec::new(),
                 anchors: Vec::new(),
@@ -432,6 +437,7 @@ mod tests {
             must_haves: Vec::new(),
             gate: None,
             evaluation_criteria: Vec::new(),
+            verify: Vec::new(),
             kind: TaskKind::default(),
             implements: Vec::new(),
             anchors: vec![],

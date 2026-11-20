@@ -60,6 +60,8 @@ pub fn lint_plan(plan: &Plan, resolved: &[ResolvedTask]) -> Vec<Diagnostic> {
     lint_orphan_task(resolved, &mut diagnostics);
     lint_missing_arch(plan, &mut diagnostics);
     lint_wide_fan_out(resolved, &mut diagnostics);
+    lint_no_verification(resolved, &mut diagnostics);
+    lint_weak_criteria(resolved, &mut diagnostics);
     lint_capability_unused(plan, &mut diagnostics);
     lint_capability_no_scenarios(plan, &mut diagnostics);
     lint_capability_no_requirements(plan, &mut diagnostics);
@@ -145,6 +147,68 @@ fn compute_depth<'a>(
     });
     cache.insert(slug, max_parent);
     max_parent
+}
+
+/// Warning: a task with no `verify` commands, no `evaluation_criteria` and no
+/// `must_haves` gives the orchestrator nothing to check beyond preflight.
+fn lint_no_verification(tasks: &[ResolvedTask], out: &mut Vec<Diagnostic>) {
+    for t in tasks {
+        if t.verify.is_empty() && t.evaluation_criteria.is_empty() && t.must_haves.is_empty() {
+            out.push(Diagnostic {
+                severity: Severity::Warning,
+                rule: "no-verification",
+                message: format!(
+                    "T{:02}-{}: no verify, evaluation_criteria or must_haves — completion can only be judged by preflight",
+                    t.number, t.slug
+                ),
+            });
+        }
+    }
+}
+
+/// True when a criterion names something checkable. The heuristic is
+/// deliberately crude: a backtick span (a command or identifier), a path
+/// separator, a `name.ext` file token, a `--flag` or `::` path (unquoted
+/// commands and identifiers), or any digit (a measurable threshold) counts as
+/// concrete. Anything else is treated as prose.
+fn criterion_is_concrete(criterion: &str) -> bool {
+    if criterion.contains('`')
+        || criterion.contains('/')
+        || criterion.contains(" --")
+        || criterion.contains("::")
+    {
+        return true;
+    }
+    if criterion.chars().any(|c| c.is_ascii_digit()) {
+        return true;
+    }
+    criterion.split_whitespace().any(|word| {
+        let word = word.trim_matches(|c: char| !c.is_alphanumeric());
+        word.split_once('.').is_some_and(|(stem, ext)| {
+            !stem.is_empty()
+                && (1..=5).contains(&ext.len())
+                && ext.chars().all(|c| c.is_ascii_alphanumeric())
+        })
+    })
+}
+
+/// Info: `evaluation_criteria` entries with no command, file path or
+/// measurable condition (see [`criterion_is_concrete`]).
+fn lint_weak_criteria(tasks: &[ResolvedTask], out: &mut Vec<Diagnostic>) {
+    for t in tasks {
+        for criterion in &t.evaluation_criteria {
+            if !criterion_is_concrete(criterion) {
+                out.push(Diagnostic {
+                    severity: Severity::Info,
+                    rule: "weak-criteria",
+                    message: format!(
+                        "T{:02}-{}: criterion \"{criterion}\" names no command, file path or measurable condition",
+                        t.number, t.slug
+                    ),
+                });
+            }
+        }
+    }
 }
 
 /// Error: Task has an empty goal.
@@ -472,6 +536,7 @@ mod tests {
                 must_haves: t.must_haves,
                 gate: t.gate,
                 evaluation_criteria: t.evaluation_criteria,
+                verify: t.verify,
                 phase_name: "Phase 1".to_string(),
                 phase_order: 1,
                 kind: t.kind,
@@ -493,6 +558,7 @@ mod tests {
             must_haves: Vec::new(),
             gate: None,
             evaluation_criteria: Vec::new(),
+            verify: Vec::new(),
             kind: TaskKind::default(),
             implements: Vec::new(),
             anchors: vec![],
@@ -542,6 +608,7 @@ mod tests {
                     must_haves: Vec::new(),
                     gate: None,
                     evaluation_criteria: Vec::new(),
+                    verify: Vec::new(),
                     kind: TaskKind::default(),
                     implements: Vec::new(),
                     anchors: vec![],
@@ -566,6 +633,7 @@ mod tests {
                 must_haves: Vec::new(),
                 gate: None,
                 evaluation_criteria: Vec::new(),
+                verify: vec!["cargo build".to_string()],
                 kind: TaskKind::default(),
                 implements: Vec::new(),
                 anchors: vec![],
@@ -580,6 +648,7 @@ mod tests {
                 must_haves: Vec::new(),
                 gate: None,
                 evaluation_criteria: Vec::new(),
+                verify: vec!["cargo test".to_string()],
                 kind: TaskKind::default(),
                 implements: Vec::new(),
                 anchors: vec![],
@@ -592,6 +661,57 @@ mod tests {
             .filter(|d| d.severity == Severity::Error || d.severity == Severity::Warning)
             .count();
         assert_eq!(serious, 0);
+    }
+
+    #[test]
+    fn no_verification_warns_when_nothing_to_check() {
+        let (plan, resolved) = make_plan(vec![task("a", "do a", &[])], None);
+        let diags = lint_plan(&plan, &resolved);
+        assert!(
+            diags
+                .iter()
+                .any(|d| d.rule == "no-verification" && d.severity == Severity::Warning)
+        );
+    }
+
+    #[test]
+    fn no_verification_quiet_with_verify_criteria_or_must_haves() {
+        let mut with_verify = task("a", "do a", &[]);
+        with_verify.verify = vec!["cargo test".to_string()];
+        let mut with_criteria = task("b", "do b", &[]);
+        with_criteria.evaluation_criteria = vec!["prose only".to_string()];
+        let mut with_must_haves = task("c", "do c", &[]);
+        with_must_haves.must_haves = vec!["a thing".to_string()];
+        let (plan, resolved) = make_plan(vec![with_verify, with_criteria, with_must_haves], None);
+        let diags = lint_plan(&plan, &resolved);
+        assert!(!diags.iter().any(|d| d.rule == "no-verification"));
+    }
+
+    #[test]
+    fn weak_criteria_flags_prose_only() {
+        let mut t = task("a", "do a", &[]);
+        t.evaluation_criteria = vec!["The code is clean and well designed".to_string()];
+        let (plan, resolved) = make_plan(vec![t], None);
+        let diags = lint_plan(&plan, &resolved);
+        assert!(
+            diags
+                .iter()
+                .any(|d| d.rule == "weak-criteria" && d.severity == Severity::Info)
+        );
+    }
+
+    #[test]
+    fn weak_criteria_accepts_commands_paths_and_numbers() {
+        let mut t = task("a", "do a", &[]);
+        t.evaluation_criteria = vec![
+            "`cargo test` passes".to_string(),
+            "src/main.rs exists".to_string(),
+            "Writes config.toml".to_string(),
+            "p95 latency under 200ms".to_string(),
+        ];
+        let (plan, resolved) = make_plan(vec![t], None);
+        let diags = lint_plan(&plan, &resolved);
+        assert!(!diags.iter().any(|d| d.rule == "weak-criteria"));
     }
 
     #[test]

@@ -43,6 +43,7 @@ pub fn render_with(tera: &Tera, plan: &Plan, tasks: &[ResolvedTask]) -> Result<S
         &plan.evaluator.as_ref().and_then(|e| e.model.clone()),
     );
     ctx.insert("has_evaluator", &plan.evaluator.is_some());
+    insert_verify_tasks(&mut ctx, tasks);
 
     // Security rules from the language profile, always injected.
     let profile = plan.project.language.profile();
@@ -84,6 +85,21 @@ pub fn render_with(tera: &Tera, plan: &Plan, tasks: &[ResolvedTask]) -> Result<S
         .map_err(|e| WiggumError::Template(e.to_string()))
 }
 
+/// Expose each task's `verify` commands so step 8 can name them.
+fn insert_verify_tasks(ctx: &mut Context, tasks: &[ResolvedTask]) {
+    let verify_tasks: Vec<serde_json::Value> = tasks
+        .iter()
+        .filter(|t| !t.verify.is_empty())
+        .map(|t| {
+            serde_json::json!({
+                "number": format!("{:02}", t.number),
+                "commands": t.verify,
+            })
+        })
+        .collect();
+    ctx.insert("verify_tasks", &verify_tasks);
+}
+
 /// Render the opencode orchestrator agent prompt (`orchestrator.md`).
 ///
 /// # Errors
@@ -123,6 +139,7 @@ pub fn render_opencode_with(tera: &Tera, plan: &Plan, tasks: &[ResolvedTask]) ->
         &plan.evaluator.as_ref().and_then(|e| e.model.clone()),
     );
     ctx.insert("has_evaluator", &plan.evaluator.is_some());
+    insert_verify_tasks(&mut ctx, tasks);
 
     // Completion standard — travels verbatim with every subagent dispatch
     // alongside Accumulated Learnings and Codebase State.
@@ -198,6 +215,7 @@ pub fn render_orchestrator_root_with(
     ctx.insert("max_retries", &plan.orchestrator.max_retries);
     ctx.insert("on_failure", &plan.orchestrator.on_failure.to_string());
     ctx.insert("has_evaluator", &plan.evaluator.is_some());
+    insert_verify_tasks(&mut ctx, tasks);
 
     let completion_standard = plan.style.resolved_completion_standard();
     ctx.insert("completion_standard", &completion_standard);

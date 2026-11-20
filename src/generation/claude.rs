@@ -120,6 +120,7 @@ mod tests {
                     must_haves: vec![],
                     gate: None,
                     evaluation_criteria: vec![],
+                    verify: vec![],
                     kind: TaskKind::default(),
                     implements: Vec::new(),
                     anchors: vec![],

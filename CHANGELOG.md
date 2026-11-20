@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Added
+
+- **Executable per-task verification** — tasks accept `verify = ["cargo test --test foo"]`.
+  The commands appear as `Verify:` items in the task file's Exit Criteria and the
+  orchestrator's independent verification step (VS Code, OpenCode and root
+  orchestrators) runs them after preflight. New lint rules `no-verification`
+  (warning) and `weak-criteria` (info), and a Verifiability dimension in
+  `wiggum check` (weights rebalanced; they still sum to 100%).
+
 ## [0.23.0] - 2026-10-27
 
 ### Changed

@@ -301,9 +301,10 @@ impl WiggumTools {
         Ok(lines.join("\n"))
     }
 
-    /// Score a plan's quality on five dimensions — granularity, dependency
-    /// health, coverage, richness, and token budget — and return an overall
-    /// score with actionable suggestions.
+    /// Score a plan's quality on seven dimensions — granularity, dependency
+    /// health, coverage, richness, token budget, harness complexity, and
+    /// verifiability — and return an overall score with actionable
+    /// suggestions.
     #[protocol_droid::tool]
     async fn wiggum_check_plan(plan_path: String) -> Result<String> {
         let fs = FsAdapter;
