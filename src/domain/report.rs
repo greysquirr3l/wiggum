@@ -201,7 +201,7 @@ pub fn collect_git_timeline(project_path: &Path) -> Vec<GitCommitInfo> {
                 && upper[1..].chars().take(2).all(|c| c.is_ascii_digit())
             {
                 commits.push(GitCommitInfo {
-                    task_id: upper.clone(),
+                    task_id: upper,
                     timestamp: timestamp.to_string(),
                     message: message.to_string(),
                 });

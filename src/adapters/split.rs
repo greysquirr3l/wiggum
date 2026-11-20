@@ -244,8 +244,7 @@ fn build_split_tasks(original: &TaskDef, split: &SplitPlan) -> Vec<TaskDef> {
                 split
                     .parts
                     .get(i - 1)
-                    .map(|prev| vec![prev.slug.clone()])
-                    .unwrap_or_default()
+                    .map_or_default(|prev| vec![prev.slug.clone()])
             } else {
                 vec![]
             };

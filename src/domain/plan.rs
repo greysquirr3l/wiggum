@@ -1330,7 +1330,7 @@ fn security_hardening_task(
     phase_name: String,
     phase_order: u32,
 ) -> ResolvedTask {
-    let depends_on = last_slug.map(|s| vec![s]).unwrap_or_default();
+    let depends_on = last_slug.map_or_default(|s| vec![s]);
 
     ResolvedTask {
         number,
@@ -1409,7 +1409,7 @@ fn integration_wiring_task(
     phase_order: u32,
     wiring_hints: &[&str],
 ) -> ResolvedTask {
-    let depends_on = last_slug.map(|s| vec![s]).unwrap_or_default();
+    let depends_on = last_slug.map_or_default(|s| vec![s]);
 
     let hints: Vec<String> = wiring_hints.iter().map(|s| (*s).to_string()).collect();
 
@@ -1463,7 +1463,7 @@ fn stub_cleanup_task(
     phase_order: u32,
     stub_patterns: &[&str],
 ) -> ResolvedTask {
-    let depends_on = last_slug.map(|s| vec![s]).unwrap_or_default();
+    let depends_on = last_slug.map_or_default(|s| vec![s]);
 
     let pattern_hints: Vec<String> = stub_patterns
         .iter()
