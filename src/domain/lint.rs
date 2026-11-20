@@ -905,7 +905,11 @@ mod tests {
     #[test]
     fn evaluator_model_unset_warns() {
         let d = independence_diags(&eval_plan(None, Some("sonnet"), true));
-        assert_eq!(d.len(), 1);
+        assert_eq!(
+            d.len(),
+            1,
+            "expected exactly one evaluator-not-independent diagnostic, got {d:?}"
+        );
         assert_eq!(d[0].severity, Severity::Warning);
         assert!(d[0].message.contains("[evaluator] model"));
         assert!(d[0].message.contains("inherits the dispatcher's model"));
@@ -914,14 +918,22 @@ mod tests {
     #[test]
     fn evaluator_model_empty_string_counts_as_unset() {
         let d = independence_diags(&eval_plan(Some("  "), Some("sonnet"), true));
-        assert_eq!(d.len(), 1);
+        assert_eq!(
+            d.len(),
+            1,
+            "expected exactly one evaluator-not-independent diagnostic, got {d:?}"
+        );
         assert!(d[0].message.contains("inherits the dispatcher's model"));
     }
 
     #[test]
     fn evaluator_model_equal_to_subagent_model_warns() {
         let d = independence_diags(&eval_plan(Some("sonnet"), Some("sonnet"), true));
-        assert_eq!(d.len(), 1);
+        assert_eq!(
+            d.len(),
+            1,
+            "expected exactly one evaluator-not-independent diagnostic, got {d:?}"
+        );
         assert!(d[0].message.contains("`sonnet`"));
         assert!(d[0].message.contains("[orchestrator] subagent_model"));
     }
@@ -933,13 +945,21 @@ mod tests {
             Some("claude-sonnet"),
             true,
         ));
-        assert_eq!(d.len(), 1);
+        assert_eq!(
+            d.len(),
+            1,
+            "expected exactly one evaluator-not-independent diagnostic, got {d:?}"
+        );
         let d = independence_diags(&eval_plan(
             Some("claude-sonnet"),
             Some("  CLAUDE-SONNET\t"),
             true,
         ));
-        assert_eq!(d.len(), 1);
+        assert_eq!(
+            d.len(),
+            1,
+            "expected exactly one evaluator-not-independent diagnostic, got {d:?}"
+        );
     }
 
     #[test]
@@ -961,7 +981,11 @@ mod tests {
     #[test]
     fn both_models_unset_warns() {
         let d = independence_diags(&eval_plan(None, None, true));
-        assert_eq!(d.len(), 1);
+        assert_eq!(
+            d.len(),
+            1,
+            "expected exactly one evaluator-not-independent diagnostic, got {d:?}"
+        );
         assert!(d[0].message.contains("set `[evaluator] model`"));
     }
 

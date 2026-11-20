@@ -116,8 +116,12 @@ model          = "claude-opus-4.7"     # orchestrator agent (recommendation head
 subagent_model = "claude-sonnet-4.5"   # every runSubagent call for implementation
 
 [evaluator]
-model          = "claude-sonnet-4.5"   # evaluator agent
+model          = "claude-opus-4.7"     # evaluator agent; keep it different from subagent_model
 ```
+
+Keep `[evaluator] model` different from `[orchestrator] subagent_model` so the
+evaluator is independent of the implementer; see
+[Evaluator configuration](#evaluator-configuration).
 
 How each field is applied depends on the active [target](./targets.md):
 
@@ -142,14 +146,6 @@ How each field is applied depends on the active [target](./targets.md):
     are not currently rendered into `CLAUDE.md` — Claude Code uses the model
     selected in its own picker at session start. The fields are preserved on the
     plan for future use and for consistency with other targets.
-
-**Evaluator independence.** `wiggum validate --lint` warns
-(`evaluator-not-independent`) when `[evaluator]` is configured and its `model` is
-unset or equals `[orchestrator] subagent_model`. Comparison ignores case and
-surrounding whitespace, and an empty string counts as unset. With no model set the
-evaluator inherits the dispatcher's model, so the same model that writes the code
-also grades it. Set `[evaluator] model` to a different model from `subagent_model`.
-A plan with no `[evaluator]` is not reported by this rule.
 
 Equivalent ChatGPT or Gemini model identifiers work the same way — the string is
 passed through to `runSubagent` verbatim, so whatever the picker accepts is valid
@@ -228,7 +224,22 @@ persona        = "You are a skeptical QA engineer"
 pass_threshold = 7
 hard_fail      = true
 test_tool      = "cargo test --workspace"
+model          = "claude-opus-4.7"   # differs from [orchestrator] subagent_model
 ```
+
+### Evaluator independence
+
+Set `[evaluator] model` to a different model from `[orchestrator] subagent_model`.
+With no evaluator model the evaluator inherits the dispatcher's model, and with the
+same model the code is graded by the model that wrote it. `wiggum validate --lint`
+warns in both cases, with either `evaluator has no [evaluator] model, so it inherits
+the dispatcher's model...` or `[evaluator] model (...) is the same as
+[orchestrator] subagent_model...`. Comparison ignores case and surrounding
+whitespace, and an empty string counts as unset. A plan with no `[evaluator]` is not
+reported. `evaluator-not-independent` is the rule id the MCP lint tool and the
+test suite use; the CLI prints only the warning text. The Claude target renders no
+model fields (see [Model selection](#model-selection)), so the pin only changes the
+vscode and opencode outputs.
 
 ### Fields
 
@@ -238,7 +249,7 @@ test_tool      = "cargo test --workspace"
 | `pass_threshold` | No | `7` | Minimum score (0–10) for a criterion to pass |
 | `hard_fail` | No | `false` | If `true`, abort the loop on any failed criterion |
 | `test_tool` | No | Inherits `preflight.test` | Command the evaluator uses to run the test suite |
-| `model` | No | — | Model identifier for the evaluator agent. Rendered as a header note in `evaluator.prompt.md` and passed as `model:` when the orchestrator dispatches the evaluator via `runSubagent`. |
+| `model` | No | — | Model identifier for the evaluator agent; should differ from `[orchestrator] subagent_model` (see [Evaluator independence](#evaluator-independence)). Rendered as a header note in `evaluator.prompt.md` and passed as `model:` when the orchestrator dispatches the evaluator via `runSubagent`. |
 
 ## Security configuration
 

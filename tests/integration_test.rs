@@ -1645,37 +1645,56 @@ fn approval_row_in_generated_progress_is_not_counted_as_a_task() {
     );
 }
 
+/// Collect every `*.toml` file under `dir`, recursively.
+fn collect_toml_files(dir: &std::path::Path, out: &mut Vec<PathBuf>) {
+    let entries = std::fs::read_dir(dir).expect("read shipped plan dir");
+    for entry in entries {
+        let path = entry.expect("dir entry").path();
+        if path.is_dir() {
+            collect_toml_files(&path, out);
+        } else if path.extension().is_some_and(|e| e == "toml") {
+            out.push(path);
+        }
+    }
+}
+
 /// Every shipped plan that configures an `[evaluator]` must pin a model that
 /// differs from the implementer's, so the `evaluator-not-independent` lint
-/// stays quiet on the fixtures, reference plans and golden plans.
+/// stays quiet on the fixtures, reference plans (including the example
+/// workspace) and golden plans. Plans are found by a recursive directory scan;
+/// TOML files that do not parse as a `Plan` (hints, workspace manifests) are
+/// skipped. All offenders are reported together.
 #[test]
 fn shipped_plans_have_independent_evaluators() {
+    const EXPECTED_PLANS: usize = 15;
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let mut paths = vec![
-        root.join("reference/example-plan.toml"),
-        root.join("reference/example-refactor-plan.toml"),
-        root.join("tests/fixtures/example-plan.toml"),
-        root.join("tests/fixtures/thin-plan.toml"),
-    ];
-    for entry in std::fs::read_dir(root.join("tests/golden")).expect("read golden dir") {
-        let path = entry.expect("dir entry").path();
-        if path.extension().is_some_and(|e| e == "toml") {
-            paths.push(path);
+    let mut files = Vec::new();
+    for dir in ["tests/fixtures", "tests/golden", "reference"] {
+        collect_toml_files(&root.join(dir), &mut files);
+    }
+    files.sort();
+
+    let mut checked = Vec::new();
+    let mut offenders = Vec::new();
+    for path in &files {
+        let text = std::fs::read_to_string(path).expect("read toml");
+        let Ok(plan) = Plan::from_toml(&text) else {
+            continue;
+        };
+        let resolved = plan.resolve_tasks().expect("resolve");
+        let diags = wiggum::domain::lint::lint_plan(&plan, &resolved);
+        checked.push(path.display().to_string());
+        if diags.iter().any(|d| d.rule == "evaluator-not-independent") {
+            offenders.push(path.display().to_string());
         }
     }
     assert!(
-        paths.len() >= 13,
-        "expected all shipped plans, got {paths:?}"
+        checked.len() >= EXPECTED_PLANS,
+        "expected at least {EXPECTED_PLANS} shipped plans, checked {}: {checked:#?}",
+        checked.len()
     );
-    for path in paths {
-        let text = std::fs::read_to_string(&path).expect("read plan");
-        let plan = Plan::from_toml(&text).expect("parse plan");
-        let resolved = plan.resolve_tasks().expect("resolve");
-        let diags = wiggum::domain::lint::lint_plan(&plan, &resolved);
-        assert!(
-            !diags.iter().any(|d| d.rule == "evaluator-not-independent"),
-            "{} raises evaluator-not-independent",
-            path.display()
-        );
-    }
+    assert!(
+        offenders.is_empty(),
+        "plans raising evaluator-not-independent: {offenders:#?}"
+    );
 }

@@ -33,6 +33,7 @@ persona     = "You are a senior Rust engineer building a lean, zero-I/O domain l
 strategy    = "tdd"
 max_retries = 2
 on_failure  = "pause"
+subagent_model = "claude-sonnet-4.5"   # implementation subagents
 rules = [
     "Library crate only — no main(), no binary targets.",
     "The domain module must have zero I/O dependencies (no tokio, no sqlx, no reqwest).",
@@ -47,6 +48,7 @@ rules = [
 persona        = "You are a skeptical QA engineer verifying a library contract that other crates depend on."
 pass_threshold = 7
 hard_fail      = true
+model          = "claude-opus-4.7"    # differs from subagent_model, so the checker is independent of the implementer
 
 # ─── Phase 1: Domain Types ────────────────────────────────────────────────────
 

@@ -23,11 +23,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
   and `wiggum diff` reports gate scope changes. Existing plans keep
   working; custom template overrides need `{{ approvals_section }}` to include
   the section.
-- **Evaluator independence lint** — new `evaluator-not-independent` warning in
-  `wiggum validate --lint` when `[evaluator]` has no `model` or the same model as
-  `[orchestrator] subagent_model` (case and whitespace ignored). `tests/fixtures/thin-plan.toml`
-  and `reference/example-plan.toml`, `reference/example-refactor-plan.toml` now pin
-  distinct evaluator and subagent models.
+- **Evaluator independence lint** — new warning (rule id `evaluator-not-independent`,
+  shown by the MCP lint tool; the CLI prints only the message) in
+  `wiggum validate --lint` when `[evaluator]` has no `model` ("evaluator has no
+  `[evaluator] model`, so it inherits the dispatcher's model...") or the same model
+  as `[orchestrator] subagent_model` ("`[evaluator] model` (...) is the same as
+  `[orchestrator] subagent_model`..."), case and whitespace ignored. All shipped
+  plans (fixtures, golden, reference and the example workspace) now pin distinct
+  evaluator and subagent models, enforced by a directory-scanning test. See
+  Evaluator configuration in the preflight docs.
 - **Golden plan corpus** — `tests/golden/` plans and `tests/golden_test.rs` check score
   floors, the Stop and ask section, Exit Criteria commands and unrendered template
   markers for every generated scaffold. Test-only; no change to generated output.
