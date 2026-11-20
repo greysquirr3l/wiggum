@@ -171,8 +171,8 @@ _None recorded._
 
 ## Approvals
 
-> Record every human approval here before acting on it. An approval covers only
-> the scope in its row and expires at the end of that task unless the row says otherwise.
+> Record every human approval here before acting on it. The Approvals section of the
+> orchestrator prompt says what an approval covers.
 
 | Scope | Action | Approved by | Expires |
 |---|---|---|---|
@@ -241,6 +241,8 @@ Repeat until all tasks (T01–T{{ task_count_padded }}) in PROGRESS.md are `[x]`
 2. Find the next task that is `[ ]` and whose dependencies are all `[x]`.
 3. **Check for a gate** — if the task file begins with a `⛔ GATE` banner, emit it verbatim
    and **stop**. The human must confirm (e.g. by restarting the orchestrator) before you proceed.
+   Record that confirmation as a row in the **Approvals** table in PROGRESS.md, using the
+   gate's `Scope:` line as the scope when the banner has one.
 4. Mark it `[~]` in PROGRESS.md.
 5. **Extract context for the subagent** — read PROGRESS.md and copy out the full text of
    the **Accumulated Learnings** section and the **Codebase State** section verbatim.
@@ -1266,7 +1268,9 @@ Repeat until all tasks (T01–T{{ task_count_padded }}) in `PROGRESS.md` are `[x
 1. Read `PROGRESS.md`.
 2. Find the next task that is `[ ]` and whose dependencies are all `[x]`.
 3. **Check for a gate** — if the task file begins with a `⛔ GATE` banner, emit it verbatim
-   and **stop**. The human must confirm before you proceed.
+   and **stop**. The human must confirm before you proceed. Record that confirmation as a row
+   in the **Approvals** table in `PROGRESS.md`, using the gate's `Scope:` line as the scope
+   when the banner has one.
 4. Mark it `[~]` in `PROGRESS.md`.
 5. **Extract context for the subagent** — read `PROGRESS.md` and copy out the full text of
    the **Accumulated Learnings** section, the **Codebase State** section, and the
@@ -1557,7 +1561,7 @@ The orchestrator only dispatches a task when all its `depends_on` slugs are `[x]
 
 For each `[ ]` task whose dependencies are `[x]`:
 
-1. **Gate check.** If the task file begins with `⛔ GATE`, emit the banner verbatim and stop. The human must confirm.
+1. **Gate check.** If the task file begins with `⛔ GATE`, emit the banner verbatim and stop. The human must confirm; record that confirmation as a row in the **Approvals** table in `PROGRESS.md` (scope from the banner's `Scope:` line when present).
 2. **Claim.** Mark `[~]` in `PROGRESS.md`.
 3. **Extract context.** Copy the full **Accumulated Learnings**, **Codebase State**, and **Completion Standard** sections out of `PROGRESS.md`.
 4. **Dispatch implementation.** Spawn a `general` subagent via `task(subagent_type="general", prompt=<SUBAGENT_PROMPT with injected context>)`. The subagent implements and runs preflight.

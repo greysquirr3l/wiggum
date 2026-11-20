@@ -100,7 +100,7 @@ The generated orchestrator runs the preflight once before the first task and rec
 
 ### Approvals
 
-Every generated orchestrator, subagent prompt and `CLAUDE.md` contains an **Approvals** section: an approval applies only to its recorded scope, an approval for a test or staging action never authorizes a production action, an approval is never reused for another task or environment, an unclear or missing scope means stop and ask, and every human approval is recorded as a row in the **Approvals** table in `PROGRESS.md`. An approval expires at the end of the task it was given for unless its row says otherwise. A custom template override must contain `{{ approvals_section }}`, or the section is omitted. Set `gate_scope` on a gated task to print the scope in its gate banner.
+The **Approvals** section appears in four generated files: `.vscode/orchestrator.prompt.md`, `.opencode/agents/orchestrator.md`, the root `ORCHESTRATOR.md` and `CLAUDE.md` (the VS Code and OpenCode orchestrators also embed it in their subagent prompt). The evaluator, planner and background-auditor prompts, `AGENTS.md` and the agent-rules files do not carry it. The section says: an approval applies only to its recorded scope, an approval for a test or staging action never authorizes a production action, an approval is never reused for another task or environment, an unclear or missing scope means stop and ask, and every human approval is recorded as a row in the **Approvals** table in `PROGRESS.md`. An approval expires at the end of the task it was given for unless its row says otherwise. A custom template override must contain `{{ approvals_section }}`, or the section is omitted. Set `gate_scope` on a gated task to print the scope in its gate banner.
 
 ### Model selection
 

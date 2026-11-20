@@ -323,7 +323,14 @@ impl WiggumTools {
         let content = fs.read_progress(&PathBuf::from(&progress_path))?;
 
         let mut statuses = Vec::new();
+        let mut in_task_section = true;
         for line in content.lines() {
+            if let Some(allowed) = crate::domain::report::heading_allows_tasks(line) {
+                in_task_section = allowed;
+            }
+            if !in_task_section {
+                continue;
+            }
             if let Some(rest) = line.strip_prefix("| T") {
                 let status = if line.contains("`[x]`") {
                     "completed"

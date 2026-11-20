@@ -1570,3 +1570,34 @@ fn gate_scope_renders_in_task_banner_only_when_set() {
     assert_eq!(lines[cat + 1], "> Scope: T01, staging only");
     assert_eq!(lines[cat + 2], ">");
 }
+
+#[test]
+fn blank_gate_scope_renders_no_scope_line() {
+    let mut plan = load_example_plan();
+    plan.phases[0].tasks[0].gate = Some("deploy".to_string());
+    plan.phases[0].tasks[0].gate_scope = Some("   ".to_string());
+    let art = generation::generate_all(&plan).expect("Generation failed");
+    assert!(!art.tasks[0].1.lines().any(|l| l.starts_with("> Scope:")));
+}
+
+#[test]
+fn approval_row_in_generated_progress_is_not_counted_as_a_task() {
+    let plan = load_example_plan();
+    let art = generation::generate_all(&plan).expect("Generation failed");
+    let expected = plan.resolve_tasks().expect("resolve").len();
+    let row =
+        "| T02 — staging payment sandbox | run capture against sandbox | alice | end of T02 |";
+    let progress = art.progress.replace(
+        "|---|---|---|---|\n",
+        &format!("|---|---|---|---|\n{row}\n"),
+    );
+    assert!(progress.lines().any(|l| l == row), "row was inserted");
+    let summary = wiggum::domain::report::parse_progress(&progress);
+    assert_eq!(summary.tasks.len(), expected);
+    assert!(
+        summary
+            .tasks
+            .iter()
+            .all(|t| t.title != "staging payment sandbox")
+    );
+}

@@ -600,6 +600,17 @@ pub struct ResolvedTask {
 }
 
 impl ResolvedTask {
+    /// The gate scope with surrounding whitespace removed; a blank scope
+    /// counts as absent. Every consumer (banner, lint, diff) goes through
+    /// this so they agree.
+    #[must_use]
+    pub fn effective_gate_scope(&self) -> Option<&str> {
+        self.gate_scope
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+    }
+
     /// Build a resolved task from its definition, stamped with its number
     /// and owning phase.
     fn from_def(task: &TaskDef, number: u32, phase: &Phase) -> Self {

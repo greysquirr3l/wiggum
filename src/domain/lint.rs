@@ -63,6 +63,7 @@ pub fn lint_plan(plan: &Plan, resolved: &[ResolvedTask]) -> Vec<Diagnostic> {
     lint_no_verification(resolved, &mut diagnostics);
     lint_weak_criteria(resolved, &mut diagnostics);
     lint_gate_without_scope(resolved, &mut diagnostics);
+    lint_gate_scope_without_gate(resolved, &mut diagnostics);
     lint_capability_unused(plan, &mut diagnostics);
     lint_capability_no_scenarios(plan, &mut diagnostics);
     lint_capability_no_requirements(plan, &mut diagnostics);
@@ -171,16 +172,31 @@ fn lint_no_verification(tasks: &[ResolvedTask], out: &mut Vec<Diagnostic>) {
 /// confirmation given for a test run can be read as covering a deployment.
 fn lint_gate_without_scope(tasks: &[ResolvedTask], out: &mut Vec<Diagnostic>) {
     for t in tasks {
-        let scoped = t
-            .gate_scope
-            .as_deref()
-            .is_some_and(|s| !s.trim().is_empty());
-        if t.gate.is_some() && !scoped {
+        if t.gate.is_some() && t.effective_gate_scope().is_none() {
             out.push(Diagnostic {
                 severity: Severity::Info,
                 rule: "gate-without-scope",
                 message: format!(
                     "T{:02}-{}: gate has no gate_scope — name the task and environment the approval covers",
+                    t.number, t.slug
+                ),
+            });
+        }
+    }
+}
+
+/// Info: `gate_scope` on a task with no `gate`. The scope is only rendered in
+/// the gate banner, so it is silently dropped. Info rather than warning: it is
+/// harmless to output and usually means the `gate` line was removed or not yet
+/// written.
+fn lint_gate_scope_without_gate(tasks: &[ResolvedTask], out: &mut Vec<Diagnostic>) {
+    for t in tasks {
+        if t.gate.is_none() && t.effective_gate_scope().is_some() {
+            out.push(Diagnostic {
+                severity: Severity::Info,
+                rule: "gate-scope-without-gate",
+                message: format!(
+                    "T{:02}-{}: gate_scope is set but the task has no gate, so the scope is not rendered",
                     t.number, t.slug
                 ),
             });
@@ -722,6 +738,32 @@ mod tests {
         let (plan, resolved) = make_plan(vec![t], Some("hexagonal".into()));
         let diags = lint_plan(&plan, &resolved);
         assert!(diags.iter().any(|d| d.rule == "gate-without-scope"));
+    }
+
+    #[test]
+    fn gate_scope_without_gate_is_info() {
+        let mut t = task("deploy", "Ship it", &[]);
+        t.gate_scope = Some("T01, staging only".into());
+        let (plan, resolved) = make_plan(vec![t], Some("hexagonal".into()));
+        let diags = lint_plan(&plan, &resolved);
+        assert!(
+            diags
+                .iter()
+                .any(|d| d.rule == "gate-scope-without-gate" && d.severity == Severity::Info)
+        );
+    }
+
+    #[test]
+    fn gate_scope_without_gate_quiet_when_gated_blank_or_absent() {
+        let mut gated = task("deploy", "Ship it", &[]);
+        gated.gate = Some("deploy".into());
+        gated.gate_scope = Some("T01, staging only".into());
+        let mut blank = task("build", "Build it", &[]);
+        blank.gate_scope = Some("   ".into());
+        let ordinary = task("lint", "Lint it", &[]);
+        let (plan, resolved) = make_plan(vec![gated, blank, ordinary], Some("hexagonal".into()));
+        let diags = lint_plan(&plan, &resolved);
+        assert!(!diags.iter().any(|d| d.rule == "gate-scope-without-gate"));
     }
 
     #[test]

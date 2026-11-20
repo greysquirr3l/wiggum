@@ -280,7 +280,7 @@ gate  = "Confirm staging tests passed before the orchestrator runs this task."
 # ... rest of task
 ```
 
-The generated task file opens with a `⛔ GATE` banner, and the orchestrator prompt instructs the loop to stop and wait for confirmation before marking the task in-progress.
+The generated task file opens with a `⛔ GATE` banner, and the orchestrator prompt instructs the loop to stop and wait for confirmation before marking the task in-progress. Add an optional `gate_scope` (for example `gate_scope = "T07, staging only"`) to print what the approval covers as a `Scope:` line in the banner; the confirmation is recorded in the **Approvals** table in `PROGRESS.md`.
 
 ## Language support
 

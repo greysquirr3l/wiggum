@@ -13,7 +13,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
   `CLAUDE.md` gets an **Approvals** section: an approval covers only its recorded
   scope, a staging approval never authorizes production, unclear scope means stop
   and ask. Tasks accept an optional `gate_scope`, shown as a `Scope:` line in the
-  gate banner; new lint rule `gate-without-scope` (info). Existing plans keep
+  gate banner; new lint rules `gate-without-scope` and `gate-scope-without-gate`
+  (info). The section appears in `.vscode/orchestrator.prompt.md`,
+  `.opencode/agents/orchestrator.md`, `ORCHESTRATOR.md` and `CLAUDE.md` (and in the
+  subagent prompts embedded in the VS Code and OpenCode orchestrators); evaluator,
+  planner and auditor prompts, `AGENTS.md` and agent-rules files do not carry it.
+  `wiggum report`, `resume`, `retro` and the MCP progress reader ignore rows under
+  the `## Approvals` and `## Known baseline failures` sections of `PROGRESS.md`,
+  and `wiggum diff` reports gate scope changes. Existing plans keep
   working; custom template overrides need `{{ approvals_section }}` to include
   the section.
 - **Golden plan corpus** — `tests/golden/` plans and `tests/golden_test.rs` check score

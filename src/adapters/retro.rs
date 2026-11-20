@@ -185,17 +185,15 @@ fn extract_learnings(content: &str) -> Vec<(String, String)> {
     let mut learnings = Vec::new();
 
     // Parse task rows with learnings: "| T01 — Title | `[x]` | Learning text |"
-    for line in content.lines() {
-        if line.starts_with("| T") && line.contains('—') {
-            let cols: Vec<&str> = line.split('|').collect();
-            if let (Some(task_col), Some(learning_col)) = (cols.get(1), cols.get(3)) {
-                let task_col = task_col.trim();
-                if let Some((id, _)) = task_col.split_once(" — ") {
-                    let task_id = id.trim().to_string();
-                    let learning = learning_col.trim();
-                    if !learning.is_empty() && learning != "_—_" {
-                        learnings.push((task_id, learning.to_string()));
-                    }
+    for line in crate::domain::report::task_rows(content) {
+        let cols: Vec<&str> = line.split('|').collect();
+        if let (Some(task_col), Some(learning_col)) = (cols.get(1), cols.get(3)) {
+            let task_col = task_col.trim();
+            if let Some((id, _)) = task_col.split_once(" — ") {
+                let task_id = id.trim().to_string();
+                let learning = learning_col.trim();
+                if !learning.is_empty() && learning != "_—_" {
+                    learnings.push((task_id, learning.to_string()));
                 }
             }
         }
@@ -274,5 +272,20 @@ mod tests {
                 .1
                 .contains("version mismatch")
         );
+    }
+
+    #[test]
+    fn extract_learnings_ignores_approval_rows() {
+        let content = r"# Project — status
+## Phase 1 — Setup
+| T01 — Setup | `[x]` | Needed a retry |
+## Approvals
+| Scope | Action | Approved by | Expires |
+|---|---|---|---|
+| T02 — staging sandbox | run capture | alice | end of T02 |
+";
+        let learnings = extract_learnings(content);
+        assert_eq!(learnings.len(), 1);
+        assert_eq!(learnings.first().map(|l| l.0.as_str()), Some("T01"));
     }
 }

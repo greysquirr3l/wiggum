@@ -35,7 +35,7 @@ pub fn render_with(tera: &Tera, plan: &Plan, task: &ResolvedTask) -> Result<Stri
     ctx.insert("test_hints", &task.test_hints);
     ctx.insert("must_haves", &task.must_haves);
     ctx.insert("gate", &task.gate);
-    ctx.insert("gate_scope", &task.gate_scope);
+    ctx.insert("gate_scope", &task.effective_gate_scope());
     ctx.insert("strategy", &plan.orchestrator.strategy.to_string());
     ctx.insert("kind", &task.kind.to_string());
     ctx.insert("evaluation_criteria", &task.evaluation_criteria);
