@@ -1,0 +1,7 @@
+Retrospective — onyx-auth (6 tasks, 1 retries, 0 gates)
+
+⚠️ Pattern: 1 task(s) currently blocked
+  Suggestion: Review blocked tasks and consider adjusting dependencies or adding hints.
+
+⚠️ Pattern: T05 hit a blocking gate
+  Suggestion: Gates add latency. Consider if this gate is necessary or if automated preflight is sufficient.

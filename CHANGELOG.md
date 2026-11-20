@@ -55,6 +55,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 - `wiggum_update_progress` (MCP) no longer rewrites rows under `## Approvals`, `## Known baseline failures` or `## Session handoff`; only task rows in task sections are touched.
 
+### Changed
+
+- **Progress corpus (tests only)** — `tests/progress-corpus/` adds ten synthetic PROGRESS.md files with hand-labelled truth, `wiggum retro` snapshots and a leak guard; no behaviour change.
+
 ## [0.23.0] - 2026-10-27
 
 ### Changed

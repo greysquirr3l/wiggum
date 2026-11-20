@@ -34,6 +34,23 @@ no generated file contains an unrendered `{{` or `{%`.
   plan's `# golden-floor:` line to the new `wiggum check` score. Never lower a
   floor to silence a failure; fix the plan or the generator.
 
+## Progress corpus
+
+`tests/progress-corpus/*.md` holds synthetic PROGRESS.md files (shapes learned from
+real runs, no real content) with hand-labelled truth in `labels.toml` and a
+`wiggum retro` snapshot per file under `snapshots/`. `tests/progress_corpus_test.rs`
+parses every file and checks task, status, phase and project-name counts, the
+evaluator verdict sequences and retry counts against the labels, and has a leak
+guard (no URLs, hashes other than 7-hex fake ones, home paths or emails).
+
+- **Add a file:** drop a `*.md` into the corpus dir, add its labels entry and a
+  snapshot. A file with no labels entry fails the test.
+- **Known defects:** where today's parser or retro disagrees with the truth, the
+  label stays true and the gap is recorded under `known_defects` / `today`. Fixing
+  the code makes the test fail until you remove the entry.
+- **Never** paste a real PROGRESS.md into the corpus, even redacted. See
+  `tests/progress-corpus/README.md` for the schema and how to regenerate snapshots.
+
 ## Linting
 
 ```bash

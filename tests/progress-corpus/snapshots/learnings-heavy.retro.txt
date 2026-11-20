@@ -1,0 +1,16 @@
+Retrospective — marl-parse (8 tasks, 4 retries, 0 gates)
+
+⚠️ Pattern: General hit a blocking gate
+  Suggestion: Gates add latency. Consider if this gate is necessary or if automated preflight is sufficient.
+
+⚠️ Pattern: General was too complex
+  Suggestion: Consider using `wiggum split --task General` to break it down.
+
+💡 Pattern: General required 2 attempts
+  Suggestion: Add hints from learnings: Fix the lockfile before running the fuzz job; a stale lock selected an old regex engine.; Attempt to inline the tokenizer into the parser was reverted; the profile showed no gain.
+
+💡 Pattern: T05: had lint issues
+  Suggestion: Add a `lint-config` task early in Phase 1 to establish lint rules first.
+
+💡 Pattern: T05: had lint issues
+  Suggestion: Add a `lint-config` task early in Phase 1 to establish lint rules first.
