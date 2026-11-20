@@ -14,6 +14,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
   orchestrators) runs them after preflight. New lint rules `no-verification`
   (warning) and `weak-criteria` (info), and a Verifiability dimension in
   `wiggum check` (weights rebalanced; they still sum to 100%).
+- **Stop and ask section** — `[orchestrator] stop_when = [...]` adds plan-specific
+  stop conditions. Every orchestrator variant and `CLAUDE.md` now lists a default
+  set (destructive operations, force-push, external systems, human approvals)
+  followed by the plan's entries. Existing plans get the defaults only.
+- **Baseline-aware preflight** — the orchestrator runs the preflight once before the
+  first task and records failures under **Known baseline failures** in `PROGRESS.md`;
+  a task then passes when it adds no failure outside that baseline. A clean
+  baseline behaves as before. Template-only; preflight commands are unchanged.
 
 ## [0.23.0] - 2026-10-27
 

@@ -53,6 +53,9 @@ require_evaluator = true
 # errors with the missing-gate message. Set explicitly to override
 # auto-derive: `gates = ["auth", "payment"]`.
 gates = []
+# Extra situations where the orchestrator must stop and ask the human. Rendered after the
+# built-in defaults (deleting data, force-pushing, external systems, destructive operations).
+# stop_when = ["before changing the public API"]
 # Optional model pinning. Wiggum can't enforce the model from a prompt file, but it
 # will render `model` as a recommendation header in orchestrator.prompt.md and inject
 # `subagent_model` as the `model:` argument on every `runSubagent` dispatch.

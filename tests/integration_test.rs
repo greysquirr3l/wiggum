@@ -1244,3 +1244,75 @@ fn task_verify_commands_reach_task_file_and_orchestrators() {
         );
     }
 }
+
+#[test]
+fn stop_and_ask_section_in_every_orchestrator_variant() {
+    let mut plan = load_example_plan();
+    let default_plan = generation::generate_all(&plan).expect("Generation failed");
+    for (name, text) in [
+        ("vscode", &default_plan.orchestrator_vscode),
+        ("opencode", &default_plan.orchestrator_opencode),
+        ("root", &default_plan.orchestrator_root),
+    ] {
+        assert!(text.contains("## Stop and ask"), "{name}: missing section");
+        assert!(
+            text.contains("before force-pushing"),
+            "{name}: missing default"
+        );
+        assert!(
+            text.contains("Keep working when the next step does not need the human's input."),
+            "{name}: missing closing sentence"
+        );
+        assert!(!text.contains("before rotating the signing key"));
+    }
+
+    plan.orchestrator.stop_when = vec!["before rotating the signing key".to_string()];
+    let artifacts = generation::generate_all(&plan).expect("Generation failed");
+    let claude = wiggum::generation::claude::render(&plan).expect("claude render");
+    for (name, text) in [
+        ("vscode", &artifacts.orchestrator_vscode),
+        ("opencode", &artifacts.orchestrator_opencode),
+        ("root", &artifacts.orchestrator_root),
+        ("claude", &claude),
+    ] {
+        assert!(text.contains("## Stop and ask"), "{name}: missing section");
+        let default_at = text.find("before force-pushing").expect("default entry");
+        let custom_at = text
+            .find("before rotating the signing key")
+            .expect("custom entry");
+        assert!(
+            custom_at > default_at,
+            "{name}: custom entry must follow defaults"
+        );
+    }
+}
+
+#[test]
+fn known_baseline_failures_in_progress_and_orchestrators() {
+    let plan = load_example_plan();
+    let artifacts = generation::generate_all(&plan).expect("Generation failed");
+    assert!(artifacts.progress.contains("## Known baseline failures"));
+    for (name, text) in [
+        ("vscode", &artifacts.orchestrator_vscode),
+        ("opencode", &artifacts.orchestrator_opencode),
+        ("root", &artifacts.orchestrator_root),
+    ] {
+        assert!(
+            text.contains("Known baseline failures"),
+            "{name}: baseline heading not mentioned"
+        );
+        assert!(
+            text.contains("run the preflight once") || text.contains("runs the preflight once"),
+            "{name}: baseline step missing"
+        );
+        assert!(
+            text.contains("never add"),
+            "{name}: rule that tasks never add baseline entries missing"
+        );
+    }
+    assert!(
+        artifacts
+            .orchestrator_vscode
+            .contains("must not show any failure that is not in")
+    );
+}

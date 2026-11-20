@@ -162,6 +162,13 @@ const PROGRESS_TEMPLATE: &str = r"# {{ project_name }} — Implementation Progre
 ---
 {% endfor %}
 
+## Known baseline failures
+
+> The orchestrator records preflight failures that exist before the first task.
+> Tasks may remove entries from this list but must never add to it.
+
+_None recorded._
+
 ## Accumulated Learnings
 
 > Subagents append discoveries here after each task.
@@ -213,7 +220,8 @@ You are an orchestration agent. Your sole job is to drive subagents to implement
    project must satisfy. Subagents may reference them by slug; the orchestrator
    is the one that has the full picture. The current plan declares
    {{ capability_count }} capability(ies).
-{% endif %}
+{% endif %}{% if has_capabilities %}4{% else %}3{% endif %}. **Record the baseline** — before the first task, run the preflight once and record every
+   failure under **Known baseline failures** in PROGRESS.md. Skip this if the section already lists a baseline.
 
 ## Implementation loop
 
@@ -237,11 +245,13 @@ Repeat until all tasks (T01–T{{ task_count_padded }}) in PROGRESS.md are `[x]`
    ```bash
    {{ preflight_build }} && {{ preflight_test }} && {{ preflight_lint }}
    ```
+   Preflight must not show any failure that is not in **Known baseline failures**. A task may
+   remove entries from the baseline but never add them.
    Then run every command listed as `Verify:` in the task file's Exit Criteria, from the
    repository root. Each must exit zero.{% if verify_tasks %}
    Commands by task:{% for vt in verify_tasks %}
    - T{{ vt.number }}: {% for c in vt.commands %}`{{ c }}`{% if not loop.last %}, {% endif %}{% endfor %}{% endfor %}{% endif %}
-   Do not accept a task as done if preflight or any verify command fails, regardless of what the subagent reports.{% if has_evaluator %}
+   Do not accept a task as done if preflight shows a new failure or any verify command fails, regardless of what the subagent reports.{% if has_evaluator %}
 9. **Spawn the evaluator** — start the evaluator agent (`.vscode/evaluator.prompt.md`) with
    the task context. Wait for it to return a PASS verdict before proceeding.{% if evaluator_model %}
    When invoking `#tool:agent/runSubagent` for the evaluator, pass
@@ -260,7 +270,7 @@ When **all** tasks T01–T{{ task_count_padded }} show `[x]` in PROGRESS.md, out
 
 ## Failure handling
 
-If a task fails verification (preflight fails or evaluator returns FAIL):
+If a task fails verification (preflight shows a new failure, a `Verify:` command fails, or the evaluator returns FAIL):
 
 {% if max_retries > 0 %}- Retry the task up to **{{ max_retries }}** time(s) before applying the failure action below.
   - On each retry: reset the task to `[ ]`, spawn a fresh subagent with full failure context prepended.
@@ -283,6 +293,7 @@ When retries are exhausted, apply the configured **failure action** (`{{ on_fail
   Wait for human confirmation before resuming.
 {% endif %}
 
+{{ stop_section }}
 ## You MUST have access to the `#tool:agent/runSubagent` tool
 
 If this tool is not available, fail immediately with:
@@ -1231,6 +1242,8 @@ You are an orchestration agent. Your sole job is to drive subagents to implement
 
 1. Read `PROGRESS.md` to understand current state.
 2. If `PROGRESS.md` does not exist, fail immediately — it should have been created by `wiggum generate`.
+3. **Record the baseline** — before the first task, run the preflight once and record every
+   failure under **Known baseline failures** in `PROGRESS.md`. Skip this if the section already lists a baseline.
 
 ## Implementation loop
 
@@ -1256,11 +1269,14 @@ Repeat until all tasks (T01–T{{ task_count_padded }}) in `PROGRESS.md` are `[x
    {{ preflight_build }} && {{ preflight_test }} && {{ preflight_lint }}
    ```
 
-   Then run every command listed as `Verify:` in the task file's Exit Criteria, from the
+   Preflight must not show any failure that is not in **Known baseline failures**. A task may
+   remove entries from the baseline but never add them.
+
+   Then run every command listed as `Verify:' in the task file's Exit Criteria, from the
    repository root. Each must exit zero.{% if verify_tasks %}
    Commands by task:{% for vt in verify_tasks %}
    - T{{ vt.number }}: {% for c in vt.commands %}`{{ c }}`{% if not loop.last %}, {% endif %}{% endfor %}{% endfor %}{% endif %}
-   Do not accept a task as done if preflight or any verify command fails, regardless of what the subagent reports.
+   Do not accept a task as done if preflight shows a new failure or any verify command fails, regardless of what the subagent reports.
 {% if has_evaluator %}
 9. **Spawn the evaluator** — dispatch the `evaluator` subagent via `task` (see
    `.opencode/agents/evaluator.md`) with the task slug and goal. Wait for a PASS verdict
@@ -1281,7 +1297,7 @@ When **all** tasks T01–T{{ task_count_padded }} show `[x]` in `PROGRESS.md`, o
 
 ## Failure handling
 
-If a task fails verification (preflight fails or evaluator returns FAIL):
+If a task fails verification (preflight shows a new failure, a `Verify:` command fails, or the evaluator returns FAIL):
 
 {% if max_retries > 0 %}- Retry the task up to **{{ max_retries }}** time(s) before applying the failure action below.
   - On each retry: reset the task to `[ ]`, spawn a fresh subagent with full failure context prepended.
@@ -1303,7 +1319,7 @@ When retries are exhausted, apply the configured **failure action** (`{{ on_fail
   - Suggested fix based on the evaluation output
   Wait for human confirmation before resuming.
 {% endif %}
-{% if parallel_groups | length > 1 %}
+{{ stop_section }}{% if parallel_groups | length > 1 %}
 ## Parallel execution groups
 
 Tasks in the same group have no intra-group dependencies and may be dispatched
@@ -1530,7 +1546,7 @@ For each `[ ]` task whose dependencies are `[x]`:
 2. **Claim.** Mark `[~]` in `PROGRESS.md`.
 3. **Extract context.** Copy the full **Accumulated Learnings**, **Codebase State**, and **Completion Standard** sections out of `PROGRESS.md`.
 4. **Dispatch implementation.** Spawn a `general` subagent via `task(subagent_type="general", prompt=<SUBAGENT_PROMPT with injected context>)`. The subagent implements and runs preflight.
-5. **Independent preflight.** Orchestrator runs the same preflight itself, then every `Verify:` command listed in the task file's Exit Criteria (each must exit zero){% if verify_tasks %}: {% for vt in verify_tasks %}T{{ vt.number }} {% for c in vt.commands %}`{{ c }}`{% if not loop.last %}, {% endif %}{% endfor %}{% if not loop.last %}; {% endif %}{% endfor %}{% endif %}. If any fails, the subagent's `[x]` claim is rejected — mark `[!]` and retry.
+5. **Independent preflight.** Orchestrator runs the same preflight itself (no failure outside **Known baseline failures** is allowed), then every `Verify:` command listed in the task file's Exit Criteria (each must exit zero){% if verify_tasks %}: {% for vt in verify_tasks %}T{{ vt.number }} {% for c in vt.commands %}`{{ c }}`{% if not loop.last %}, {% endif %}{% endfor %}{% if not loop.last %}; {% endif %}{% endfor %}{% endif %}. If any fails, the subagent's `[x]` claim is rejected — mark `[!]` and retry.
 6. **Evaluator.** Spawn `evaluator` subagent. Weighted rubric must score ≥ {{ pass_threshold }}/10; hard-fail mode on.
 7. **Background auditor.** Spawn `background-auditor` subagent. Findings are recorded in `PROGRESS.md` notes.
 8. **Verify.** Confirm the task is `[x]` in `PROGRESS.md`. If not, mark `[!]` and continue to the next task (failures don't block unrelated tasks).
@@ -1540,6 +1556,7 @@ After {{ max_retries }} retries with preflight or evaluator failure, the orchest
 and emits a `⛔ Task T{NN} failed after {{ max_retries }} retries. Human intervention required.`
 banner.
 
+{{ stop_section }}
 ## Preflight
 
 The preflight is a single command, called out verbatim in every agent prompt:
@@ -1550,6 +1567,11 @@ The preflight is a single command, called out verbatim in every agent prompt:
 
 The full command lives in `[preflight]` of the plan TOML. **Never loosen any flag
 to make a task pass — fix the code.**
+
+Before the first task the orchestrator runs the preflight once and records any failures under
+**Known baseline failures** in `PROGRESS.md`. A task passes preflight when it shows no failure
+that is not in that baseline; tasks may remove baseline entries but never add them. A clean
+baseline is the same as requiring preflight to pass.
 
 ## Evaluator rubric
 
@@ -2059,7 +2081,7 @@ Avoid patterns that reveal AI authorship.
 3. Mark it `[~]` (in-progress) before any code changes.
 4. Read the task file `tasks/T{NN}-{slug}.md` for goal, hints, test hints, must-haves, and exit criteria.
 5. Implement the task end-to-end. Touch only files within the task's scope.
-6. Run preflight. Fix every error and warning until preflight passes.
+6. Run preflight and any `Verify:` commands in the task's Exit Criteria. Fix every error and warning until preflight shows no failure outside **Known baseline failures** in `PROGRESS.md`.
 7. Update `PROGRESS.md`: change `[~]` to `[x]`; append any learnings to "Accumulated Learnings"; update "Codebase State" with what now exists.
 8. Commit with a conventional-commits message focused on user impact.
 9. Repeat from step 1.
@@ -2069,7 +2091,7 @@ On a preflight failure or `[!]` outcome, the task resets to `[ ]` for up to **{{
 {% else %}
 No retries are configured; treat the first failure as the only chance.
 {% endif %}
-## Strategy
+{{ stop_section }}## Strategy
 
 {% if strategy == "tdd" %}
 **TDD** — write a failing test first, then the minimum implementation to pass it, then refactor. Don't add code without a corresponding test.

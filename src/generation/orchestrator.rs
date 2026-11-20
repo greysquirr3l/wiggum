@@ -5,6 +5,7 @@ use crate::domain::{
     plan::{Plan, ResolvedTask},
 };
 use crate::error::{Result, WiggumError};
+use crate::generation::stop_section::insert_stop_section;
 use crate::generation::templates::get_tera;
 
 /// Render the orchestrator prompt using the default template.
@@ -44,6 +45,7 @@ pub fn render_with(tera: &Tera, plan: &Plan, tasks: &[ResolvedTask]) -> Result<S
     );
     ctx.insert("has_evaluator", &plan.evaluator.is_some());
     insert_verify_tasks(&mut ctx, tasks);
+    insert_stop_section(&mut ctx, plan);
 
     // Security rules from the language profile, always injected.
     let profile = plan.project.language.profile();
@@ -140,6 +142,7 @@ pub fn render_opencode_with(tera: &Tera, plan: &Plan, tasks: &[ResolvedTask]) ->
     );
     ctx.insert("has_evaluator", &plan.evaluator.is_some());
     insert_verify_tasks(&mut ctx, tasks);
+    insert_stop_section(&mut ctx, plan);
 
     // Completion standard — travels verbatim with every subagent dispatch
     // alongside Accumulated Learnings and Codebase State.
@@ -216,6 +219,7 @@ pub fn render_orchestrator_root_with(
     ctx.insert("on_failure", &plan.orchestrator.on_failure.to_string());
     ctx.insert("has_evaluator", &plan.evaluator.is_some());
     insert_verify_tasks(&mut ctx, tasks);
+    insert_stop_section(&mut ctx, plan);
 
     let completion_standard = plan.style.resolved_completion_standard();
     ctx.insert("completion_standard", &completion_standard);

@@ -340,6 +340,10 @@ pub struct Orchestrator {
     /// missing gate and the affected task.
     #[serde(default)]
     pub gates: Vec<String>,
+    /// Plan-specific situations in which the orchestrator must stop and ask
+    /// the human, rendered after the built-in default list.
+    #[serde(default)]
+    pub stop_when: Vec<String>,
 }
 
 /// Prompt strategy mode controlling task and orchestrator template styles.
@@ -698,6 +702,7 @@ impl Default for Orchestrator {
             subagent_model: None,
             require_evaluator: None,
             gates: Vec::new(),
+            stop_when: Vec::new(),
         }
     }
 }

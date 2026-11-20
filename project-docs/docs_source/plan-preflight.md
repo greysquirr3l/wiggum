@@ -58,6 +58,7 @@ rules = [
 | `on_failure` | No | `pause` | Action taken when a task exhausts `max_retries`: `pause`, `skip`, or `escalate` |
 | `model` | No | — | Recommended model identifier (e.g. `"claude-opus-4.7"`, `"gpt-5"`, `"gemini-2.5-pro"`) for the orchestrator agent itself. Rendered as a header note in `orchestrator.prompt.md`; Wiggum cannot enforce the picker choice from a prompt file. |
 | `subagent_model` | No | — | Model identifier passed as `model:` to every `runSubagent` call the orchestrator dispatches for implementation work. Lets you run the orchestrator on a stronger model (e.g. Opus) while implementation subagents use a cheaper one (e.g. Sonnet or Haiku). |
+| `stop_when` | No | `[]` | Extra situations in which the orchestrator must stop and ask the human. Listed after the built-in defaults in the **Stop and ask** section. |
 | `rules` | No | | Project-specific rules included in each subagent prompt. Appended after the automatic security rules from the language profile. |
 
 ### Failure actions
@@ -75,6 +76,27 @@ When a task exhausts its `max_retries` budget, the orchestrator applies `on_fail
 max_retries = 3
 on_failure  = "escalate"
 ```
+
+### Stop and ask
+
+Every generated orchestrator (`orchestrator.prompt.md`, the opencode agent, `ORCHESTRATOR.md`) and `CLAUDE.md` contains a **Stop and ask** section. It always lists these defaults:
+
+- before deleting important data
+- before force-pushing
+- before modifying external systems
+- before any other destructive operation
+- before a decision that needs the human's approval
+
+followed by the plan's `stop_when` entries, and ends with "Keep working when the next step does not need the human's input." A plan without `stop_when` gets only the defaults.
+
+```toml
+[orchestrator]
+stop_when = ["before changing the public API", "before bumping a dependency major version"]
+```
+
+### Known baseline failures
+
+The generated orchestrator runs the preflight once before the first task and records any failures under **Known baseline failures** in `PROGRESS.md`. Afterwards a task passes preflight when it shows no failure that is not in the baseline. Tasks may remove entries from the baseline but never add them. Your `[preflight]` commands are not changed. When the baseline is clean, this is the same as the previous behaviour: preflight must pass.
 
 ### Model selection
 

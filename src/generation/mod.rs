@@ -13,6 +13,7 @@ pub mod plan_doc;
 pub mod planner;
 pub mod progress;
 pub mod run_log;
+pub(crate) mod stop_section;
 pub mod task;
 pub(crate) mod templates;
 pub mod tokens;
