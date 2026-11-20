@@ -1,0 +1,61 @@
+# golden-floor: 8
+[project]
+name = "golden-ts-gsd"
+description = "Golden plan: typescript, gsd strategy, evaluator, capabilities, must_haves."
+language = "typescript"
+path = "/tmp/golden-ts-gsd"
+
+[orchestrator]
+strategy = "gsd"
+subagent_model = "claude-haiku-4.5"
+stop_when = ["before adding a runtime dependency"]
+
+[evaluator]
+model = "claude-sonnet-4.5"
+pass_threshold = 8
+hard_fail = true
+
+[[capabilities]]
+name = "list-rendering"
+title = "List Rendering"
+description = "Renders item lists for the dashboard."
+[[capabilities.scenarios]]
+name = "empty-list"
+when = "the item list is empty"
+then = "the component renders the empty state message"
+
+[[phases]]
+name = "UI"
+order = 1
+
+[[phases.tasks]]
+slug = "component-shell"
+title = "Component shell"
+goal = "Create the list component skeleton."
+must_haves = ["Component exports a typed props interface"]
+verify = ["npx tsc --noEmit"]
+
+[[phases.tasks]]
+slug = "list-view"
+title = "List view"
+goal = "Render item lists including the empty state."
+depends_on = ["component-shell"]
+implements = ["list-rendering"]
+must_haves = ["Empty state is rendered when there are no items"]
+verify = ["npx vitest run list-view"]
+
+[[phases.tasks]]
+slug = "pagination"
+title = "Pagination controls"
+goal = "Add page controls to the list view."
+depends_on = ["list-view"]
+must_haves = ["Page size is configurable"]
+verify = ["npx vitest run pagination"]
+
+[[phases.tasks]]
+slug = "dashboard-page"
+title = "Dashboard page"
+goal = "Mount the list view on the dashboard page."
+depends_on = ["pagination"]
+must_haves = ["Page renders without console errors"]
+verify = ["npm run build"]

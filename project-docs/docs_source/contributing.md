@@ -16,6 +16,24 @@ cargo build
 cargo test --workspace
 ```
 
+## Golden plan corpus
+
+`tests/golden/*.toml` holds small plans spanning languages, strategies, evaluator
+and gate settings, and capabilities. `tests/golden_test.rs` generates each plan
+(all targets) into a temp dir and checks that the `check` score is at or above
+the plan's floor, that every orchestrator variant and `CLAUDE.md` carries the
+Stop and ask section, that every task has a command in its Exit Criteria (a
+`Verify:` line, or the preflight command when the task declares none), and that
+no generated file contains an unrendered `{{` or `{%`.
+
+- **Add a plan:** drop a `*.toml` into `tests/golden/` with a leading
+  `# golden-floor: N` comment (use the score `wiggum check` reports). There is no
+  registry list. The plan must pass `wiggum generate` validation; set
+  `require_evaluator = false` on purpose when it has no evaluator.
+- **Bump a floor:** after improving a plan or the scorer, edit the number in that
+  plan's `# golden-floor:` line to the new `wiggum check` score. Never lower a
+  floor to silence a failure; fix the plan or the generator.
+
 ## Linting
 
 ```bash

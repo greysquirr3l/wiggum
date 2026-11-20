@@ -8,6 +8,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Added
 
+- **Golden plan corpus** — `tests/golden/` plans and `tests/golden_test.rs` check score
+  floors, the Stop and ask section, Exit Criteria commands and unrendered template
+  markers for every generated scaffold. Test-only; no change to generated output.
 - **Executable per-task verification** — tasks accept `verify = ["cargo test --test foo"]`.
   The commands appear as `Verify:` items in the task file's Exit Criteria and the
   orchestrator's independent verification step (VS Code, OpenCode and root

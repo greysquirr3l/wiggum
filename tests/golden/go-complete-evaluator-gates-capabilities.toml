@@ -1,0 +1,57 @@
+# golden-floor: 7
+[project]
+name = "golden-go-complete"
+description = "Golden plan: go, complete strategy, evaluator, gates, capabilities, stop_when."
+language = "go"
+path = "/tmp/golden-go-complete"
+
+[orchestrator]
+strategy = "complete"
+subagent_model = "claude-haiku-4.5"
+gates = ["credential"]
+stop_when = ["before rotating stored values", "before running migrations on a shared database"]
+
+[evaluator]
+model = "claude-sonnet-4.5"
+
+[[capabilities]]
+name = "vault-lookup"
+title = "Vault Lookup"
+description = "Resolves stored values by name."
+[[capabilities.scenarios]]
+name = "missing-name"
+when = "a name that is not stored is requested"
+then = "the lookup returns a not-found error"
+
+[[phases]]
+name = "Lookup"
+order = 1
+
+[[phases.tasks]]
+slug = "store-interface"
+title = "Store interface"
+goal = "Define the lookup store interface."
+verify = ["go build ./..."]
+
+[[phases.tasks]]
+slug = "credential-lookup"
+title = "Credential lookup"
+goal = "Resolve stored credentials by name."
+depends_on = ["store-interface"]
+gate = "credential"
+implements = ["vault-lookup"]
+verify = ["go test ./lookup/..."]
+
+[[phases.tasks]]
+slug = "memory-store"
+title = "In-memory store"
+goal = "Provide an in-memory store for tests."
+depends_on = ["store-interface"]
+verify = ["go test ./memstore/..."]
+
+[[phases.tasks]]
+slug = "service-main"
+title = "Service main"
+goal = "Wire the lookup service."
+depends_on = ["credential-lookup", "memory-store"]
+verify = ["go vet ./..."]

@@ -1,0 +1,72 @@
+# golden-floor: 8
+[project]
+name = "golden-rust-tdd"
+description = "Golden plan: rust, tdd strategy, advisor evaluator with contract review and weighted criteria, capabilities."
+language = "rust"
+path = "/tmp/golden-rust-tdd"
+
+[orchestrator]
+strategy = "tdd"
+model = "claude-opus-4.7"
+subagent_model = "claude-sonnet-4.5"
+max_retries = 3
+on_failure = "escalate"
+stop_when = ["before changing the on-disk format"]
+
+[evaluator]
+model = "claude-opus-4.7"
+mode = "advisor"
+contract_review = true
+pass_threshold = 7
+
+[[evaluator.criteria]]
+name = "tests-pass"
+weight = 60
+description = "All tests pass and new behaviour is covered."
+
+[[evaluator.criteria]]
+name = "scope"
+weight = 40
+description = "The change stays inside the task goal."
+
+[[capabilities]]
+name = "record-store"
+title = "Record Store"
+description = "Persists records to disk."
+[[capabilities.scenarios]]
+name = "round-trip"
+when = "a record is written and read back"
+then = "the record is equal to the original"
+
+[[phases]]
+name = "Storage"
+order = 1
+
+[[phases.tasks]]
+slug = "record-type"
+title = "Record type"
+goal = "Define the record type and its codec."
+test_hints = ["Round-trip test for the codec"]
+verify = ["cargo test record"]
+
+[[phases.tasks]]
+slug = "file-store"
+title = "File store"
+goal = "Persist records in a single file."
+depends_on = ["record-type"]
+implements = ["record-store"]
+verify = ["cargo test file_store"]
+
+[[phases.tasks]]
+slug = "compaction"
+title = "Compaction"
+goal = "Compact the store file on demand."
+depends_on = ["file-store"]
+verify = ["cargo test compaction"]
+
+[[phases.tasks]]
+slug = "store-cli"
+title = "Store CLI"
+goal = "Expose the store through a small CLI."
+depends_on = ["compaction"]
+verify = ["cargo run -- --help"]
