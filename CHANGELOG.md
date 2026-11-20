@@ -22,6 +22,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
   first task and records failures under **Known baseline failures** in `PROGRESS.md`;
   a task then passes when it adds no failure outside that baseline. A clean
   baseline behaves as before. Template-only; preflight commands are unchanged.
+  Failure handling and `CLAUDE.md` step 6 now also mention `Verify:` commands and the baseline.
 
 ## [0.23.0] - 2026-10-27
 

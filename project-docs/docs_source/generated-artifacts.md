@@ -47,6 +47,8 @@ Includes a **Completion Standard** section that travels verbatim with every suba
 
 Includes a learnings column where the orchestrator records insights from each completed task.
 
+Includes a **Known baseline failures** section where the orchestrator records preflight failures that exist before the first task (`_None recorded._` until then).
+
 ### Implementation plan — `IMPLEMENTATION_PLAN.md`
 
 A high-level architecture document derived from your plan's project description and phase structure. Subagents reference this for context about how their task fits into the overall project.

@@ -87,7 +87,7 @@ Every generated orchestrator (`orchestrator.prompt.md`, the opencode agent, `ORC
 - before any other destructive operation
 - before a decision that needs the human's approval
 
-followed by the plan's `stop_when` entries, and ends with "Keep working when the next step does not need the human's input." A plan without `stop_when` gets only the defaults.
+followed by the plan's `stop_when` entries, and ends with "Keep working when the next step does not need the human's input." A plan without `stop_when` gets only the defaults. A custom template override must contain `{{ stop_section }}`, or the section is omitted. Each entry must be a non-empty single line.
 
 ```toml
 [orchestrator]

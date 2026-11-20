@@ -1302,7 +1302,7 @@ fn known_baseline_failures_in_progress_and_orchestrators() {
             "{name}: baseline heading not mentioned"
         );
         assert!(
-            text.contains("run the preflight once") || text.contains("runs the preflight once"),
+            text.to_lowercase().contains("the preflight once"),
             "{name}: baseline step missing"
         );
         assert!(
@@ -1315,4 +1315,160 @@ fn known_baseline_failures_in_progress_and_orchestrators() {
             .orchestrator_vscode
             .contains("must not show any failure that is not in")
     );
+}
+
+const BASELINE_PLAN_NO_CAPS: &str = r#"
+[project]
+name = "kestrel"
+path = "/tmp/kestrel"
+description = "Webhook relay"
+language = "rust"
+
+[[phases]]
+name = "Inbound"
+order = 1
+[[phases.tasks]]
+slug = "router"
+title = "Router"
+goal = "Stand up the inbound router."
+verify = ["cargo test --test foo"]
+"#;
+
+const BASELINE_PLAN_WITH_CAPS: &str = r#"
+[project]
+name = "kestrel"
+path = "/tmp/kestrel"
+description = "Webhook relay"
+language = "rust"
+
+[[capabilities]]
+name = "webhook-reception"
+title = "Inbound Webhook Reception"
+description = "Accepts and validates inbound webhooks."
+[[capabilities.scenarios]]
+name = "valid-signature"
+when = "POST /webhook receives a valid HMAC signature"
+then = "the server returns 202 Accepted"
+
+[[phases]]
+name = "Inbound"
+order = 1
+[[phases.tasks]]
+slug = "router"
+title = "Router"
+goal = "Stand up the inbound router."
+implements = ["webhook-reception"]
+verify = ["cargo test --test foo"]
+"#;
+
+fn assert_baseline_step_on_own_line(text: &str, label: &str, marker: &str) {
+    let lines: Vec<&str> = text.lines().collect();
+    let pos = lines.iter().position(|l| l.starts_with(marker));
+    assert!(pos.is_some(), "{label}: no line starts with {marker:?}");
+    let idx = pos.expect("checked above");
+    assert!(idx > 0, "{label}: baseline step is the first line");
+    let prev = lines[idx - 1].trim_end();
+    let before_step = if prev.is_empty() {
+        lines[idx - 2].trim_end()
+    } else {
+        prev
+    };
+    assert!(
+        before_step.ends_with("should have been created.")
+            || before_step.ends_with("capability(ies)."),
+        "{label}: text glued before baseline step: {before_step:?}"
+    );
+    assert!(
+        !prev.contains("**Record the baseline**"),
+        "{label}: duplicate baseline step"
+    );
+}
+
+#[test]
+fn baseline_step_renders_on_its_own_line_with_and_without_capabilities() {
+    let plain = Plan::from_toml(BASELINE_PLAN_NO_CAPS).expect("plan parses");
+    let plain_art = generation::generate_all(&plain).expect("generation");
+    let vscode = &plain_art.orchestrator_vscode;
+    assert_baseline_step_on_own_line(vscode, "vscode/no-caps", "3. **Record the baseline**");
+    let before = vscode
+        .lines()
+        .take_while(|l| !l.starts_with("3. **Record the baseline**"))
+        .last()
+        .expect("line before step");
+    assert!(
+        before.ends_with("should have been created."),
+        "no-caps: preceding line is {before:?}"
+    );
+
+    let caps = Plan::from_toml(BASELINE_PLAN_WITH_CAPS).expect("plan parses");
+    let caps_art = generation::generate_all(&caps).expect("generation");
+    assert_baseline_step_on_own_line(
+        &caps_art.orchestrator_vscode,
+        "vscode/caps",
+        "4. **Record the baseline**",
+    );
+    assert!(
+        caps_art
+            .orchestrator_vscode
+            .lines()
+            .any(|l| l.starts_with("3. Read every file in `capabilities/`")),
+        "caps: step 3 must start its own line"
+    );
+    assert!(
+        caps_art
+            .orchestrator_opencode
+            .lines()
+            .any(|l| l.starts_with("3. **Record the baseline**")),
+        "opencode baseline step must start a line"
+    );
+}
+
+#[test]
+fn baseline_resume_rule_and_subagent_wording() {
+    let plan = Plan::from_toml(BASELINE_PLAN_NO_CAPS).expect("plan parses");
+    let art = generation::generate_all(&plan).expect("generation");
+    let claude = wiggum::generation::claude::render(&plan).expect("claude render");
+    for (name, text) in [
+        ("vscode", &art.orchestrator_vscode),
+        ("opencode", &art.orchestrator_opencode),
+    ] {
+        assert!(
+            text.contains("`_None recorded._`"),
+            "{name}: placeholder rule"
+        );
+        assert!(
+            text.contains("`None (clean, recorded before T01)`"),
+            "{name}: clean-baseline marker"
+        );
+        assert!(
+            !text.contains("until preflight passes"),
+            "{name}: stale subagent preflight wording"
+        );
+        assert!(
+            text.contains("never add to the baseline"),
+            "{name}: subagent baseline rule"
+        );
+    }
+    assert!(!art.orchestrator_root.contains("until preflight passes"));
+
+    for (name, text) in [
+        ("vscode", &art.orchestrator_vscode),
+        ("opencode", &art.orchestrator_opencode),
+        ("root", &art.orchestrator_root),
+        ("claude", &claude),
+    ] {
+        assert!(!text.contains("`Verify:'"), "{name}: mismatched backtick");
+        for line in text.lines().filter(|l| l.contains("Verify:")) {
+            assert_eq!(
+                line.matches('`').count() % 2,
+                0,
+                "{name}: odd backticks on line {line:?}"
+            );
+        }
+    }
+    assert!(
+        claude.contains("\n\n## Strategy"),
+        "claude: blank line before Strategy"
+    );
+    assert!(claude.contains("not already listed under **Known baseline failures**"));
 }

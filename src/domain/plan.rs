@@ -993,6 +993,14 @@ impl Plan {
     /// and points at the two ways to resolve it: add an `[evaluator]` block
     /// or opt out with `require_evaluator = false`.
     pub fn validate_gates_and_evaluator(&self, resolved: &[ResolvedTask]) -> Result<()> {
+        for entry in &self.orchestrator.stop_when {
+            if entry.trim().is_empty() || entry.contains('\n') || entry.contains('\r') {
+                return Err(WiggumError::Validation(format!(
+                    "invalid [orchestrator] stop_when entry {entry:?}: each entry must be a \
+                     non-empty single line because it is rendered as one bullet"
+                )));
+            }
+        }
         let required = self.effective_require_evaluator(resolved);
         if required && self.evaluator.is_none() {
             let reason = if resolved.len() >= 4 {
@@ -1637,6 +1645,19 @@ depends_on = []
         match result {
             Ok(v) => v,
             Err(e) => panic!("{context}: expected Ok, got Err({e})"),
+        }
+    }
+
+    #[test]
+    fn stop_when_rejects_blank_and_multiline_entries() {
+        for bad in ["   ", "", "line one\nline two"] {
+            let toml = build_plan(&["alpha"], None, false).replacen(
+                "[orchestrator]\n",
+                &format!("[orchestrator]\nstop_when = [{bad:?}]\n"),
+                1,
+            );
+            let err = parse_and_validate_or_err(&toml, "bad stop_when");
+            assert!(err.to_string().contains("stop_when"), "{err}");
         }
     }
 
