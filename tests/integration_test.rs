@@ -1644,3 +1644,38 @@ fn approval_row_in_generated_progress_is_not_counted_as_a_task() {
             .all(|t| t.title != "staging payment sandbox")
     );
 }
+
+/// Every shipped plan that configures an `[evaluator]` must pin a model that
+/// differs from the implementer's, so the `evaluator-not-independent` lint
+/// stays quiet on the fixtures, reference plans and golden plans.
+#[test]
+fn shipped_plans_have_independent_evaluators() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let mut paths = vec![
+        root.join("reference/example-plan.toml"),
+        root.join("reference/example-refactor-plan.toml"),
+        root.join("tests/fixtures/example-plan.toml"),
+        root.join("tests/fixtures/thin-plan.toml"),
+    ];
+    for entry in std::fs::read_dir(root.join("tests/golden")).expect("read golden dir") {
+        let path = entry.expect("dir entry").path();
+        if path.extension().is_some_and(|e| e == "toml") {
+            paths.push(path);
+        }
+    }
+    assert!(
+        paths.len() >= 13,
+        "expected all shipped plans, got {paths:?}"
+    );
+    for path in paths {
+        let text = std::fs::read_to_string(&path).expect("read plan");
+        let plan = Plan::from_toml(&text).expect("parse plan");
+        let resolved = plan.resolve_tasks().expect("resolve");
+        let diags = wiggum::domain::lint::lint_plan(&plan, &resolved);
+        assert!(
+            !diags.iter().any(|d| d.rule == "evaluator-not-independent"),
+            "{} raises evaluator-not-independent",
+            path.display()
+        );
+    }
+}

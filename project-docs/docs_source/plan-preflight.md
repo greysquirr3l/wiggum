@@ -143,6 +143,14 @@ How each field is applied depends on the active [target](./targets.md):
     selected in its own picker at session start. The fields are preserved on the
     plan for future use and for consistency with other targets.
 
+**Evaluator independence.** `wiggum validate --lint` warns
+(`evaluator-not-independent`) when `[evaluator]` is configured and its `model` is
+unset or equals `[orchestrator] subagent_model`. Comparison ignores case and
+surrounding whitespace, and an empty string counts as unset. With no model set the
+evaluator inherits the dispatcher's model, so the same model that writes the code
+also grades it. Set `[evaluator] model` to a different model from `subagent_model`.
+A plan with no `[evaluator]` is not reported by this rule.
+
 Equivalent ChatGPT or Gemini model identifiers work the same way — the string is
 passed through to `runSubagent` verbatim, so whatever the picker accepts is valid
 (e.g. `"gpt-5"`, `"gpt-5-mini"`, `"gemini-2.5-pro"`, `"gemini-2.5-flash"`).

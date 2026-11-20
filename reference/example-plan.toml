@@ -63,7 +63,7 @@ gates = []
 # BYOK backends (Ollama, LM Studio, llama.cpp). Use the exact picker label in the
 # form "Model Name (Vendor)".
 # model          = "claude-opus-4.7"            # recommended for the orchestrator agent itself
-# subagent_model = "claude-sonnet-4.5"          # pinned model for implementation subagents
+subagent_model = "claude-sonnet-4.5"            # pinned model for implementation subagents
 # subagent_model = "Qwen 2.5 Coder 32B (Ollama)"  # or a local model — server must be running
 rules = [
     "Rust edition 2024, stable toolchain only — no nightly features.",
@@ -87,7 +87,10 @@ hard_fail      = true     # abort the loop on any failed criterion
 test_tool      = "cargo test --workspace"   # defaults to preflight.test if omitted
 mode           = "blocking"  # blocking (default) | advisor — blocking gates task progression
 contract_review = true       # run a contract-review phase before dispatching the subagent
-# model        = "claude-sonnet-4.5"  # optional model pin for the evaluator agent
+# Pin a model different from `[orchestrator] subagent_model` (or leave it unpinned and
+# `wiggum validate --lint` warns `evaluator-not-independent`): the model that writes the
+# code should not be the one that grades it.
+model          = "claude-opus-4.7"    # evaluator agent; must differ from subagent_model
 
 # Weighted criteria — when provided, weights must sum to 100.
 # The evaluator scores each criterion independently; hard_fail fires if any score < pass_threshold.

@@ -64,6 +64,7 @@ pub fn lint_plan(plan: &Plan, resolved: &[ResolvedTask]) -> Vec<Diagnostic> {
     lint_weak_criteria(resolved, &mut diagnostics);
     lint_gate_without_scope(resolved, &mut diagnostics);
     lint_gate_scope_without_gate(resolved, &mut diagnostics);
+    lint_evaluator_not_independent(plan, &mut diagnostics);
     lint_capability_unused(plan, &mut diagnostics);
     lint_capability_no_scenarios(plan, &mut diagnostics);
     lint_capability_no_requirements(plan, &mut diagnostics);
@@ -460,6 +461,40 @@ fn lint_wide_fan_out(tasks: &[ResolvedTask], out: &mut Vec<Diagnostic>) {
     }
 }
 
+/// Normalise a model name for comparison: trimmed, lower-cased, and `None`
+/// when empty.
+fn normalized_model(model: Option<&String>) -> Option<String> {
+    model
+        .map(|m| m.trim().to_lowercase())
+        .filter(|m| !m.is_empty())
+}
+
+/// Warning: The evaluator is configured but is not guaranteed to run on a
+/// different model from the implementer. With no `[evaluator] model` the
+/// evaluator inherits the dispatcher's model, and with the same model as
+/// `[orchestrator] subagent_model` the assistant grades its own work. A plan
+/// with no `[evaluator]` at all is not reported here.
+fn lint_evaluator_not_independent(plan: &Plan, out: &mut Vec<Diagnostic>) {
+    let Some(evaluator) = &plan.evaluator else {
+        return;
+    };
+    let eval_model = normalized_model(evaluator.model.as_ref());
+    let impl_model = normalized_model(plan.orchestrator.subagent_model.as_ref());
+    let message = match eval_model {
+        None => "evaluator has no `[evaluator] model`, so it inherits the dispatcher's model and the same model writes and grades the work; set `[evaluator] model` to a different model than `[orchestrator] subagent_model`".to_string(),
+        Some(m) if Some(&m) == impl_model.as_ref() => format!(
+            "`[evaluator] model` (`{}`) is the same as `[orchestrator] subagent_model`, so the model that writes the code also grades it; set `[evaluator] model` to a different model",
+            evaluator.model.as_deref().unwrap_or_default().trim()
+        ),
+        Some(_) => return,
+    };
+    out.push(Diagnostic {
+        severity: Severity::Warning,
+        rule: "evaluator-not-independent",
+        message,
+    });
+}
+
 /// Warning: A capability is declared but no task references it via
 /// `implements = [...]`. Dead capability — the contract exists but no
 /// task is accountable for satisfying it.
@@ -846,6 +881,88 @@ mod tests {
         let orphan_diags: Vec<_> = diags.iter().filter(|d| d.rule == "orphan-task").collect();
         assert_eq!(orphan_diags.len(), 1);
         assert!(orphan_diags[0].message.contains("orphan"));
+    }
+
+    fn eval_plan(eval_model: Option<&str>, sub_model: Option<&str>, with_eval: bool) -> Plan {
+        let (mut plan, _) = make_plan(vec![task("t1", "build it", &[])], None);
+        if with_eval {
+            plan.evaluator = Some(crate::domain::plan::EvaluatorConfig {
+                model: eval_model.map(str::to_string),
+                ..Default::default()
+            });
+        }
+        plan.orchestrator.subagent_model = sub_model.map(str::to_string);
+        plan
+    }
+
+    fn independence_diags(plan: &Plan) -> Vec<Diagnostic> {
+        lint_plan(plan, &[])
+            .into_iter()
+            .filter(|d| d.rule == "evaluator-not-independent")
+            .collect()
+    }
+
+    #[test]
+    fn evaluator_model_unset_warns() {
+        let d = independence_diags(&eval_plan(None, Some("sonnet"), true));
+        assert_eq!(d.len(), 1);
+        assert_eq!(d[0].severity, Severity::Warning);
+        assert!(d[0].message.contains("[evaluator] model"));
+        assert!(d[0].message.contains("inherits the dispatcher's model"));
+    }
+
+    #[test]
+    fn evaluator_model_empty_string_counts_as_unset() {
+        let d = independence_diags(&eval_plan(Some("  "), Some("sonnet"), true));
+        assert_eq!(d.len(), 1);
+        assert!(d[0].message.contains("inherits the dispatcher's model"));
+    }
+
+    #[test]
+    fn evaluator_model_equal_to_subagent_model_warns() {
+        let d = independence_diags(&eval_plan(Some("sonnet"), Some("sonnet"), true));
+        assert_eq!(d.len(), 1);
+        assert!(d[0].message.contains("`sonnet`"));
+        assert!(d[0].message.contains("[orchestrator] subagent_model"));
+    }
+
+    #[test]
+    fn evaluator_model_equal_ignoring_case_and_whitespace_warns() {
+        let d = independence_diags(&eval_plan(
+            Some(" Claude-Sonnet "),
+            Some("claude-sonnet"),
+            true,
+        ));
+        assert_eq!(d.len(), 1);
+        let d = independence_diags(&eval_plan(
+            Some("claude-sonnet"),
+            Some("  CLAUDE-SONNET\t"),
+            true,
+        ));
+        assert_eq!(d.len(), 1);
+    }
+
+    #[test]
+    fn evaluator_model_distinct_does_not_warn() {
+        assert!(independence_diags(&eval_plan(Some("opus"), Some("sonnet"), true)).is_empty());
+    }
+
+    #[test]
+    fn evaluator_pinned_with_unset_subagent_model_does_not_warn() {
+        assert!(independence_diags(&eval_plan(Some("opus"), None, true)).is_empty());
+    }
+
+    #[test]
+    fn no_evaluator_does_not_raise_independence_warning() {
+        assert!(independence_diags(&eval_plan(None, None, false)).is_empty());
+        assert!(independence_diags(&eval_plan(None, Some("sonnet"), false)).is_empty());
+    }
+
+    #[test]
+    fn both_models_unset_warns() {
+        let d = independence_diags(&eval_plan(None, None, true));
+        assert_eq!(d.len(), 1);
+        assert!(d[0].message.contains("set `[evaluator] model`"));
     }
 
     #[test]
