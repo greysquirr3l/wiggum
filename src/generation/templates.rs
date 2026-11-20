@@ -172,7 +172,7 @@ _None recorded._
 ## Approvals
 
 > Record every human approval here before acting on it. The Approvals section of the
-> orchestrator prompt says what an approval covers.
+> generated orchestrator or CLAUDE.md prompt says what an approval covers.
 
 | Scope | Action | Approved by | Expires |
 |---|---|---|---|

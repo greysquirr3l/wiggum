@@ -64,7 +64,11 @@ pub struct GitCommitInfo {
 
 /// `## ` sections whose tables hold user-written rows that look like task
 /// rows (`| T02 — staging sandbox | ... |`) but are not tasks.
-const NON_TASK_SECTIONS: [&str; 2] = ["## Approvals", "## Known baseline failures"];
+const NON_TASK_SECTIONS: [&str; 3] = [
+    "## Approvals",
+    "## Known baseline failures",
+    "## Session handoff",
+];
 
 /// Whether a `## ` heading line opens a section that may hold task rows.
 ///
@@ -519,5 +523,28 @@ _No learnings yet._
         );
         assert_eq!(heading_allows_tasks("## Phase 1 — A"), Some(true));
         assert_eq!(heading_allows_tasks("## Codebase State"), Some(true));
+    }
+
+    #[test]
+    fn session_handoff_rows_are_not_tasks() {
+        let content = "## Phase 1 — A\n| T01 — One | `[x]` |\n\
+            ## Session handoff\n| T01 — One | `[~]` |\n";
+        assert_eq!(
+            heading_allows_tasks("## Session handoff"),
+            Some(false),
+            "Session handoff must be excluded from task sections"
+        );
+        let rows: Vec<&str> = task_rows(content).collect();
+        assert_eq!(
+            rows,
+            ["| T01 — One | `[x]` |"],
+            "handoff row counted as task"
+        );
+        let summary = parse_progress(content);
+        assert_eq!(
+            summary.tasks.len(),
+            1,
+            "handoff row counted by parse_progress"
+        );
     }
 }

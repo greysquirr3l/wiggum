@@ -1516,6 +1516,49 @@ fn approval_rules_in_every_orchestrator_variant_and_claude() {
 }
 
 #[test]
+fn gate_step_records_confirmation_in_approvals_table() {
+    let plan = load_example_plan();
+    let artifacts = generation::generate_all(&plan).expect("Generation failed");
+    let vscode_lines = [
+        "   Record that confirmation as a row in the **Approvals** table in PROGRESS.md, using the",
+        "   gate's `Scope:` line as the scope when the banner has one.",
+    ];
+    let opencode_lines = [
+        "   and **stop**. The human must confirm before you proceed. Record that confirmation as a row",
+        "   in the **Approvals** table in `PROGRESS.md`, using the gate's `Scope:` line as the scope",
+        "   when the banner has one.",
+    ];
+    let root_line = "1. **Gate check.** If the task file begins with `⛔ GATE`, emit the banner verbatim and stop. The human must confirm; record that confirmation as a row in the **Approvals** table in `PROGRESS.md` (scope from the banner's `Scope:` line when present).";
+    assert_lines_present(
+        "vscode gate step (confirmation recorded in Approvals)",
+        &artifacts.orchestrator_vscode,
+        &vscode_lines,
+    );
+    assert_lines_present(
+        "opencode gate step (confirmation recorded in Approvals)",
+        &artifacts.orchestrator_opencode,
+        &opencode_lines,
+    );
+    assert_lines_present(
+        "ORCHESTRATOR.md gate step (confirmation recorded in Approvals)",
+        &artifacts.orchestrator_root,
+        &[root_line],
+    );
+}
+
+#[test]
+fn progress_approvals_note_names_prompts_for_every_target() {
+    let plan = load_example_plan();
+    let artifacts = generation::generate_all(&plan).expect("Generation failed");
+    assert!(
+        artifacts
+            .progress
+            .contains("generated orchestrator or CLAUDE.md prompt says what an approval covers"),
+        "PROGRESS approvals note must name CLAUDE.md as well as the orchestrator"
+    );
+}
+
+#[test]
 fn progress_has_approvals_table_and_still_parses() {
     let plan = load_example_plan();
     let artifacts = generation::generate_all(&plan).expect("Generation failed");

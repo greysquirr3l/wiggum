@@ -42,6 +42,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
   baseline behaves as before. Template-only; preflight commands are unchanged.
   Failure handling and `CLAUDE.md` step 6 now also mention `Verify:` commands and the baseline.
 
+### Fixed
+
+- `wiggum_update_progress` (MCP) no longer rewrites rows under `## Approvals`, `## Known baseline failures` or `## Session handoff`; only task rows in task sections are touched.
+
 ## [0.23.0] - 2026-10-27
 
 ### Changed

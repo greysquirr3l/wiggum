@@ -322,33 +322,7 @@ impl WiggumTools {
         let fs = FsAdapter;
         let content = fs.read_progress(&PathBuf::from(&progress_path))?;
 
-        let mut statuses = Vec::new();
-        let mut in_task_section = true;
-        for line in content.lines() {
-            if let Some(allowed) = crate::domain::report::heading_allows_tasks(line) {
-                in_task_section = allowed;
-            }
-            if !in_task_section {
-                continue;
-            }
-            if let Some(rest) = line.strip_prefix("| T") {
-                let status = if line.contains("`[x]`") {
-                    "completed"
-                } else if line.contains("`[~]`") {
-                    "in-progress"
-                } else if line.contains("`[!]`") {
-                    "blocked"
-                } else {
-                    "not-started"
-                };
-                if let Some(title_end) = rest.find(" | ") {
-                    let task_id = &rest[..title_end];
-                    statuses.push(format!("T{task_id}: {status}"));
-                }
-            }
-        }
-
-        Ok(statuses.join("\n"))
+        Ok(task_statuses(&content))
     }
 
     /// Set a task's status in a PROGRESS.md file.
@@ -376,42 +350,12 @@ impl WiggumTools {
         let path = PathBuf::from(&progress_path);
         let content = fs.read_progress(&path)?;
 
-        let mut updated = false;
-        let new_content: String = content
-            .lines()
-            .map(|line| {
-                if line.contains(&format!("| {task_prefix} "))
-                    || line.contains(&format!("| {task_prefix} —"))
-                {
-                    updated = true;
-                    let parts: Vec<&str> = line.split('|').collect();
-                    if parts.len() >= 4 {
-                        parts.get(1).map_or_else(
-                            || line.to_string(),
-                            |task_col| {
-                                let notes_text = if notes.is_empty() {
-                                    String::new()
-                                } else {
-                                    format!(" {notes}")
-                                };
-                                format!("|{task_col}| {status_marker} |{notes_text} |")
-                            },
-                        )
-                    } else {
-                        line.to_string()
-                    }
-                } else {
-                    line.to_string()
-                }
-            })
-            .collect::<Vec<_>>()
-            .join("\n");
-
-        if !updated {
+        let Some(new_content) = set_task_status(&content, &task_prefix, status_marker, &notes)
+        else {
             return Err(WiggumError::Validation(format!(
                 "Task {task_prefix} not found in progress file"
             )));
-        }
+        };
 
         fs.write_progress(&path, &new_content)?;
         Ok(format!("Updated {task_prefix} to {status}"))
@@ -510,5 +454,142 @@ impl WiggumTools {
         Ok(format!(
             "# wiggum skeleton plan — fill in goals, hints, and evaluation_criteria before running `wiggum generate`\n\n{plan_toml}"
         ))
+    }
+}
+
+/// One `T01: status` line per task row of a PROGRESS.md, skipping rows under
+/// sections that do not hold tasks (Approvals, baseline failures).
+fn task_statuses(content: &str) -> String {
+    let mut statuses = Vec::new();
+    let mut in_task_section = true;
+    for line in content.lines() {
+        if let Some(allowed) = crate::domain::report::heading_allows_tasks(line) {
+            in_task_section = allowed;
+        }
+        if !in_task_section {
+            continue;
+        }
+        if let Some(rest) = line.strip_prefix("| T") {
+            let status = if line.contains("`[x]`") {
+                "completed"
+            } else if line.contains("`[~]`") {
+                "in-progress"
+            } else if line.contains("`[!]`") {
+                "blocked"
+            } else {
+                "not-started"
+            };
+            if let Some(title_end) = rest.find(" | ") {
+                let task_id = &rest[..title_end];
+                statuses.push(format!("T{task_id}: {status}"));
+            }
+        }
+    }
+    statuses.join("\n")
+}
+
+/// Rewrite the status and notes of task row `task_prefix` (e.g. `T02`).
+///
+/// Only task rows in sections that allow tasks are touched, so a user-written
+/// Approvals row that begins `| T02 — ...` is left byte-identical. Returns
+/// `None` when no such task row exists.
+fn set_task_status(
+    content: &str,
+    task_prefix: &str,
+    status_marker: &str,
+    notes: &str,
+) -> Option<String> {
+    let row_prefix = format!("| {task_prefix} ");
+    let mut updated = false;
+    let mut in_task_section = true;
+    let new_lines: Vec<String> = content
+        .lines()
+        .map(|line| {
+            if let Some(allowed) = crate::domain::report::heading_allows_tasks(line) {
+                in_task_section = allowed;
+            }
+            if !(in_task_section
+                && crate::domain::report::is_task_row(line)
+                && line.starts_with(&row_prefix))
+            {
+                return line.to_string();
+            }
+            updated = true;
+            let parts: Vec<&str> = line.split('|').collect();
+            if parts.len() < 4 {
+                return line.to_string();
+            }
+            parts.get(1).map_or_else(
+                || line.to_string(),
+                |task_col| {
+                    let notes_text = if notes.is_empty() {
+                        String::new()
+                    } else {
+                        format!(" {notes}")
+                    };
+                    format!("|{task_col}| {status_marker} |{notes_text} |")
+                },
+            )
+        })
+        .collect();
+    if !updated {
+        return None;
+    }
+    let mut out = new_lines.join("\n");
+    if content.ends_with('\n') {
+        out.push('\n');
+    }
+    Some(out)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const PROGRESS: &str = "# p — Implementation Progress\n\n## Phase 1 — Core\n\n| Task | Status | Notes |\n|---|---|---|\n| T02 — real task | `[ ]` | |\n\n## Approvals\n\n| Scope | Action | Approved by | Expires |\n|---|---|---|---|\n| T02 — staging payment sandbox | run capture against sandbox | alice | end of T02 |\n\n## Session handoff\n\n| T02 — handoff | `[x]` | |\n";
+
+    const APPROVAL_ROW: &str =
+        "| T02 — staging payment sandbox | run capture against sandbox | alice | end of T02 |";
+
+    #[test]
+    fn update_progress_leaves_approval_rows_byte_identical() -> std::result::Result<(), String> {
+        let out = set_task_status(PROGRESS, "T02", "`[~]`", "")
+            .ok_or_else(|| "task row T02 was not found".to_string())?;
+        assert!(
+            out.lines().any(|l| l == APPROVAL_ROW),
+            "Approvals row was rewritten or lost:\n{out}"
+        );
+        assert!(
+            out.lines().any(|l| l == "| T02 — real task | `[~]` | |"),
+            "real task row was not updated:\n{out}"
+        );
+        assert!(
+            out.lines().any(|l| l == "| T02 — handoff | `[x]` | |"),
+            "Session handoff row was changed:\n{out}"
+        );
+        assert!(out.ends_with('\n'), "trailing newline was dropped");
+        Ok(())
+    }
+
+    #[test]
+    fn update_progress_ignores_task_that_only_exists_under_approvals() {
+        let content = "## Approvals\n\n| T05 — staging sandbox | x | bob | y |\n";
+        assert!(
+            set_task_status(content, "T05", "`[x]`", "").is_none(),
+            "a row under Approvals must not count as a task"
+        );
+    }
+
+    #[test]
+    fn read_progress_skips_approval_rows() {
+        let listed = task_statuses(PROGRESS);
+        assert!(
+            listed.contains("T02 — real task: not-started"),
+            "real task row not listed: {listed}"
+        );
+        assert!(
+            !listed.contains("staging payment sandbox"),
+            "Approvals row listed as a task: {listed}"
+        );
     }
 }
