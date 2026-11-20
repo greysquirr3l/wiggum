@@ -169,6 +169,14 @@ const PROGRESS_TEMPLATE: &str = r"# {{ project_name }} — Implementation Progre
 
 _None recorded._
 
+## Approvals
+
+> Record every human approval here before acting on it. An approval covers only
+> the scope in its row and expires at the end of that task unless the row says otherwise.
+
+| Scope | Action | Approved by | Expires |
+|---|---|---|---|
+
 ## Accumulated Learnings
 
 > Subagents append discoveries here after each task.
@@ -296,6 +304,7 @@ When retries are exhausted, apply the configured **failure action** (`{{ on_fail
 {% endif %}
 
 {{ stop_section }}
+{{ approvals_section }}
 ## You MUST have access to the `#tool:agent/runSubagent` tool
 
 If this tool is not available, fail immediately with:
@@ -469,6 +478,7 @@ Complete the real fix in one pass. No workaround when the root fix is in scope.
 - Implement THIS TASK ONLY. Do not touch code from other tasks.
 {% for rule in rules %}- {{ rule }}
 {% endfor %}
+{{ approvals_section }}
 ## Security (non-negotiable)
 {% for rule in security_rules %}
 - {{ rule }}
@@ -530,7 +540,8 @@ Avoid patterns that reveal AI authorship.
 const TASK_TEMPLATE: &str = r#"{% if gate %}
 > ⛔ **GATE — Human confirmation required before starting this task.**
 > Category: `{{ gate }}`
->
+{% if gate_scope %}> Scope: {{ gate_scope }}
+{% endif %}>
 > The orchestrator must STOP and emit this banner verbatim. The human must
 > confirm (e.g. by restarting the orchestrator) before implementation begins.
 
@@ -1322,7 +1333,8 @@ When retries are exhausted, apply the configured **failure action** (`{{ on_fail
   - Suggested fix based on the evaluation output
   Wait for human confirmation before resuming.
 {% endif %}
-{{ stop_section }}{% if parallel_groups | length > 1 %}
+{{ stop_section }}
+{{ approvals_section }}{% if parallel_groups | length > 1 %}
 ## Parallel execution groups
 
 Tasks in the same group have no intra-group dependencies and may be dispatched
@@ -1398,6 +1410,7 @@ You are a senior software engineer with deep familiarity with the project's rule
 - Implement THIS TASK ONLY. Do not touch code from other tasks.
 {% for rule in rules %}- {{ rule }}
 {% endfor %}
+{{ approvals_section }}
 ## Security (non-negotiable)
 {% for rule in security_rules %}
 - {{ rule }}
@@ -1559,6 +1572,7 @@ and emits a `⛔ Task T{NN} failed after {{ max_retries }} retries. Human interv
 banner.
 
 {{ stop_section }}
+{{ approvals_section }}
 ## Preflight
 
 The preflight is a single command, called out verbatim in every agent prompt:
@@ -2094,6 +2108,7 @@ On a new preflight failure (one not already listed under **Known baseline failur
 No retries are configured; treat the first failure as the only chance.
 {% endif %}
 {{ stop_section }}
+{{ approvals_section }}
 ## Strategy
 
 {% if strategy == "tdd" %}

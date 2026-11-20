@@ -98,6 +98,10 @@ stop_when = ["before changing the public API", "before bumping a dependency majo
 
 The generated orchestrator runs the preflight once before the first task and records any failures under **Known baseline failures** in `PROGRESS.md`. Afterwards a task passes preflight when it shows no failure that is not in the baseline. Tasks may remove entries from the baseline but never add them. Your `[preflight]` commands are not changed. When the baseline is clean, this is the same as the previous behaviour: preflight must pass.
 
+### Approvals
+
+Every generated orchestrator, subagent prompt and `CLAUDE.md` contains an **Approvals** section: an approval applies only to its recorded scope, an approval for a test or staging action never authorizes a production action, an approval is never reused for another task or environment, an unclear or missing scope means stop and ask, and every human approval is recorded as a row in the **Approvals** table in `PROGRESS.md`. An approval expires at the end of the task it was given for unless its row says otherwise. A custom template override must contain `{{ approvals_section }}`, or the section is omitted. Set `gate_scope` on a gated task to print the scope in its gate banner.
+
 ### Model selection
 
 By default the orchestrator, every implementation subagent, and the evaluator all

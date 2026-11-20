@@ -153,6 +153,7 @@ mod tests {
             test_hints: vec![],
             must_haves: vec![],
             gate: None,
+            gate_scope: None,
             evaluation_criteria: vec![],
             verify: vec![],
             phase_name: "Phase 1".to_string(),

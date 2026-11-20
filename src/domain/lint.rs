@@ -62,6 +62,7 @@ pub fn lint_plan(plan: &Plan, resolved: &[ResolvedTask]) -> Vec<Diagnostic> {
     lint_wide_fan_out(resolved, &mut diagnostics);
     lint_no_verification(resolved, &mut diagnostics);
     lint_weak_criteria(resolved, &mut diagnostics);
+    lint_gate_without_scope(resolved, &mut diagnostics);
     lint_capability_unused(plan, &mut diagnostics);
     lint_capability_no_scenarios(plan, &mut diagnostics);
     lint_capability_no_requirements(plan, &mut diagnostics);
@@ -159,6 +160,27 @@ fn lint_no_verification(tasks: &[ResolvedTask], out: &mut Vec<Diagnostic>) {
                 rule: "no-verification",
                 message: format!(
                     "T{:02}-{}: no verify, evaluation_criteria or must_haves — completion can only be judged by preflight",
+                    t.number, t.slug
+                ),
+            });
+        }
+    }
+}
+
+/// Info: a gated task whose approval has no recorded scope. Without one, a
+/// confirmation given for a test run can be read as covering a deployment.
+fn lint_gate_without_scope(tasks: &[ResolvedTask], out: &mut Vec<Diagnostic>) {
+    for t in tasks {
+        let scoped = t
+            .gate_scope
+            .as_deref()
+            .is_some_and(|s| !s.trim().is_empty());
+        if t.gate.is_some() && !scoped {
+            out.push(Diagnostic {
+                severity: Severity::Info,
+                rule: "gate-without-scope",
+                message: format!(
+                    "T{:02}-{}: gate has no gate_scope — name the task and environment the approval covers",
                     t.number, t.slug
                 ),
             });
@@ -535,6 +557,7 @@ mod tests {
                 test_hints: t.test_hints,
                 must_haves: t.must_haves,
                 gate: t.gate,
+                gate_scope: t.gate_scope,
                 evaluation_criteria: t.evaluation_criteria,
                 verify: t.verify,
                 phase_name: "Phase 1".to_string(),
@@ -557,6 +580,7 @@ mod tests {
             test_hints: Vec::new(),
             must_haves: Vec::new(),
             gate: None,
+            gate_scope: None,
             evaluation_criteria: Vec::new(),
             verify: Vec::new(),
             kind: TaskKind::default(),
@@ -607,6 +631,7 @@ mod tests {
                     test_hints: vec!["test".to_string()],
                     must_haves: Vec::new(),
                     gate: None,
+                    gate_scope: None,
                     evaluation_criteria: Vec::new(),
                     verify: Vec::new(),
                     kind: TaskKind::default(),
@@ -632,6 +657,7 @@ mod tests {
                 test_hints: vec!["verify compiles".to_string()],
                 must_haves: Vec::new(),
                 gate: None,
+                gate_scope: None,
                 evaluation_criteria: Vec::new(),
                 verify: vec!["cargo build".to_string()],
                 kind: TaskKind::default(),
@@ -647,6 +673,7 @@ mod tests {
                 test_hints: vec!["unit test parsing".to_string()],
                 must_haves: Vec::new(),
                 gate: None,
+                gate_scope: None,
                 evaluation_criteria: Vec::new(),
                 verify: vec!["cargo test".to_string()],
                 kind: TaskKind::default(),
@@ -661,6 +688,40 @@ mod tests {
             .filter(|d| d.severity == Severity::Error || d.severity == Severity::Warning)
             .count();
         assert_eq!(serious, 0);
+    }
+
+    #[test]
+    fn gate_without_scope_is_info() {
+        let mut t = task("deploy", "Ship it", &[]);
+        t.gate = Some("deploy".into());
+        let (plan, resolved) = make_plan(vec![t], Some("hexagonal".into()));
+        let diags = lint_plan(&plan, &resolved);
+        assert!(
+            diags
+                .iter()
+                .any(|d| d.rule == "gate-without-scope" && d.severity == Severity::Info)
+        );
+    }
+
+    #[test]
+    fn gate_without_scope_quiet_when_scoped_or_ungated() {
+        let mut scoped = task("deploy", "Ship it", &[]);
+        scoped.gate = Some("deploy".into());
+        scoped.gate_scope = Some("T01, staging only".into());
+        let ungated = task("build", "Build it", &[]);
+        let (plan, resolved) = make_plan(vec![scoped, ungated], Some("hexagonal".into()));
+        let diags = lint_plan(&plan, &resolved);
+        assert!(!diags.iter().any(|d| d.rule == "gate-without-scope"));
+    }
+
+    #[test]
+    fn gate_without_scope_flags_blank_scope() {
+        let mut t = task("deploy", "Ship it", &[]);
+        t.gate = Some("deploy".into());
+        t.gate_scope = Some("  ".into());
+        let (plan, resolved) = make_plan(vec![t], Some("hexagonal".into()));
+        let diags = lint_plan(&plan, &resolved);
+        assert!(diags.iter().any(|d| d.rule == "gate-without-scope"));
     }
 
     #[test]

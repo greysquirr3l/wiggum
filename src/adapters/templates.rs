@@ -50,6 +50,7 @@ impl From<TaskTemplate> for TaskDef {
             test_hints: tmpl.test_hints,
             must_haves: tmpl.must_haves,
             gate: None,
+            gate_scope: None,
             evaluation_criteria: tmpl.evaluation_criteria,
             verify: Vec::new(),
             kind: TaskKind::default(),

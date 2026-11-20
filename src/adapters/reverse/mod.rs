@@ -267,6 +267,7 @@ fn apply_hints_to_plan(plan: &mut Plan, h: &hints::Hints) {
                         test_hints: Vec::new(),
                         must_haves: Vec::new(),
                         gate: t.gate.clone(),
+                        gate_scope: None,
                         evaluation_criteria: Vec::new(),
                         verify: Vec::new(),
                         kind: crate::domain::plan::TaskKind::default(),

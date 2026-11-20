@@ -1472,3 +1472,101 @@ fn baseline_resume_rule_and_subagent_wording() {
     );
     assert!(claude.contains("not already listed under **Known baseline failures**"));
 }
+
+const APPROVAL_RULE_LINES: [&str; 6] = [
+    "## Approvals",
+    "- An approval applies only to its recorded scope (the task and the environment it names).",
+    "- An approval for a test or staging action never authorizes a production action.",
+    "- Never reuse an approval for a different task or a different environment.",
+    "- If the scope of an approval is unclear or missing, stop and ask the human.",
+    "- An approval expires at the end of the task it was given for, unless its row says otherwise.",
+];
+const APPROVAL_RECORD_LINE: &str = "- Record every human approval as a row in the **Approvals** table in `PROGRESS.md` (scope, action, approved by, expires) before acting on it.";
+
+fn assert_lines_present(name: &str, text: &str, lines: &[&str]) {
+    let have: Vec<&str> = text.lines().collect();
+    for want in lines {
+        assert!(have.contains(want), "{name}: missing whole line `{want}`");
+    }
+}
+
+#[test]
+fn approval_rules_in_every_orchestrator_variant_and_claude() {
+    let plan = load_example_plan();
+    let artifacts = generation::generate_all(&plan).expect("Generation failed");
+    let claude = wiggum::generation::claude::render(&plan).expect("claude render");
+    for (name, text) in [
+        ("vscode", &artifacts.orchestrator_vscode),
+        ("opencode", &artifacts.orchestrator_opencode),
+        ("root", &artifacts.orchestrator_root),
+        ("claude", &claude),
+    ] {
+        assert_lines_present(name, text, &APPROVAL_RULE_LINES);
+        assert_lines_present(name, text, &[APPROVAL_RECORD_LINE]);
+    }
+    // The vscode and opencode files also carry the subagent prompt, which
+    // repeats the rules so a subagent dispatched alone still sees them.
+    for (name, text) in [
+        ("vscode", &artifacts.orchestrator_vscode),
+        ("opencode", &artifacts.orchestrator_opencode),
+    ] {
+        let count = text.lines().filter(|l| *l == "## Approvals").count();
+        assert_eq!(count, 2, "{name}: orchestrator and subagent sections");
+    }
+}
+
+#[test]
+fn progress_has_approvals_table_and_still_parses() {
+    let plan = load_example_plan();
+    let artifacts = generation::generate_all(&plan).expect("Generation failed");
+    let lines: Vec<&str> = artifacts.progress.lines().collect();
+    let header = lines
+        .iter()
+        .position(|l| *l == "| Scope | Action | Approved by | Expires |")
+        .expect("approvals table header line");
+    assert_eq!(lines[header + 1], "|---|---|---|---|");
+    let approvals = lines.iter().position(|l| *l == "## Approvals").unwrap();
+    let baseline = lines
+        .iter()
+        .position(|l| *l == "## Known baseline failures")
+        .unwrap();
+    let learnings = lines
+        .iter()
+        .position(|l| *l == "## Accumulated Learnings")
+        .unwrap();
+    assert!(baseline < approvals && approvals < header && header < learnings);
+    assert!(lines.contains(&"_None recorded._"));
+
+    let summary = wiggum::domain::report::parse_progress(&artifacts.progress);
+    let resolved = plan.resolve_tasks().expect("resolve");
+    assert_eq!(summary.tasks.len(), resolved.len());
+    assert!(
+        summary
+            .tasks
+            .iter()
+            .all(|t| !t.title.contains("Approved by"))
+    );
+}
+
+#[test]
+fn gate_scope_renders_in_task_banner_only_when_set() {
+    let mut plan = load_example_plan();
+    plan.phases[0].tasks[0].gate = Some("deploy".to_string());
+    let without = generation::generate_all(&plan).expect("Generation failed");
+    assert!(
+        !without.tasks[0]
+            .1
+            .lines()
+            .any(|l| l.starts_with("> Scope:"))
+    );
+
+    plan.phases[0].tasks[0].gate_scope = Some("T01, staging only".to_string());
+    let with = generation::generate_all(&plan).expect("Generation failed");
+    let lines: Vec<&str> = with.tasks[0].1.lines().collect();
+    let cat = lines
+        .iter()
+        .position(|l| l.starts_with("> Category: `deploy`"))
+        .expect("category line");
+    assert_eq!(lines[cat + 1], "> Scope: T01, staging only");
+    assert_eq!(lines[cat + 2], ">");
+}

@@ -885,6 +885,7 @@ mod tests {
                 test_hints: Vec::new(),
                 must_haves: Vec::new(),
                 gate: None,
+                gate_scope: None,
                 evaluation_criteria: Vec::new(),
                 verify: Vec::new(),
                 phase_name: "Phase 1".to_string(),

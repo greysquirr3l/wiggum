@@ -430,6 +430,10 @@ pub struct TaskDef {
     /// message and pause for human confirmation before starting this task.
     #[serde(default)]
     pub gate: Option<String>,
+    /// What the gate's approval covers (task and environment). Rendered in
+    /// the gate banner; a sibling of `gate` so existing plans keep parsing.
+    #[serde(default)]
+    pub gate_scope: Option<String>,
     /// Evaluator exit criteria — each item is a verifiable condition that
     /// must pass before the task can be marked complete.
     #[serde(default)]
@@ -577,6 +581,8 @@ pub struct ResolvedTask {
     pub must_haves: Vec<String>,
     /// Human-in-the-loop gate message, if any.
     pub gate: Option<String>,
+    /// Scope of the gate's approval, if declared.
+    pub gate_scope: Option<String>,
     /// Evaluator exit criteria carried over from `TaskDef`.
     pub evaluation_criteria: Vec<String>,
     /// Verification commands carried over from `TaskDef::verify`.
@@ -607,6 +613,7 @@ impl ResolvedTask {
             test_hints: task.test_hints.clone(),
             must_haves: task.must_haves.clone(),
             gate: task.gate.clone(),
+            gate_scope: task.gate_scope.clone(),
             evaluation_criteria: task.evaluation_criteria.clone(),
             verify: task.verify.clone(),
             phase_name: phase.name.clone(),
@@ -1403,6 +1410,7 @@ fn security_hardening_task(
             "URL-fetching code validates target against an allowlist".to_string(),
         ],
         gate: None,
+        gate_scope: None,
         evaluation_criteria: vec![
             "No secrets found by grep -r for hardcoded keys, passwords, or tokens".to_string(),
             "Security response headers verified by an integration test or curl assertion"
@@ -1463,6 +1471,7 @@ fn integration_wiring_task(
             "Configuration values are read and passed to components that need them".to_string(),
         ],
         gate: None,
+        gate_scope: None,
         evaluation_criteria: vec![
             "No dead code: every public function/type is reachable from main or tests".to_string(),
             "Integration test passes exercising the primary user flow end-to-end".to_string(),
@@ -1526,6 +1535,7 @@ fn stub_cleanup_task(
             "All code paths are reachable and functional".to_string(),
         ],
         gate: None,
+        gate_scope: None,
         evaluation_criteria: vec![
             "grep for stub patterns returns zero matches in src/ (excluding tests)".to_string(),
             "All previously-stubbed functions now have real implementations with tests".to_string(),

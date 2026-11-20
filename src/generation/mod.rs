@@ -1,5 +1,6 @@
 pub mod agent_rules;
 pub mod agents_md;
+pub(crate) mod approvals;
 pub mod background_auditor;
 pub mod budget;
 pub mod capability;

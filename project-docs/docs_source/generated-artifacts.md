@@ -49,6 +49,8 @@ Includes a learnings column where the orchestrator records insights from each co
 
 Includes a **Known baseline failures** section where the orchestrator records preflight failures that exist before the first task (`_None recorded._` until then).
 
+Includes an **Approvals** table (scope, action, approved by, expires) where every human approval is recorded. An approval covers only the scope in its row and expires at the end of its task unless the row says otherwise.
+
 ### Implementation plan — `IMPLEMENTATION_PLAN.md`
 
 A high-level architecture document derived from your plan's project description and phase structure. Subagents reference this for context about how their task fits into the overall project.

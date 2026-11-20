@@ -8,6 +8,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Added
 
+- **Scoped approvals** — `PROGRESS.md` gains an **Approvals** table (scope, action,
+  approved by, expires), and every orchestrator variant, subagent prompt and
+  `CLAUDE.md` gets an **Approvals** section: an approval covers only its recorded
+  scope, a staging approval never authorizes production, unclear scope means stop
+  and ask. Tasks accept an optional `gate_scope`, shown as a `Scope:` line in the
+  gate banner; new lint rule `gate-without-scope` (info). Existing plans keep
+  working; custom template overrides need `{{ approvals_section }}` to include
+  the section.
 - **Golden plan corpus** — `tests/golden/` plans and `tests/golden_test.rs` check score
   floors, the Stop and ask section, Exit Criteria commands and unrendered template
   markers for every generated scaffold. Test-only; no change to generated output.

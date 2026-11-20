@@ -6,6 +6,7 @@
 use tera::Context;
 
 use crate::domain::plan::Plan;
+use crate::generation::approvals::render_approvals_section;
 
 const DEFAULT_STOPS: [&str; 5] = [
     "before deleting important data",
@@ -32,9 +33,11 @@ pub fn render_stop_section(plan: &Plan) -> String {
     out
 }
 
-/// Insert `stop_section` into a template context.
+/// Insert `stop_section` and `approvals_section` into a template context.
+/// Both sit at every call site that renders the orchestrator rules.
 pub fn insert_stop_section(ctx: &mut Context, plan: &Plan) {
     ctx.insert("stop_section", &render_stop_section(plan));
+    ctx.insert("approvals_section", &render_approvals_section());
 }
 
 #[cfg(test)]
