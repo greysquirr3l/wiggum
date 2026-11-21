@@ -12,6 +12,8 @@ cargo install wiggum
 
 ## Quick start
 
+> **Note:** This project has been renamed to [Moloch](https://github.com/greysquirr3l/moloch). Wiggum is the legacy name of the project and is no longer actively developed — use Moloch for new work.
+
 ```bash
 # Create a plan interactively
 wiggum init
