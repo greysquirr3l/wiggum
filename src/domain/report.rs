@@ -62,6 +62,44 @@ pub struct GitCommitInfo {
     pub message: String,
 }
 
+/// `## ` sections whose tables hold user-written rows that look like task
+/// rows (`| T02 — staging sandbox | ... |`) but are not tasks.
+const NON_TASK_SECTIONS: [&str; 3] = [
+    "## Approvals",
+    "## Known baseline failures",
+    "## Session handoff",
+];
+
+/// Whether a `## ` heading line opens a section that may hold task rows.
+///
+/// Returns `None` when `line` is not a `## ` heading. Only the generated
+/// sections in `NON_TASK_SECTIONS` are excluded: legacy PROGRESS.md files
+/// keep task rows under other headings (out-of-band work, learnings), and
+/// those must keep counting.
+#[must_use]
+pub fn heading_allows_tasks(line: &str) -> Option<bool> {
+    line.starts_with("## ")
+        .then(|| !NON_TASK_SECTIONS.iter().any(|h| line.starts_with(h)))
+}
+
+/// Whether `line` has the shape of a task row: `| T01 — Title | ... |`.
+#[must_use]
+pub fn is_task_row(line: &str) -> bool {
+    line.starts_with("| T") && line.contains('\u{2014}')
+}
+
+/// Iterate the task rows of a PROGRESS.md, skipping rows under non-phase
+/// `## ` sections. Rows before the first `## ` heading are kept.
+pub fn task_rows(content: &str) -> impl Iterator<Item = &str> {
+    let mut allowed = true;
+    content.lines().filter(move |line| {
+        if let Some(a) = heading_allows_tasks(line) {
+            allowed = a;
+        }
+        allowed && is_task_row(line)
+    })
+}
+
 /// Parse a PROGRESS.md file content into a [`ProgressSummary`].
 #[must_use]
 pub fn parse_progress(content: &str) -> ProgressSummary {
@@ -77,8 +115,12 @@ pub fn parse_progress(content: &str) -> ProgressSummary {
     let mut phase_task_map: Vec<(String, Vec<TaskStatus>)> = Vec::new();
     let mut phase_infos: Vec<PhaseInfo> = Vec::new();
     let mut current_phase_idx: Option<usize> = None;
+    let mut in_task_section = true;
 
     for line in content.lines() {
+        if let Some(allowed) = heading_allows_tasks(line) {
+            in_task_section = allowed;
+        }
         // Detect phase headers: "## Phase 1 — Scaffold"
         if let Some(rest) = line.strip_prefix("## Phase ")
             && let Some(name) = rest.split(" \u{2014} ").nth(1)
@@ -92,7 +134,7 @@ pub fn parse_progress(content: &str) -> ProgressSummary {
         }
 
         // Parse task rows: "| T01 — Workspace Scaffold | `[x]` | notes |"
-        if line.starts_with("| T") && line.contains('—') {
+        if in_task_section && is_task_row(line) {
             let status = if line.contains("`[x]`") {
                 TaskStatus::Completed
             } else if line.contains("`[~]`") {
@@ -201,7 +243,7 @@ pub fn collect_git_timeline(project_path: &Path) -> Vec<GitCommitInfo> {
                 && upper[1..].chars().take(2).all(|c| c.is_ascii_digit())
             {
                 commits.push(GitCommitInfo {
-                    task_id: upper.clone(),
+                    task_id: upper,
                     timestamp: timestamp.to_string(),
                     message: message.to_string(),
                 });
@@ -413,5 +455,96 @@ _No learnings yet._
         assert!(output.contains("2 learnings captured"));
         assert!(output.contains("✅ T01 — Workspace Setup"));
         assert!(output.contains("❌ T05 — Integration"));
+    }
+
+    const WITH_APPROVALS: &str = r"# gated — Implementation Progress
+
+## Phase 1 — Build
+
+| Task | Status | Notes |
+|---|---|---|
+| T01 — Alpha | `[x]` | |
+| T02 — Beta | `[x]` | |
+
+## Approvals
+
+| Scope | Action | Approved by | Expires |
+|---|---|---|---|
+| T02 — staging payment sandbox | run capture against sandbox | alice | end of T02 |
+| T07 only; staging | deploy preview | bob | end of T07 |
+
+## Known baseline failures
+
+| T09 — flaky suite | `[ ]` | known |
+
+## Accumulated Learnings
+
+_No learnings yet._
+";
+
+    #[test]
+    fn approvals_rows_are_not_tasks() {
+        let summary = parse_progress(WITH_APPROVALS);
+        let ids: Vec<&str> = summary.tasks.iter().map(|t| t.id.as_str()).collect();
+        assert_eq!(ids, ["T01", "T02"]);
+        assert_eq!(
+            summary.tasks.iter().filter(|t| t.title == "Beta").count(),
+            1
+        );
+        assert_eq!(summary.phases_total, 1);
+        assert_eq!(summary.phases_completed, 1);
+        assert_eq!(summary.phases.first().map(|p| p.task_ids.len()), Some(2));
+    }
+
+    #[test]
+    fn task_rows_skips_excluded_sections_but_keeps_other_headings() {
+        let content = "| T00 — Before any heading | `[ ]` |\n\
+            ## Phase 1 — A\n| T01 — One | `[x]` |\n\
+            ## Approvals\n| T02 — nope | x |\n\
+            ## Codebase State\n| T03 — legacy row | `[x]` |\n";
+        let rows: Vec<&str> = task_rows(content).collect();
+        assert_eq!(
+            rows,
+            [
+                "| T00 — Before any heading | `[ ]` |",
+                "| T01 — One | `[x]` |",
+                "| T03 — legacy row | `[x]` |",
+            ]
+        );
+    }
+
+    #[test]
+    fn heading_allows_tasks_only_for_headings() {
+        assert_eq!(heading_allows_tasks("| T01 — x |"), None);
+        assert_eq!(heading_allows_tasks("## Approvals"), Some(false));
+        assert_eq!(
+            heading_allows_tasks("## Known baseline failures"),
+            Some(false)
+        );
+        assert_eq!(heading_allows_tasks("## Phase 1 — A"), Some(true));
+        assert_eq!(heading_allows_tasks("## Codebase State"), Some(true));
+    }
+
+    #[test]
+    fn session_handoff_rows_are_not_tasks() {
+        let content = "## Phase 1 — A\n| T01 — One | `[x]` |\n\
+            ## Session handoff\n| T01 — One | `[~]` |\n";
+        assert_eq!(
+            heading_allows_tasks("## Session handoff"),
+            Some(false),
+            "Session handoff must be excluded from task sections"
+        );
+        let rows: Vec<&str> = task_rows(content).collect();
+        assert_eq!(
+            rows,
+            ["| T01 — One | `[x]` |"],
+            "handoff row counted as task"
+        );
+        let summary = parse_progress(content);
+        assert_eq!(
+            summary.tasks.len(),
+            1,
+            "handoff row counted by parse_progress"
+        );
     }
 }

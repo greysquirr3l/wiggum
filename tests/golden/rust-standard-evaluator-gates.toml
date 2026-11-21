@@ -1,0 +1,56 @@
+# golden-floor: 8
+[project]
+name = "golden-rust-standard"
+description = "Golden plan: rust, standard strategy, evaluator, gates, verify, stop_when."
+language = "rust"
+path = "/tmp/golden-rust-standard"
+architecture = "hexagonal"
+
+[orchestrator]
+persona = "You are a senior Rust engineer"
+strategy = "standard"
+rules = ["Keep the domain layer free of I/O"]
+model = "claude-opus-4.7"
+subagent_model = "claude-haiku-4.5"
+gates = ["auth"]
+stop_when = ["before changing the public API", "before editing CI configuration"]
+
+[evaluator]
+model = "claude-sonnet-4.5"
+pass_threshold = 7
+
+[[phases]]
+name = "Foundation"
+order = 1
+
+[[phases.tasks]]
+slug = "workspace"
+title = "Cargo workspace"
+goal = "Create the workspace with stub crates."
+verify = ["cargo build --workspace"]
+
+[[phases.tasks]]
+slug = "domain-types"
+title = "Domain types"
+goal = "Define entities and port traits."
+depends_on = ["workspace"]
+verify = ["cargo test -p domain"]
+
+[[phases]]
+name = "Access"
+order = 2
+
+[[phases.tasks]]
+slug = "session-auth"
+title = "Session authentication"
+goal = "Authenticate callers through the session port."
+depends_on = ["domain-types"]
+gate = "auth"
+verify = ["cargo test -p domain auth"]
+
+[[phases.tasks]]
+slug = "adapter-wiring"
+title = "Adapter wiring"
+goal = "Wire adapters into the binary."
+depends_on = ["session-auth"]
+verify = ["cargo run -- --help"]

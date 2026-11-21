@@ -14,6 +14,7 @@ use tera::{Context, Tera};
 
 use crate::domain::plan::Plan;
 use crate::error::{Result, WiggumError};
+use crate::generation::stop_section::insert_stop_section;
 use crate::generation::templates::get_tera;
 
 /// Render the `CLAUDE.md` project memory file using the default template.
@@ -46,6 +47,7 @@ pub fn render_with(tera: &Tera, plan: &Plan) -> Result<String> {
     ctx.insert("rules", &plan.orchestrator.rules);
     ctx.insert("strategy", &plan.orchestrator.strategy.to_string());
     ctx.insert("max_retries", &plan.orchestrator.max_retries);
+    insert_stop_section(&mut ctx, plan);
 
     // Security rules from the language profile, always injected.
     let profile = plan.project.language.profile();
@@ -119,7 +121,9 @@ mod tests {
                     test_hints: vec![],
                     must_haves: vec![],
                     gate: None,
+                    gate_scope: None,
                     evaluation_criteria: vec![],
+                    verify: vec![],
                     kind: TaskKind::default(),
                     implements: Vec::new(),
                     anchors: vec![],

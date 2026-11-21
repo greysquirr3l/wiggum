@@ -1,7 +1,7 @@
 //! Plan quality scoring — the `wiggum check` command.
 //!
 //! Unlike `validate --lint`, which checks structural correctness, `check`
-//! scores the *substance* of a plan on five dimensions and produces concrete
+//! scores the *substance* of a plan on seven dimensions and produces concrete
 //! improvement suggestions. Run it before `generate` to catch bad plans early.
 
 use std::collections::HashSet;
@@ -75,6 +75,7 @@ pub fn score_plan(plan: &Plan, resolved: &[ResolvedTask]) -> PlanScore {
     let richness = score_richness(resolved);
     let token_dim = score_token_budget(resolved);
     let harness = score_harness_complexity(plan, resolved);
+    let verifiability = score_verifiability(resolved);
 
     let estimated_tokens = estimated_total_tokens(resolved);
 
@@ -85,19 +86,24 @@ pub fn score_plan(plan: &Plan, resolved: &[ResolvedTask]) -> PlanScore {
     collect_suggestions(&richness, &mut suggestions);
     collect_suggestions(&token_dim, &mut suggestions);
     collect_suggestions(&harness, &mut suggestions);
+    collect_suggestions(&verifiability, &mut suggestions);
 
-    // Overall: weighted average (granularity 22%, dep 18%, coverage 22%, richness 23%, tokens 10%, harness 5%)
+    // Overall: weighted average (granularity 20%, dep 18%, coverage 20%, richness 19%,
+    // tokens 10%, harness 5%, verifiability 8%). Verifiability took 8 points from the
+    // previous split (granularity 22, coverage 22, richness 23): 2 + 2 + 4. Dependency,
+    // tokens and harness are unchanged, so the weights still sum to 100%.
     #[expect(
         clippy::suboptimal_flops,
         reason = "sequential form preserves score boundary semantics relied on by tests"
     )]
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-    let overall = (f64::from(granularity.score) * 0.22
+    let overall = (f64::from(granularity.score) * 0.20
         + f64::from(dependency.score) * 0.18
-        + f64::from(coverage.score) * 0.22
-        + f64::from(richness.score) * 0.23
+        + f64::from(coverage.score) * 0.20
+        + f64::from(richness.score) * 0.19
         + f64::from(token_dim.score) * 0.10
-        + f64::from(harness.score) * 0.05)
+        + f64::from(harness.score) * 0.05
+        + f64::from(verifiability.score) * 0.08)
         .round() as u8;
 
     let dimensions = vec![
@@ -107,6 +113,7 @@ pub fn score_plan(plan: &Plan, resolved: &[ResolvedTask]) -> PlanScore {
         richness,
         token_dim,
         harness,
+        verifiability,
     ];
 
     PlanScore {
@@ -566,6 +573,37 @@ fn score_harness_complexity(plan: &Plan, tasks: &[ResolvedTask]) -> DimensionSco
     score_from_penalty("Harness complexity", clamped_penalty, findings)
 }
 
+// ─── Dimension: Verifiability ────────────────────────────────────────────────
+
+/// Scores the share of tasks that carry at least one `verify` command.
+///
+/// Commands are the only completion check the orchestrator can run without
+/// judgement, so a plan with none leans entirely on preflight and prose.
+fn score_verifiability(tasks: &[ResolvedTask]) -> DimensionScore {
+    let total = tasks.len();
+    if total == 0 {
+        return score_from_penalty("Verifiability", 10, vec!["No tasks to score".to_string()]);
+    }
+
+    let verified = tasks.iter().filter(|t| !t.verify.is_empty()).count();
+    let pct = (verified * 100) / total;
+    let penalty = match pct {
+        75..=100 => 0,
+        50..=74 => 1,
+        25..=49 => 3,
+        1..=24 => 6,
+        _ => 8,
+    };
+
+    let mut findings = Vec::new();
+    if penalty > 0 {
+        findings.push(format!(
+            "{verified}/{total} tasks ({pct}%) have a verify command — add `verify = [\"...\"]` so completion is machine-checkable"
+        ));
+    }
+    score_from_penalty("Verifiability", penalty, findings)
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 fn phase_task_counts(tasks: &[ResolvedTask]) -> Vec<(String, usize)> {
@@ -789,6 +827,50 @@ mod tests {
     use super::*;
     use crate::domain::plan::{Language, Plan, Preflight, Project, TaskKind};
 
+    fn verifiability_of(verified: usize, total: usize) -> DimensionScore {
+        let (_, mut tasks) = minimal_plan(
+            &(0..total)
+                .map(|_| ("t", "goal"))
+                .collect::<Vec<(&str, &str)>>(),
+        );
+        for t in tasks.iter_mut().take(verified) {
+            t.verify = vec!["cargo test".to_string()];
+        }
+        score_verifiability(&tasks)
+    }
+
+    #[test]
+    fn verifiability_scores_share_of_verified_tasks() {
+        assert_eq!(verifiability_of(4, 4).score, 10);
+        assert_eq!(verifiability_of(2, 4).score, 9);
+        assert_eq!(verifiability_of(1, 4).score, 7);
+        assert_eq!(verifiability_of(1, 10).score, 4);
+        let none = verifiability_of(0, 4);
+        assert_eq!(none.score, 2);
+        assert_eq!(none.name, "Verifiability");
+        assert!(none.findings.iter().any(|f| f.contains("0/4")));
+    }
+
+    #[test]
+    fn verify_commands_raise_the_overall_score() {
+        let (plan, mut tasks) = minimal_plan(&[("a", "goal a"), ("b", "goal b")]);
+        let before = score_plan(&plan, &tasks);
+        for t in &mut tasks {
+            t.verify = vec!["cargo test".to_string()];
+        }
+        let after = score_plan(&plan, &tasks);
+        assert!(after.overall >= before.overall);
+        assert_eq!(after.dimensions.len(), 7);
+        let dim = |s: &PlanScore| {
+            s.dimensions
+                .iter()
+                .find(|d| d.name == "Verifiability")
+                .map(|d| d.score)
+        };
+        assert_eq!(dim(&before), Some(2));
+        assert_eq!(dim(&after), Some(10));
+    }
+
     fn minimal_plan(task_goals: &[(&str, &str)]) -> (Plan, Vec<ResolvedTask>) {
         let tasks: Vec<ResolvedTask> = task_goals
             .iter()
@@ -803,7 +885,9 @@ mod tests {
                 test_hints: Vec::new(),
                 must_haves: Vec::new(),
                 gate: None,
+                gate_scope: None,
                 evaluation_criteria: Vec::new(),
+                verify: Vec::new(),
                 phase_name: "Phase 1".to_string(),
                 phase_order: 1,
                 kind: TaskKind::Feature,

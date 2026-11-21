@@ -53,6 +53,7 @@ persona     = "You are a senior Rust engineer with deep experience migrating syn
 strategy    = "tdd"
 max_retries = 1             # refactor failures usually need human review, not blind retries
 on_failure  = "escalate"    # produce a full diagnostic report so the human can pinpoint the regression
+subagent_model = "claude-sonnet-4.5"   # implementation subagents
 rules = [
     "Rust edition 2024, stable toolchain only.",
     "All tests that passed before the refactor must still pass after — zero regressions.",
@@ -67,6 +68,7 @@ rules = [
 
 [evaluator]
 persona        = "You are a Rust engineer specialised in catching regressions and API drift during migrations. You are highly skeptical of 'it compiled' as proof of correctness."
+model          = "claude-opus-4.7"   # a different model from subagent_model, so the checker is independent of the implementer
 pass_threshold = 8          # higher bar than usual — regressions are not acceptable
 hard_fail      = true
 test_tool      = "cargo test --workspace"

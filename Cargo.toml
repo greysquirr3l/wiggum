@@ -1,6 +1,6 @@
 [package]
 name = "wiggum"
-version = "0.23.0"
+version = "0.24.0"
 edition = "2024"
 rust-version = "1.99.0"
 description = "Agentic implementation scaffold generator for dependency-aware AI coding workflows"
@@ -79,7 +79,6 @@ tokio = { version = "1.53.3", features = ["full"] }
 
 # Error handling
 thiserror = "2"
-anyhow = "1"
 
 # Logging
 tracing = "0.1"

@@ -32,6 +32,7 @@ pub struct TaskDiff {
     pub deps_removed: Vec<String>,
     pub gate_added: bool,
     pub gate_removed: bool,
+    pub gate_scope_changed: bool,
 }
 
 impl TaskDiff {
@@ -45,6 +46,7 @@ impl TaskDiff {
             && self.deps_removed.is_empty()
             && !self.gate_added
             && !self.gate_removed
+            && !self.gate_scope_changed
     }
 }
 
@@ -151,6 +153,7 @@ fn diff_task(old: &ResolvedTask, new: &ResolvedTask) -> TaskDiff {
             .collect(),
         gate_added: old.gate.is_none() && new.gate.is_some(),
         gate_removed: old.gate.is_some() && new.gate.is_none(),
+        gate_scope_changed: old.effective_gate_scope() != new.effective_gate_scope(),
     }
 }
 
@@ -230,6 +233,9 @@ pub fn format_diff(changes: &[Change]) -> String {
                     if diff.gate_removed {
                         mods.push("gate removed");
                     }
+                    if diff.gate_scope_changed {
+                        mods.push("gate scope changed");
+                    }
                     lines.push(format!("  ~ {:<24} {}", diff.slug, mods.join(", ")));
 
                     if !diff.deps_added.is_empty() {
@@ -269,7 +275,9 @@ mod tests {
             test_hints: vec![],
             must_haves: vec![],
             gate: None,
+            gate_scope: None,
             evaluation_criteria: vec![],
+            verify: vec![],
             phase_name: "Phase 1".into(),
             phase_order: 1,
             kind: TaskKind::default(),
@@ -278,5 +286,38 @@ mod tests {
         };
         let diff = diff_task(&task, &task);
         assert!(diff.is_empty());
+    }
+
+    #[test]
+    fn gate_scope_change_is_reported() {
+        let mut old = ResolvedTask {
+            number: 1,
+            slug: "deploy".into(),
+            title: "Deploy".into(),
+            goal: "g".into(),
+            depends_on: vec![],
+            hints: vec![],
+            test_hints: vec![],
+            must_haves: vec![],
+            gate: Some("confirm".into()),
+            gate_scope: None,
+            evaluation_criteria: vec![],
+            verify: vec![],
+            phase_name: "Phase 1".into(),
+            phase_order: 1,
+            kind: TaskKind::default(),
+            implements: vec![],
+            anchors: vec![],
+        };
+        let mut new = old.clone();
+        new.gate_scope = Some("T01, staging only".into());
+        let diff = diff_task(&old, &new);
+        assert!(diff.gate_scope_changed);
+        assert!(!diff.is_empty());
+
+        // Blank and absent scopes are the same thing.
+        old.gate_scope = Some("  ".into());
+        new.gate_scope = None;
+        assert!(!diff_task(&old, &new).gate_scope_changed);
     }
 }

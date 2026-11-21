@@ -1,0 +1,36 @@
+# golden-floor: 8
+[project]
+name = "golden-go-tdd"
+description = "Golden plan: go, tdd strategy, no evaluator (deliberate), non-rust preflight defaults."
+language = "go"
+path = "/tmp/golden-go-tdd"
+
+[orchestrator]
+strategy = "tdd"
+require_evaluator = false
+stop_when = ["before touching the release pipeline"]
+
+[[phases]]
+name = "Core"
+order = 1
+
+[[phases.tasks]]
+slug = "parser"
+title = "Line parser"
+goal = "Parse input lines into records."
+test_hints = ["Table-driven test with empty, valid and malformed lines"]
+verify = ["go test ./parser/..."]
+
+[[phases.tasks]]
+slug = "formatter"
+title = "Record formatter"
+goal = "Format records for output."
+depends_on = ["parser"]
+verify = ["go test ./formatter/..."]
+
+[[phases.tasks]]
+slug = "cli-entry"
+title = "CLI entry point"
+goal = "Wire parser and formatter into main."
+depends_on = ["formatter"]
+verify = ["go build ./..."]

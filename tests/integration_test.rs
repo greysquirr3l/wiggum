@@ -637,14 +637,14 @@ fn patterns_save_multiple_sorted_by_timestamp() {
 // ─── check / score_plan ───────────────────────────────────────────────────────
 
 #[test]
-fn check_score_plan_has_six_dimensions() {
+fn check_score_plan_has_seven_dimensions() {
     let plan = load_example_plan();
     let resolved = plan.resolve_tasks().expect("resolve");
     let score = score_plan(&plan, &resolved);
     assert_eq!(
         score.dimensions.len(),
-        6,
-        "Expected exactly 6 scoring dimensions"
+        7,
+        "Expected exactly 7 scoring dimensions"
     );
 }
 
@@ -1207,5 +1207,494 @@ note = "file was deleted"
             .count(),
         1,
         "expected one missing-file error, got {diags:?}"
+    );
+}
+
+#[test]
+fn task_verify_commands_reach_task_file_and_orchestrators() {
+    let mut plan = load_example_plan();
+    let task = plan
+        .phases
+        .iter_mut()
+        .flat_map(|p| p.tasks.iter_mut())
+        .find(|t| t.slug == "domain-model")
+        .expect("fixture has domain-model");
+    task.verify = vec!["cargo test --test foo".to_string()];
+
+    let artifacts = generation::generate_all(&plan).expect("Generation failed");
+
+    let (_, task_file) = artifacts
+        .tasks
+        .iter()
+        .find(|(name, _)| name == "T02-domain-model.md")
+        .expect("T02 task file");
+    assert!(
+        task_file.contains("- [ ] Verify: `cargo test --test foo` exits with status 0"),
+        "task file must list the verify command in Exit Criteria:\n{task_file}"
+    );
+
+    for (name, orchestrator) in [
+        ("vscode", &artifacts.orchestrator_vscode),
+        ("opencode", &artifacts.orchestrator_opencode),
+        ("root", &artifacts.orchestrator_root),
+    ] {
+        assert!(
+            orchestrator.contains("`cargo test --test foo`"),
+            "{name} orchestrator verify step must name the command"
+        );
+    }
+}
+
+#[test]
+fn stop_and_ask_section_in_every_orchestrator_variant() {
+    let mut plan = load_example_plan();
+    let default_plan = generation::generate_all(&plan).expect("Generation failed");
+    for (name, text) in [
+        ("vscode", &default_plan.orchestrator_vscode),
+        ("opencode", &default_plan.orchestrator_opencode),
+        ("root", &default_plan.orchestrator_root),
+    ] {
+        assert!(text.contains("## Stop and ask"), "{name}: missing section");
+        assert!(
+            text.contains("before force-pushing"),
+            "{name}: missing default"
+        );
+        assert!(
+            text.contains("Keep working when the next step does not need the human's input."),
+            "{name}: missing closing sentence"
+        );
+        assert!(!text.contains("before rotating the signing key"));
+    }
+
+    plan.orchestrator.stop_when = vec!["before rotating the signing key".to_string()];
+    let artifacts = generation::generate_all(&plan).expect("Generation failed");
+    let claude = wiggum::generation::claude::render(&plan).expect("claude render");
+    for (name, text) in [
+        ("vscode", &artifacts.orchestrator_vscode),
+        ("opencode", &artifacts.orchestrator_opencode),
+        ("root", &artifacts.orchestrator_root),
+        ("claude", &claude),
+    ] {
+        assert!(text.contains("## Stop and ask"), "{name}: missing section");
+        let default_at = text.find("before force-pushing").expect("default entry");
+        let custom_at = text
+            .find("before rotating the signing key")
+            .expect("custom entry");
+        assert!(
+            custom_at > default_at,
+            "{name}: custom entry must follow defaults"
+        );
+    }
+}
+
+#[test]
+fn known_baseline_failures_in_progress_and_orchestrators() {
+    let plan = load_example_plan();
+    let artifacts = generation::generate_all(&plan).expect("Generation failed");
+    assert!(artifacts.progress.contains("## Known baseline failures"));
+    for (name, text) in [
+        ("vscode", &artifacts.orchestrator_vscode),
+        ("opencode", &artifacts.orchestrator_opencode),
+        ("root", &artifacts.orchestrator_root),
+    ] {
+        assert!(
+            text.contains("Known baseline failures"),
+            "{name}: baseline heading not mentioned"
+        );
+        assert!(
+            text.to_lowercase().contains("the preflight once"),
+            "{name}: baseline step missing"
+        );
+        assert!(
+            text.contains("never add"),
+            "{name}: rule that tasks never add baseline entries missing"
+        );
+    }
+    assert!(
+        artifacts
+            .orchestrator_vscode
+            .contains("must not show any failure that is not in")
+    );
+}
+
+const BASELINE_PLAN_NO_CAPS: &str = r#"
+[project]
+name = "kestrel"
+path = "/tmp/kestrel"
+description = "Webhook relay"
+language = "rust"
+
+[[phases]]
+name = "Inbound"
+order = 1
+[[phases.tasks]]
+slug = "router"
+title = "Router"
+goal = "Stand up the inbound router."
+verify = ["cargo test --test foo"]
+"#;
+
+const BASELINE_PLAN_WITH_CAPS: &str = r#"
+[project]
+name = "kestrel"
+path = "/tmp/kestrel"
+description = "Webhook relay"
+language = "rust"
+
+[[capabilities]]
+name = "webhook-reception"
+title = "Inbound Webhook Reception"
+description = "Accepts and validates inbound webhooks."
+[[capabilities.scenarios]]
+name = "valid-signature"
+when = "POST /webhook receives a valid HMAC signature"
+then = "the server returns 202 Accepted"
+
+[[phases]]
+name = "Inbound"
+order = 1
+[[phases.tasks]]
+slug = "router"
+title = "Router"
+goal = "Stand up the inbound router."
+implements = ["webhook-reception"]
+verify = ["cargo test --test foo"]
+"#;
+
+fn assert_baseline_step_on_own_line(text: &str, label: &str, marker: &str) {
+    let lines: Vec<&str> = text.lines().collect();
+    let pos = lines.iter().position(|l| l.starts_with(marker));
+    assert!(pos.is_some(), "{label}: no line starts with {marker:?}");
+    let idx = pos.expect("checked above");
+    assert!(idx > 0, "{label}: baseline step is the first line");
+    let prev = lines[idx - 1].trim_end();
+    let before_step = if prev.is_empty() {
+        lines[idx - 2].trim_end()
+    } else {
+        prev
+    };
+    assert!(
+        before_step.ends_with("should have been created.")
+            || before_step.ends_with("capability(ies)."),
+        "{label}: text glued before baseline step: {before_step:?}"
+    );
+    assert!(
+        !prev.contains("**Record the baseline**"),
+        "{label}: duplicate baseline step"
+    );
+}
+
+#[test]
+fn baseline_step_renders_on_its_own_line_with_and_without_capabilities() {
+    let plain = Plan::from_toml(BASELINE_PLAN_NO_CAPS).expect("plan parses");
+    let plain_art = generation::generate_all(&plain).expect("generation");
+    let vscode = &plain_art.orchestrator_vscode;
+    assert_baseline_step_on_own_line(vscode, "vscode/no-caps", "3. **Record the baseline**");
+    let before = vscode
+        .lines()
+        .take_while(|l| !l.starts_with("3. **Record the baseline**"))
+        .last()
+        .expect("line before step");
+    assert!(
+        before.ends_with("should have been created."),
+        "no-caps: preceding line is {before:?}"
+    );
+
+    let caps = Plan::from_toml(BASELINE_PLAN_WITH_CAPS).expect("plan parses");
+    let caps_art = generation::generate_all(&caps).expect("generation");
+    assert_baseline_step_on_own_line(
+        &caps_art.orchestrator_vscode,
+        "vscode/caps",
+        "4. **Record the baseline**",
+    );
+    assert!(
+        caps_art
+            .orchestrator_vscode
+            .lines()
+            .any(|l| l.starts_with("3. Read every file in `capabilities/`")),
+        "caps: step 3 must start its own line"
+    );
+    assert!(
+        caps_art
+            .orchestrator_opencode
+            .lines()
+            .any(|l| l.starts_with("3. **Record the baseline**")),
+        "opencode baseline step must start a line"
+    );
+}
+
+#[test]
+fn baseline_resume_rule_and_subagent_wording() {
+    let plan = Plan::from_toml(BASELINE_PLAN_NO_CAPS).expect("plan parses");
+    let art = generation::generate_all(&plan).expect("generation");
+    let claude = wiggum::generation::claude::render(&plan).expect("claude render");
+    for (name, text) in [
+        ("vscode", &art.orchestrator_vscode),
+        ("opencode", &art.orchestrator_opencode),
+    ] {
+        assert!(
+            text.contains("`_None recorded._`"),
+            "{name}: placeholder rule"
+        );
+        assert!(
+            text.contains("`None (clean, recorded before T01)`"),
+            "{name}: clean-baseline marker"
+        );
+        assert!(
+            !text.contains("until preflight passes"),
+            "{name}: stale subagent preflight wording"
+        );
+        assert!(
+            text.contains("never add to the baseline"),
+            "{name}: subagent baseline rule"
+        );
+    }
+    assert!(!art.orchestrator_root.contains("until preflight passes"));
+
+    for (name, text) in [
+        ("vscode", &art.orchestrator_vscode),
+        ("opencode", &art.orchestrator_opencode),
+        ("root", &art.orchestrator_root),
+        ("claude", &claude),
+    ] {
+        assert!(!text.contains("`Verify:'"), "{name}: mismatched backtick");
+        for line in text.lines().filter(|l| l.contains("Verify:")) {
+            assert_eq!(
+                line.matches('`').count() % 2,
+                0,
+                "{name}: odd backticks on line {line:?}"
+            );
+        }
+    }
+    assert!(
+        claude.contains("\n\n## Strategy"),
+        "claude: blank line before Strategy"
+    );
+    assert!(claude.contains("not already listed under **Known baseline failures**"));
+}
+
+const APPROVAL_RULE_LINES: [&str; 6] = [
+    "## Approvals",
+    "- An approval applies only to its recorded scope (the task and the environment it names).",
+    "- An approval for a test or staging action never authorizes a production action.",
+    "- Never reuse an approval for a different task or a different environment.",
+    "- If the scope of an approval is unclear or missing, stop and ask the human.",
+    "- An approval expires at the end of the task it was given for, unless its row says otherwise.",
+];
+const APPROVAL_RECORD_LINE: &str = "- Record every human approval as a row in the **Approvals** table in `PROGRESS.md` (scope, action, approved by, expires) before acting on it.";
+
+fn assert_lines_present(name: &str, text: &str, lines: &[&str]) {
+    let have: Vec<&str> = text.lines().collect();
+    for want in lines {
+        assert!(have.contains(want), "{name}: missing whole line `{want}`");
+    }
+}
+
+#[test]
+fn approval_rules_in_every_orchestrator_variant_and_claude() {
+    let plan = load_example_plan();
+    let artifacts = generation::generate_all(&plan).expect("Generation failed");
+    let claude = wiggum::generation::claude::render(&plan).expect("claude render");
+    for (name, text) in [
+        ("vscode", &artifacts.orchestrator_vscode),
+        ("opencode", &artifacts.orchestrator_opencode),
+        ("root", &artifacts.orchestrator_root),
+        ("claude", &claude),
+    ] {
+        assert_lines_present(name, text, &APPROVAL_RULE_LINES);
+        assert_lines_present(name, text, &[APPROVAL_RECORD_LINE]);
+    }
+    // The vscode and opencode files also carry the subagent prompt, which
+    // repeats the rules so a subagent dispatched alone still sees them.
+    for (name, text) in [
+        ("vscode", &artifacts.orchestrator_vscode),
+        ("opencode", &artifacts.orchestrator_opencode),
+    ] {
+        let count = text.lines().filter(|l| *l == "## Approvals").count();
+        assert_eq!(count, 2, "{name}: orchestrator and subagent sections");
+    }
+}
+
+#[test]
+fn gate_step_records_confirmation_in_approvals_table() {
+    let plan = load_example_plan();
+    let artifacts = generation::generate_all(&plan).expect("Generation failed");
+    let vscode_lines = [
+        "   Record that confirmation as a row in the **Approvals** table in PROGRESS.md, using the",
+        "   gate's `Scope:` line as the scope when the banner has one.",
+    ];
+    let opencode_lines = [
+        "   and **stop**. The human must confirm before you proceed. Record that confirmation as a row",
+        "   in the **Approvals** table in `PROGRESS.md`, using the gate's `Scope:` line as the scope",
+        "   when the banner has one.",
+    ];
+    let root_line = "1. **Gate check.** If the task file begins with `⛔ GATE`, emit the banner verbatim and stop. The human must confirm; record that confirmation as a row in the **Approvals** table in `PROGRESS.md` (scope from the banner's `Scope:` line when present).";
+    assert_lines_present(
+        "vscode gate step (confirmation recorded in Approvals)",
+        &artifacts.orchestrator_vscode,
+        &vscode_lines,
+    );
+    assert_lines_present(
+        "opencode gate step (confirmation recorded in Approvals)",
+        &artifacts.orchestrator_opencode,
+        &opencode_lines,
+    );
+    assert_lines_present(
+        "ORCHESTRATOR.md gate step (confirmation recorded in Approvals)",
+        &artifacts.orchestrator_root,
+        &[root_line],
+    );
+}
+
+#[test]
+fn progress_approvals_note_names_prompts_for_every_target() {
+    let plan = load_example_plan();
+    let artifacts = generation::generate_all(&plan).expect("Generation failed");
+    assert!(
+        artifacts
+            .progress
+            .contains("generated orchestrator or CLAUDE.md prompt says what an approval covers"),
+        "PROGRESS approvals note must name CLAUDE.md as well as the orchestrator"
+    );
+}
+
+#[test]
+fn progress_has_approvals_table_and_still_parses() {
+    let plan = load_example_plan();
+    let artifacts = generation::generate_all(&plan).expect("Generation failed");
+    let lines: Vec<&str> = artifacts.progress.lines().collect();
+    let header = lines
+        .iter()
+        .position(|l| *l == "| Scope | Action | Approved by | Expires |")
+        .expect("approvals table header line");
+    assert_eq!(lines[header + 1], "|---|---|---|---|");
+    let approvals = lines.iter().position(|l| *l == "## Approvals").unwrap();
+    let baseline = lines
+        .iter()
+        .position(|l| *l == "## Known baseline failures")
+        .unwrap();
+    let learnings = lines
+        .iter()
+        .position(|l| *l == "## Accumulated Learnings")
+        .unwrap();
+    assert!(baseline < approvals && approvals < header && header < learnings);
+    assert!(lines.contains(&"_None recorded._"));
+
+    let summary = wiggum::domain::report::parse_progress(&artifacts.progress);
+    let resolved = plan.resolve_tasks().expect("resolve");
+    assert_eq!(summary.tasks.len(), resolved.len());
+    assert!(
+        summary
+            .tasks
+            .iter()
+            .all(|t| !t.title.contains("Approved by"))
+    );
+}
+
+#[test]
+fn gate_scope_renders_in_task_banner_only_when_set() {
+    let mut plan = load_example_plan();
+    plan.phases[0].tasks[0].gate = Some("deploy".to_string());
+    let without = generation::generate_all(&plan).expect("Generation failed");
+    assert!(
+        !without.tasks[0]
+            .1
+            .lines()
+            .any(|l| l.starts_with("> Scope:"))
+    );
+
+    plan.phases[0].tasks[0].gate_scope = Some("T01, staging only".to_string());
+    let with = generation::generate_all(&plan).expect("Generation failed");
+    let lines: Vec<&str> = with.tasks[0].1.lines().collect();
+    let cat = lines
+        .iter()
+        .position(|l| l.starts_with("> Category: `deploy`"))
+        .expect("category line");
+    assert_eq!(lines[cat + 1], "> Scope: T01, staging only");
+    assert_eq!(lines[cat + 2], ">");
+}
+
+#[test]
+fn blank_gate_scope_renders_no_scope_line() {
+    let mut plan = load_example_plan();
+    plan.phases[0].tasks[0].gate = Some("deploy".to_string());
+    plan.phases[0].tasks[0].gate_scope = Some("   ".to_string());
+    let art = generation::generate_all(&plan).expect("Generation failed");
+    assert!(!art.tasks[0].1.lines().any(|l| l.starts_with("> Scope:")));
+}
+
+#[test]
+fn approval_row_in_generated_progress_is_not_counted_as_a_task() {
+    let plan = load_example_plan();
+    let art = generation::generate_all(&plan).expect("Generation failed");
+    let expected = plan.resolve_tasks().expect("resolve").len();
+    let row =
+        "| T02 — staging payment sandbox | run capture against sandbox | alice | end of T02 |";
+    let progress = art.progress.replace(
+        "|---|---|---|---|\n",
+        &format!("|---|---|---|---|\n{row}\n"),
+    );
+    assert!(progress.lines().any(|l| l == row), "row was inserted");
+    let summary = wiggum::domain::report::parse_progress(&progress);
+    assert_eq!(summary.tasks.len(), expected);
+    assert!(
+        summary
+            .tasks
+            .iter()
+            .all(|t| t.title != "staging payment sandbox")
+    );
+}
+
+/// Collect every `*.toml` file under `dir`, recursively.
+fn collect_toml_files(dir: &std::path::Path, out: &mut Vec<PathBuf>) {
+    let entries = std::fs::read_dir(dir).expect("read shipped plan dir");
+    for entry in entries {
+        let path = entry.expect("dir entry").path();
+        if path.is_dir() {
+            collect_toml_files(&path, out);
+        } else if path.extension().is_some_and(|e| e == "toml") {
+            out.push(path);
+        }
+    }
+}
+
+/// Every shipped plan that configures an `[evaluator]` must pin a model that
+/// differs from the implementer's, so the `evaluator-not-independent` lint
+/// stays quiet on the fixtures, reference plans (including the example
+/// workspace) and golden plans. Plans are found by a recursive directory scan;
+/// TOML files that do not parse as a `Plan` (hints, workspace manifests) are
+/// skipped. All offenders are reported together.
+#[test]
+fn shipped_plans_have_independent_evaluators() {
+    const EXPECTED_PLANS: usize = 15;
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let mut files = Vec::new();
+    for dir in ["tests/fixtures", "tests/golden", "reference"] {
+        collect_toml_files(&root.join(dir), &mut files);
+    }
+    files.sort();
+
+    let mut checked = Vec::new();
+    let mut offenders = Vec::new();
+    for path in &files {
+        let text = std::fs::read_to_string(path).expect("read toml");
+        let Ok(plan) = Plan::from_toml(&text) else {
+            continue;
+        };
+        let resolved = plan.resolve_tasks().expect("resolve");
+        let diags = wiggum::domain::lint::lint_plan(&plan, &resolved);
+        checked.push(path.display().to_string());
+        if diags.iter().any(|d| d.rule == "evaluator-not-independent") {
+            offenders.push(path.display().to_string());
+        }
+    }
+    assert!(
+        checked.len() >= EXPECTED_PLANS,
+        "expected at least {EXPECTED_PLANS} shipped plans, checked {}: {checked:#?}",
+        checked.len()
+    );
+    assert!(
+        offenders.is_empty(),
+        "plans raising evaluator-not-independent: {offenders:#?}"
     );
 }

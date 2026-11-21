@@ -58,6 +58,7 @@ rules = [
 | `on_failure` | No | `pause` | Action taken when a task exhausts `max_retries`: `pause`, `skip`, or `escalate` |
 | `model` | No | — | Recommended model identifier (e.g. `"claude-opus-4.7"`, `"gpt-5"`, `"gemini-2.5-pro"`) for the orchestrator agent itself. Rendered as a header note in `orchestrator.prompt.md`; Wiggum cannot enforce the picker choice from a prompt file. |
 | `subagent_model` | No | — | Model identifier passed as `model:` to every `runSubagent` call the orchestrator dispatches for implementation work. Lets you run the orchestrator on a stronger model (e.g. Opus) while implementation subagents use a cheaper one (e.g. Sonnet or Haiku). |
+| `stop_when` | No | `[]` | Extra situations in which the orchestrator must stop and ask the human. Listed after the built-in defaults in the **Stop and ask** section. |
 | `rules` | No | | Project-specific rules included in each subagent prompt. Appended after the automatic security rules from the language profile. |
 
 ### Failure actions
@@ -76,6 +77,31 @@ max_retries = 3
 on_failure  = "escalate"
 ```
 
+### Stop and ask
+
+Every generated orchestrator (`orchestrator.prompt.md`, the opencode agent, `ORCHESTRATOR.md`) and `CLAUDE.md` contains a **Stop and ask** section. It always lists these defaults:
+
+- before deleting important data
+- before force-pushing
+- before modifying external systems
+- before any other destructive operation
+- before a decision that needs the human's approval
+
+followed by the plan's `stop_when` entries, and ends with "Keep working when the next step does not need the human's input." A plan without `stop_when` gets only the defaults. A custom template override must contain `{{ stop_section }}`, or the section is omitted. Each entry must be a non-empty single line.
+
+```toml
+[orchestrator]
+stop_when = ["before changing the public API", "before bumping a dependency major version"]
+```
+
+### Known baseline failures
+
+The generated orchestrator runs the preflight once before the first task and records any failures under **Known baseline failures** in `PROGRESS.md`. Afterwards a task passes preflight when it shows no failure that is not in the baseline. Tasks may remove entries from the baseline but never add them. Your `[preflight]` commands are not changed. When the baseline is clean, this is the same as the previous behaviour: preflight must pass.
+
+### Approvals
+
+The **Approvals** section appears in four generated files: `.vscode/orchestrator.prompt.md`, `.opencode/agents/orchestrator.md`, the root `ORCHESTRATOR.md` and `CLAUDE.md` (the VS Code and OpenCode orchestrators also embed it in their subagent prompt). The evaluator, planner and background-auditor prompts, `AGENTS.md` and the agent-rules files do not carry it. The section says: an approval applies only to its recorded scope, an approval for a test or staging action never authorizes a production action, an approval is never reused for another task or environment, an unclear or missing scope means stop and ask, and every human approval is recorded as a row in the **Approvals** table in `PROGRESS.md`. An approval expires at the end of the task it was given for unless its row says otherwise. A custom template override must contain `{{ approvals_section }}`, or the section is omitted. Set `gate_scope` on a gated task to print the scope in its gate banner.
+
 ### Model selection
 
 By default the orchestrator, every implementation subagent, and the evaluator all
@@ -90,8 +116,12 @@ model          = "claude-opus-4.7"     # orchestrator agent (recommendation head
 subagent_model = "claude-sonnet-4.5"   # every runSubagent call for implementation
 
 [evaluator]
-model          = "claude-sonnet-4.5"   # evaluator agent
+model          = "claude-opus-4.7"     # evaluator agent; keep it different from subagent_model
 ```
+
+Keep `[evaluator] model` different from `[orchestrator] subagent_model` so the
+evaluator is independent of the implementer; see
+[Evaluator configuration](#evaluator-configuration).
 
 How each field is applied depends on the active [target](./targets.md):
 
@@ -194,7 +224,22 @@ persona        = "You are a skeptical QA engineer"
 pass_threshold = 7
 hard_fail      = true
 test_tool      = "cargo test --workspace"
+model          = "claude-opus-4.7"   # differs from [orchestrator] subagent_model
 ```
+
+### Evaluator independence
+
+Set `[evaluator] model` to a different model from `[orchestrator] subagent_model`.
+With no evaluator model the evaluator inherits the dispatcher's model, and with the
+same model the code is graded by the model that wrote it. `wiggum validate --lint`
+warns in both cases, with either `evaluator has no [evaluator] model, so it inherits
+the dispatcher's model...` or `[evaluator] model (...) is the same as
+[orchestrator] subagent_model...`. Comparison ignores case and surrounding
+whitespace, and an empty string counts as unset. A plan with no `[evaluator]` is not
+reported. `evaluator-not-independent` is the rule id the MCP lint tool and the
+test suite use; the CLI prints only the warning text. The Claude target renders no
+model fields (see [Model selection](#model-selection)), so the pin only changes the
+vscode and opencode outputs.
 
 ### Fields
 
@@ -204,7 +249,7 @@ test_tool      = "cargo test --workspace"
 | `pass_threshold` | No | `7` | Minimum score (0–10) for a criterion to pass |
 | `hard_fail` | No | `false` | If `true`, abort the loop on any failed criterion |
 | `test_tool` | No | Inherits `preflight.test` | Command the evaluator uses to run the test suite |
-| `model` | No | — | Model identifier for the evaluator agent. Rendered as a header note in `evaluator.prompt.md` and passed as `model:` when the orchestrator dispatches the evaluator via `runSubagent`. |
+| `model` | No | — | Model identifier for the evaluator agent; should differ from `[orchestrator] subagent_model` (see [Evaluator independence](#evaluator-independence)). Rendered as a header note in `evaluator.prompt.md` and passed as `model:` when the orchestrator dispatches the evaluator via `runSubagent`. |
 
 ## Security configuration
 

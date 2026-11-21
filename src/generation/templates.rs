@@ -162,6 +162,21 @@ const PROGRESS_TEMPLATE: &str = r"# {{ project_name }} — Implementation Progre
 ---
 {% endfor %}
 
+## Known baseline failures
+
+> The orchestrator records preflight failures that exist before the first task.
+> Tasks may remove entries from this list but must never add to it.
+
+_None recorded._
+
+## Approvals
+
+> Record every human approval here before acting on it. The Approvals section of the
+> generated orchestrator or CLAUDE.md prompt says what an approval covers.
+
+| Scope | Action | Approved by | Expires |
+|---|---|---|---|
+
 ## Accumulated Learnings
 
 > Subagents append discoveries here after each task.
@@ -208,12 +223,15 @@ You are an orchestration agent. Your sole job is to drive subagents to implement
 ## Setup
 
 1. Read PROGRESS.md to understand current state.
-2. If PROGRESS.md does not exist, fail immediately — it should have been created.{% if has_capabilities %}
-3. Read every file in `capabilities/` — these are the behavioural contracts the
+2. If PROGRESS.md does not exist, fail immediately — it should have been created.
+{% if has_capabilities %}3. Read every file in `capabilities/` — these are the behavioural contracts the
    project must satisfy. Subagents may reference them by slug; the orchestrator
    is the one that has the full picture. The current plan declares
    {{ capability_count }} capability(ies).
-{% endif %}
+{% endif %}{% if has_capabilities %}4{% else %}3{% endif %}. **Record the baseline** — only if the placeholder `_None recorded._` is still under **Known baseline failures**
+   in PROGRESS.md. Run the preflight once, before the first task, and replace the placeholder with the failing
+   commands and messages, or with `None (clean, recorded before T01)` if everything passes. Once the placeholder
+   is gone, never run or re-record the baseline, and never record failures that appear after a task has started.
 
 ## Implementation loop
 
@@ -223,6 +241,8 @@ Repeat until all tasks (T01–T{{ task_count_padded }}) in PROGRESS.md are `[x]`
 2. Find the next task that is `[ ]` and whose dependencies are all `[x]`.
 3. **Check for a gate** — if the task file begins with a `⛔ GATE` banner, emit it verbatim
    and **stop**. The human must confirm (e.g. by restarting the orchestrator) before you proceed.
+   Record that confirmation as a row in the **Approvals** table in PROGRESS.md, using the
+   gate's `Scope:` line as the scope when the banner has one.
 4. Mark it `[~]` in PROGRESS.md.
 5. **Extract context for the subagent** — read PROGRESS.md and copy out the full text of
    the **Accumulated Learnings** section and the **Codebase State** section verbatim.
@@ -237,7 +257,13 @@ Repeat until all tasks (T01–T{{ task_count_padded }}) in PROGRESS.md are `[x]`
    ```bash
    {{ preflight_build }} && {{ preflight_test }} && {{ preflight_lint }}
    ```
-   Do not accept a task as done if preflight fails, regardless of what the subagent reports.{% if has_evaluator %}
+   Preflight must not show any failure that is not in **Known baseline failures**. A task may
+   remove entries from the baseline but never add them.
+   Then run every command listed as `Verify:` in the task file's Exit Criteria, from the
+   repository root. Each must exit zero.{% if verify_tasks %}
+   Commands by task:{% for vt in verify_tasks %}
+   - T{{ vt.number }}: {% for c in vt.commands %}`{{ c }}`{% if not loop.last %}, {% endif %}{% endfor %}{% endfor %}{% endif %}
+   Do not accept a task as done if preflight shows a new failure or any verify command fails, regardless of what the subagent reports.{% if has_evaluator %}
 9. **Spawn the evaluator** — start the evaluator agent (`.vscode/evaluator.prompt.md`) with
    the task context. Wait for it to return a PASS verdict before proceeding.{% if evaluator_model %}
    When invoking `#tool:agent/runSubagent` for the evaluator, pass
@@ -256,7 +282,7 @@ When **all** tasks T01–T{{ task_count_padded }} show `[x]` in PROGRESS.md, out
 
 ## Failure handling
 
-If a task fails verification (preflight fails or evaluator returns FAIL):
+If a task fails verification (preflight shows a new failure, a `Verify:` command fails, or the evaluator returns FAIL):
 
 {% if max_retries > 0 %}- Retry the task up to **{{ max_retries }}** time(s) before applying the failure action below.
   - On each retry: reset the task to `[ ]`, spawn a fresh subagent with full failure context prepended.
@@ -279,6 +305,8 @@ When retries are exhausted, apply the configured **failure action** (`{{ on_fail
   Wait for human confirmation before resuming.
 {% endif %}
 
+{{ stop_section }}
+{{ approvals_section }}
 ## You MUST have access to the `#tool:agent/runSubagent` tool
 
 If this tool is not available, fail immediately with:
@@ -300,7 +328,6 @@ Pass `model: "{{ subagent_model }}"` on every concurrent dispatch.{% endif %}
 > If your environment supports only sequential execution, fall back to running
 > each group in dependency order.
 {% endif %}
-
 ## Session-boundary protocol
 
 When a context window ends mid-task (compaction or interrupt), before surrendering:
@@ -345,7 +372,7 @@ Follow the Red-Green-Refactor cycle strictly:
     ```bash
     {{ preflight_build }} && {{ preflight_test }} && {{ preflight_lint }}
     ```
-    Fix all errors and warnings until preflight passes.
+    Fix every failure your change introduces until preflight shows no failure outside **Known baseline failures** in `PROGRESS.md`. Do not fix or hide baseline failures that are out of scope for this task, and never add to the baseline.
 10. Verify every exit criterion from the task file is met.
 11. Update PROGRESS.md: change `[~]` to `[x]` for this task.
 12. **Update Codebase State** in PROGRESS.md — briefly describe what now exists after this task.
@@ -374,7 +401,7 @@ Focus on must-haves. No gold-plating.
    ```bash
    {{ preflight_build }} && {{ preflight_test }} && {{ preflight_lint }}
    ```
-   Fix all errors and warnings until preflight passes.
+   Fix every failure your change introduces until preflight shows no failure outside **Known baseline failures** in `PROGRESS.md`. Do not fix or hide baseline failures that are out of scope for this task, and never add to the baseline.
 9. Verify every exit criterion from the task file is met.
 10. Update PROGRESS.md: change `[~]` to `[x]` for this task.
 11. **Update Codebase State** in PROGRESS.md — briefly describe what now exists after this task.
@@ -406,7 +433,7 @@ Complete the real fix in one pass. No workaround when the root fix is in scope.
     ```bash
     {{ preflight_build }} && {{ preflight_test }} && {{ preflight_lint }}
     ```
-    Fix all errors and warnings until preflight passes.
+    Fix every failure your change introduces until preflight shows no failure outside **Known baseline failures** in `PROGRESS.md`. Do not fix or hide baseline failures that are out of scope for this task, and never add to the baseline.
 11. Verify every exit criterion from the task file is met.
 12. Ensure no dangling threads remain inside this task's scope.
 13. Update PROGRESS.md: change `[~]` to `[x]` for this task.
@@ -438,7 +465,7 @@ Complete the real fix in one pass. No workaround when the root fix is in scope.
    ```bash
    {{ preflight_build }} && {{ preflight_test }} && {{ preflight_lint }}
    ```
-   Fix all errors and warnings until preflight passes.
+   Fix every failure your change introduces until preflight shows no failure outside **Known baseline failures** in `PROGRESS.md`. Do not fix or hide baseline failures that are out of scope for this task, and never add to the baseline.
 8. Verify every exit criterion from the task file is met.
 9. Update PROGRESS.md: change `[~]` to `[x]` for this task.
 10. **Update Codebase State** in PROGRESS.md — briefly describe what now exists after this task.
@@ -453,6 +480,7 @@ Complete the real fix in one pass. No workaround when the root fix is in scope.
 - Implement THIS TASK ONLY. Do not touch code from other tasks.
 {% for rule in rules %}- {{ rule }}
 {% endfor %}
+{{ approvals_section }}
 ## Security (non-negotiable)
 {% for rule in security_rules %}
 - {{ rule }}
@@ -514,7 +542,8 @@ Avoid patterns that reveal AI authorship.
 const TASK_TEMPLATE: &str = r#"{% if gate %}
 > ⛔ **GATE — Human confirmation required before starting this task.**
 > Category: `{{ gate }}`
->
+{% if gate_scope %}> Scope: {{ gate_scope }}
+{% endif %}>
 > The orchestrator must STOP and emit this banner verbatim. The human must
 > confirm (e.g. by restarting the orchestrator) before implementation begins.
 
@@ -751,7 +780,8 @@ If none are found, move on.
 {% if audit_cmd %}- [ ] `{{ audit_cmd }}` reports no vulnerabilities
 {% endif %}- [ ] Implementation matches the goal described above
 - [ ] No unresolved TODO/FIXME/HACK markers that belong to this task's scope
-{% if evaluation_criteria %}
+{% if verify %}{% for cmd in verify %}- [ ] Verify: `{{ cmd }}` exits with status 0
+{% endfor %}{% endif %}{% if evaluation_criteria %}
 {% for criterion in evaluation_criteria %}- [ ] {{ criterion }}
 {% endfor %}{% endif %}
 
@@ -1226,6 +1256,10 @@ You are an orchestration agent. Your sole job is to drive subagents to implement
 
 1. Read `PROGRESS.md` to understand current state.
 2. If `PROGRESS.md` does not exist, fail immediately — it should have been created by `wiggum generate`.
+3. **Record the baseline** — only if the placeholder `_None recorded._` is still under **Known baseline failures**
+   in `PROGRESS.md`. Run the preflight once, before the first task, and replace the placeholder with the failing
+   commands and messages, or with `None (clean, recorded before T01)` if everything passes. Once the placeholder
+   is gone, never run or re-record the baseline, and never record failures that appear after a task has started.
 
 ## Implementation loop
 
@@ -1234,7 +1268,9 @@ Repeat until all tasks (T01–T{{ task_count_padded }}) in `PROGRESS.md` are `[x
 1. Read `PROGRESS.md`.
 2. Find the next task that is `[ ]` and whose dependencies are all `[x]`.
 3. **Check for a gate** — if the task file begins with a `⛔ GATE` banner, emit it verbatim
-   and **stop**. The human must confirm before you proceed.
+   and **stop**. The human must confirm before you proceed. Record that confirmation as a row
+   in the **Approvals** table in `PROGRESS.md`, using the gate's `Scope:` line as the scope
+   when the banner has one.
 4. Mark it `[~]` in `PROGRESS.md`.
 5. **Extract context for the subagent** — read `PROGRESS.md` and copy out the full text of
    the **Accumulated Learnings** section, the **Codebase State** section, and the
@@ -1251,7 +1287,14 @@ Repeat until all tasks (T01–T{{ task_count_padded }}) in `PROGRESS.md` are `[x
    {{ preflight_build }} && {{ preflight_test }} && {{ preflight_lint }}
    ```
 
-   Do not accept a task as done if preflight fails, regardless of what the subagent reports.
+   Preflight must not show any failure that is not in **Known baseline failures**. A task may
+   remove entries from the baseline but never add them.
+
+   Then run every command listed as `Verify:` in the task file's Exit Criteria, from the
+   repository root. Each must exit zero.{% if verify_tasks %}
+   Commands by task:{% for vt in verify_tasks %}
+   - T{{ vt.number }}: {% for c in vt.commands %}`{{ c }}`{% if not loop.last %}, {% endif %}{% endfor %}{% endfor %}{% endif %}
+   Do not accept a task as done if preflight shows a new failure or any verify command fails, regardless of what the subagent reports.
 {% if has_evaluator %}
 9. **Spawn the evaluator** — dispatch the `evaluator` subagent via `task` (see
    `.opencode/agents/evaluator.md`) with the task slug and goal. Wait for a PASS verdict
@@ -1272,7 +1315,7 @@ When **all** tasks T01–T{{ task_count_padded }} show `[x]` in `PROGRESS.md`, o
 
 ## Failure handling
 
-If a task fails verification (preflight fails or evaluator returns FAIL):
+If a task fails verification (preflight shows a new failure, a `Verify:` command fails, or the evaluator returns FAIL):
 
 {% if max_retries > 0 %}- Retry the task up to **{{ max_retries }}** time(s) before applying the failure action below.
   - On each retry: reset the task to `[ ]`, spawn a fresh subagent with full failure context prepended.
@@ -1294,7 +1337,8 @@ When retries are exhausted, apply the configured **failure action** (`{{ on_fail
   - Suggested fix based on the evaluation output
   Wait for human confirmation before resuming.
 {% endif %}
-{% if parallel_groups | length > 1 %}
+{{ stop_section }}
+{{ approvals_section }}{% if parallel_groups | length > 1 %}
 ## Parallel execution groups
 
 Tasks in the same group have no intra-group dependencies and may be dispatched
@@ -1308,7 +1352,6 @@ tasks simultaneously using separate `task` tool calls (each with a unique
 > If your environment supports only sequential execution, fall back to running
 > each group in dependency order.
 {% endif %}
-
 ## Session-boundary protocol
 
 When a context window ends mid-task (compaction or interrupt), before surrendering:
@@ -1357,7 +1400,7 @@ You are a senior software engineer with deep familiarity with the project's rule
    {{ preflight_build }} && {{ preflight_test }} && {{ preflight_lint }}
    ```
 
-   Fix all errors and warnings until preflight passes.
+   Fix every failure your change introduces until preflight shows no failure outside **Known baseline failures** in `PROGRESS.md`. Do not fix or hide baseline failures that are out of scope for this task, and never add to the baseline.
 8. Verify every exit criterion from the task file is met.
 9. Update `PROGRESS.md`: change `[~]` to `[x]` for this task.
 10. **Update Codebase State** in `PROGRESS.md` — briefly describe what now exists after this task.
@@ -1371,6 +1414,7 @@ You are a senior software engineer with deep familiarity with the project's rule
 - Implement THIS TASK ONLY. Do not touch code from other tasks.
 {% for rule in rules %}- {{ rule }}
 {% endfor %}
+{{ approvals_section }}
 ## Security (non-negotiable)
 {% for rule in security_rules %}
 - {{ rule }}
@@ -1517,11 +1561,11 @@ The orchestrator only dispatches a task when all its `depends_on` slugs are `[x]
 
 For each `[ ]` task whose dependencies are `[x]`:
 
-1. **Gate check.** If the task file begins with `⛔ GATE`, emit the banner verbatim and stop. The human must confirm.
+1. **Gate check.** If the task file begins with `⛔ GATE`, emit the banner verbatim and stop. The human must confirm; record that confirmation as a row in the **Approvals** table in `PROGRESS.md` (scope from the banner's `Scope:` line when present).
 2. **Claim.** Mark `[~]` in `PROGRESS.md`.
 3. **Extract context.** Copy the full **Accumulated Learnings**, **Codebase State**, and **Completion Standard** sections out of `PROGRESS.md`.
 4. **Dispatch implementation.** Spawn a `general` subagent via `task(subagent_type="general", prompt=<SUBAGENT_PROMPT with injected context>)`. The subagent implements and runs preflight.
-5. **Independent preflight.** Orchestrator runs the same preflight itself. If it fails, the subagent's `[x]` claim is rejected — mark `[!]` and retry.
+5. **Independent preflight.** Orchestrator runs the same preflight itself (no failure outside **Known baseline failures** is allowed), then every `Verify:` command listed in the task file's Exit Criteria (each must exit zero){% if verify_tasks %}: {% for vt in verify_tasks %}T{{ vt.number }} {% for c in vt.commands %}`{{ c }}`{% if not loop.last %}, {% endif %}{% endfor %}{% if not loop.last %}; {% endif %}{% endfor %}{% endif %}. If any fails, the subagent's `[x]` claim is rejected — mark `[!]` and retry.
 6. **Evaluator.** Spawn `evaluator` subagent. Weighted rubric must score ≥ {{ pass_threshold }}/10; hard-fail mode on.
 7. **Background auditor.** Spawn `background-auditor` subagent. Findings are recorded in `PROGRESS.md` notes.
 8. **Verify.** Confirm the task is `[x]` in `PROGRESS.md`. If not, mark `[!]` and continue to the next task (failures don't block unrelated tasks).
@@ -1531,6 +1575,8 @@ After {{ max_retries }} retries with preflight or evaluator failure, the orchest
 and emits a `⛔ Task T{NN} failed after {{ max_retries }} retries. Human intervention required.`
 banner.
 
+{{ stop_section }}
+{{ approvals_section }}
 ## Preflight
 
 The preflight is a single command, called out verbatim in every agent prompt:
@@ -1541,6 +1587,11 @@ The preflight is a single command, called out verbatim in every agent prompt:
 
 The full command lives in `[preflight]` of the plan TOML. **Never loosen any flag
 to make a task pass — fix the code.**
+
+Before the first task the orchestrator runs the preflight once and records any failures under
+**Known baseline failures** in `PROGRESS.md`. A task passes preflight when it shows no failure
+that is not in that baseline; tasks may remove baseline entries but never add them. A clean
+baseline is the same as requiring preflight to pass.
 
 ## Evaluator rubric
 
@@ -2050,16 +2101,18 @@ Avoid patterns that reveal AI authorship.
 3. Mark it `[~]` (in-progress) before any code changes.
 4. Read the task file `tasks/T{NN}-{slug}.md` for goal, hints, test hints, must-haves, and exit criteria.
 5. Implement the task end-to-end. Touch only files within the task's scope.
-6. Run preflight. Fix every error and warning until preflight passes.
+6. Run preflight and any `Verify:` commands in the task's Exit Criteria. Fix every error and warning until preflight shows no failure outside **Known baseline failures** in `PROGRESS.md`.
 7. Update `PROGRESS.md`: change `[~]` to `[x]`; append any learnings to "Accumulated Learnings"; update "Codebase State" with what now exists.
 8. Commit with a conventional-commits message focused on user impact.
 9. Repeat from step 1.
 
 {% if max_retries > 0 %}
-On a preflight failure or `[!]` outcome, the task resets to `[ ]` for up to **{{ max_retries }}** retries before escalation.
+On a new preflight failure (one not already listed under **Known baseline failures**) or a `[!]` outcome, the task resets to `[ ]` for up to **{{ max_retries }}** retries before escalation.
 {% else %}
 No retries are configured; treat the first failure as the only chance.
 {% endif %}
+{{ stop_section }}
+{{ approvals_section }}
 ## Strategy
 
 {% if strategy == "tdd" %}

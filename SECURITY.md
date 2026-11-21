@@ -4,9 +4,9 @@
 
 | Version | Supported |
 |---------|-----------|
-| 0.7.x   | Yes       |
-| 0.6.x   | Yes       |
-| < 0.6.0 | No        |
+| 0.24.x  | Yes       |
+| 0.23.x  | Yes       |
+| < 0.23.0 | No        |
 
 ## Reporting a vulnerability
 
@@ -36,6 +36,7 @@ Wiggum is a scaffold generator that reads TOML plan files and writes markdown ar
 - **Token permissions** — GitHub Actions use minimal required permissions (least privilege)
 - **Release-chain hardening** — Auto-tag runs only after CI succeeds on `main`; release publishing is gated on CI success for the tagged SHA
 - **Dangerous workflow protection** — No `pull_request_target`; `workflow_run` is used only for non-privileged chaining (no token escalation)
+- **Approval-record integrity** — The MCP progress writer rewrites only task rows in task sections. Rows under `## Approvals`, `## Known baseline failures` and `## Session handoff` are left byte-identical, so a recorded human approval cannot be overwritten by a status update
 
 ## Recommendations for maintainers
 

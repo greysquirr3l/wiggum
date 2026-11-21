@@ -60,6 +60,11 @@ pub fn lint_plan(plan: &Plan, resolved: &[ResolvedTask]) -> Vec<Diagnostic> {
     lint_orphan_task(resolved, &mut diagnostics);
     lint_missing_arch(plan, &mut diagnostics);
     lint_wide_fan_out(resolved, &mut diagnostics);
+    lint_no_verification(resolved, &mut diagnostics);
+    lint_weak_criteria(resolved, &mut diagnostics);
+    lint_gate_without_scope(resolved, &mut diagnostics);
+    lint_gate_scope_without_gate(resolved, &mut diagnostics);
+    lint_evaluator_not_independent(plan, &mut diagnostics);
     lint_capability_unused(plan, &mut diagnostics);
     lint_capability_no_scenarios(plan, &mut diagnostics);
     lint_capability_no_requirements(plan, &mut diagnostics);
@@ -145,6 +150,104 @@ fn compute_depth<'a>(
     });
     cache.insert(slug, max_parent);
     max_parent
+}
+
+/// Warning: a task with no `verify` commands, no `evaluation_criteria` and no
+/// `must_haves` gives the orchestrator nothing to check beyond preflight.
+fn lint_no_verification(tasks: &[ResolvedTask], out: &mut Vec<Diagnostic>) {
+    for t in tasks {
+        if t.verify.is_empty() && t.evaluation_criteria.is_empty() && t.must_haves.is_empty() {
+            out.push(Diagnostic {
+                severity: Severity::Warning,
+                rule: "no-verification",
+                message: format!(
+                    "T{:02}-{}: no verify, evaluation_criteria or must_haves — completion can only be judged by preflight",
+                    t.number, t.slug
+                ),
+            });
+        }
+    }
+}
+
+/// Info: a gated task whose approval has no recorded scope. Without one, a
+/// confirmation given for a test run can be read as covering a deployment.
+fn lint_gate_without_scope(tasks: &[ResolvedTask], out: &mut Vec<Diagnostic>) {
+    for t in tasks {
+        if t.gate.is_some() && t.effective_gate_scope().is_none() {
+            out.push(Diagnostic {
+                severity: Severity::Info,
+                rule: "gate-without-scope",
+                message: format!(
+                    "T{:02}-{}: gate has no gate_scope — name the task and environment the approval covers",
+                    t.number, t.slug
+                ),
+            });
+        }
+    }
+}
+
+/// Info: `gate_scope` on a task with no `gate`. The scope is only rendered in
+/// the gate banner, so it is silently dropped. Info rather than warning: it is
+/// harmless to output and usually means the `gate` line was removed or not yet
+/// written.
+fn lint_gate_scope_without_gate(tasks: &[ResolvedTask], out: &mut Vec<Diagnostic>) {
+    for t in tasks {
+        if t.gate.is_none() && t.effective_gate_scope().is_some() {
+            out.push(Diagnostic {
+                severity: Severity::Info,
+                rule: "gate-scope-without-gate",
+                message: format!(
+                    "T{:02}-{}: gate_scope is set but the task has no gate, so the scope is not rendered",
+                    t.number, t.slug
+                ),
+            });
+        }
+    }
+}
+
+/// True when a criterion names something checkable. The heuristic is
+/// deliberately crude: a backtick span (a command or identifier), a path
+/// separator, a `name.ext` file token, a `--flag` or `::` path (unquoted
+/// commands and identifiers), or any digit (a measurable threshold) counts as
+/// concrete. Anything else is treated as prose.
+fn criterion_is_concrete(criterion: &str) -> bool {
+    if criterion.contains('`')
+        || criterion.contains('/')
+        || criterion.contains(" --")
+        || criterion.contains("::")
+    {
+        return true;
+    }
+    if criterion.chars().any(|c| c.is_ascii_digit()) {
+        return true;
+    }
+    criterion.split_whitespace().any(|word| {
+        let word = word.trim_matches(|c: char| !c.is_alphanumeric());
+        word.split_once('.').is_some_and(|(stem, ext)| {
+            !stem.is_empty()
+                && (1..=5).contains(&ext.len())
+                && ext.chars().all(|c| c.is_ascii_alphanumeric())
+        })
+    })
+}
+
+/// Info: `evaluation_criteria` entries with no command, file path or
+/// measurable condition (see [`criterion_is_concrete`]).
+fn lint_weak_criteria(tasks: &[ResolvedTask], out: &mut Vec<Diagnostic>) {
+    for t in tasks {
+        for criterion in &t.evaluation_criteria {
+            if !criterion_is_concrete(criterion) {
+                out.push(Diagnostic {
+                    severity: Severity::Info,
+                    rule: "weak-criteria",
+                    message: format!(
+                        "T{:02}-{}: criterion \"{criterion}\" names no command, file path or measurable condition",
+                        t.number, t.slug
+                    ),
+                });
+            }
+        }
+    }
 }
 
 /// Error: Task has an empty goal.
@@ -358,6 +461,40 @@ fn lint_wide_fan_out(tasks: &[ResolvedTask], out: &mut Vec<Diagnostic>) {
     }
 }
 
+/// Normalise a model name for comparison: trimmed, lower-cased, and `None`
+/// when empty.
+fn normalized_model(model: Option<&String>) -> Option<String> {
+    model
+        .map(|m| m.trim().to_lowercase())
+        .filter(|m| !m.is_empty())
+}
+
+/// Warning: The evaluator is configured but is not guaranteed to run on a
+/// different model from the implementer. With no `[evaluator] model` the
+/// evaluator inherits the dispatcher's model, and with the same model as
+/// `[orchestrator] subagent_model` the assistant grades its own work. A plan
+/// with no `[evaluator]` at all is not reported here.
+fn lint_evaluator_not_independent(plan: &Plan, out: &mut Vec<Diagnostic>) {
+    let Some(evaluator) = &plan.evaluator else {
+        return;
+    };
+    let eval_model = normalized_model(evaluator.model.as_ref());
+    let impl_model = normalized_model(plan.orchestrator.subagent_model.as_ref());
+    let message = match eval_model {
+        None => "evaluator has no `[evaluator] model`, so it inherits the dispatcher's model and the same model writes and grades the work; set `[evaluator] model` to a different model than `[orchestrator] subagent_model`".to_string(),
+        Some(m) if Some(&m) == impl_model.as_ref() => format!(
+            "`[evaluator] model` (`{}`) is the same as `[orchestrator] subagent_model`, so the model that writes the code also grades it; set `[evaluator] model` to a different model",
+            evaluator.model.as_deref().unwrap_or_default().trim()
+        ),
+        Some(_) => return,
+    };
+    out.push(Diagnostic {
+        severity: Severity::Warning,
+        rule: "evaluator-not-independent",
+        message,
+    });
+}
+
 /// Warning: A capability is declared but no task references it via
 /// `implements = [...]`. Dead capability — the contract exists but no
 /// task is accountable for satisfying it.
@@ -471,7 +608,9 @@ mod tests {
                 test_hints: t.test_hints,
                 must_haves: t.must_haves,
                 gate: t.gate,
+                gate_scope: t.gate_scope,
                 evaluation_criteria: t.evaluation_criteria,
+                verify: t.verify,
                 phase_name: "Phase 1".to_string(),
                 phase_order: 1,
                 kind: t.kind,
@@ -492,7 +631,9 @@ mod tests {
             test_hints: Vec::new(),
             must_haves: Vec::new(),
             gate: None,
+            gate_scope: None,
             evaluation_criteria: Vec::new(),
+            verify: Vec::new(),
             kind: TaskKind::default(),
             implements: Vec::new(),
             anchors: vec![],
@@ -541,7 +682,9 @@ mod tests {
                     test_hints: vec!["test".to_string()],
                     must_haves: Vec::new(),
                     gate: None,
+                    gate_scope: None,
                     evaluation_criteria: Vec::new(),
+                    verify: Vec::new(),
                     kind: TaskKind::default(),
                     implements: Vec::new(),
                     anchors: vec![],
@@ -565,7 +708,9 @@ mod tests {
                 test_hints: vec!["verify compiles".to_string()],
                 must_haves: Vec::new(),
                 gate: None,
+                gate_scope: None,
                 evaluation_criteria: Vec::new(),
+                verify: vec!["cargo build".to_string()],
                 kind: TaskKind::default(),
                 implements: Vec::new(),
                 anchors: vec![],
@@ -579,7 +724,9 @@ mod tests {
                 test_hints: vec!["unit test parsing".to_string()],
                 must_haves: Vec::new(),
                 gate: None,
+                gate_scope: None,
                 evaluation_criteria: Vec::new(),
+                verify: vec!["cargo test".to_string()],
                 kind: TaskKind::default(),
                 implements: Vec::new(),
                 anchors: vec![],
@@ -592,6 +739,117 @@ mod tests {
             .filter(|d| d.severity == Severity::Error || d.severity == Severity::Warning)
             .count();
         assert_eq!(serious, 0);
+    }
+
+    #[test]
+    fn gate_without_scope_is_info() {
+        let mut t = task("deploy", "Ship it", &[]);
+        t.gate = Some("deploy".into());
+        let (plan, resolved) = make_plan(vec![t], Some("hexagonal".into()));
+        let diags = lint_plan(&plan, &resolved);
+        assert!(
+            diags
+                .iter()
+                .any(|d| d.rule == "gate-without-scope" && d.severity == Severity::Info)
+        );
+    }
+
+    #[test]
+    fn gate_without_scope_quiet_when_scoped_or_ungated() {
+        let mut scoped = task("deploy", "Ship it", &[]);
+        scoped.gate = Some("deploy".into());
+        scoped.gate_scope = Some("T01, staging only".into());
+        let ungated = task("build", "Build it", &[]);
+        let (plan, resolved) = make_plan(vec![scoped, ungated], Some("hexagonal".into()));
+        let diags = lint_plan(&plan, &resolved);
+        assert!(!diags.iter().any(|d| d.rule == "gate-without-scope"));
+    }
+
+    #[test]
+    fn gate_without_scope_flags_blank_scope() {
+        let mut t = task("deploy", "Ship it", &[]);
+        t.gate = Some("deploy".into());
+        t.gate_scope = Some("  ".into());
+        let (plan, resolved) = make_plan(vec![t], Some("hexagonal".into()));
+        let diags = lint_plan(&plan, &resolved);
+        assert!(diags.iter().any(|d| d.rule == "gate-without-scope"));
+    }
+
+    #[test]
+    fn gate_scope_without_gate_is_info() {
+        let mut t = task("deploy", "Ship it", &[]);
+        t.gate_scope = Some("T01, staging only".into());
+        let (plan, resolved) = make_plan(vec![t], Some("hexagonal".into()));
+        let diags = lint_plan(&plan, &resolved);
+        assert!(
+            diags
+                .iter()
+                .any(|d| d.rule == "gate-scope-without-gate" && d.severity == Severity::Info)
+        );
+    }
+
+    #[test]
+    fn gate_scope_without_gate_quiet_when_gated_blank_or_absent() {
+        let mut gated = task("deploy", "Ship it", &[]);
+        gated.gate = Some("deploy".into());
+        gated.gate_scope = Some("T01, staging only".into());
+        let mut blank = task("build", "Build it", &[]);
+        blank.gate_scope = Some("   ".into());
+        let ordinary = task("lint", "Lint it", &[]);
+        let (plan, resolved) = make_plan(vec![gated, blank, ordinary], Some("hexagonal".into()));
+        let diags = lint_plan(&plan, &resolved);
+        assert!(!diags.iter().any(|d| d.rule == "gate-scope-without-gate"));
+    }
+
+    #[test]
+    fn no_verification_warns_when_nothing_to_check() {
+        let (plan, resolved) = make_plan(vec![task("a", "do a", &[])], None);
+        let diags = lint_plan(&plan, &resolved);
+        assert!(
+            diags
+                .iter()
+                .any(|d| d.rule == "no-verification" && d.severity == Severity::Warning)
+        );
+    }
+
+    #[test]
+    fn no_verification_quiet_with_verify_criteria_or_must_haves() {
+        let mut with_verify = task("a", "do a", &[]);
+        with_verify.verify = vec!["cargo test".to_string()];
+        let mut with_criteria = task("b", "do b", &[]);
+        with_criteria.evaluation_criteria = vec!["prose only".to_string()];
+        let mut with_must_haves = task("c", "do c", &[]);
+        with_must_haves.must_haves = vec!["a thing".to_string()];
+        let (plan, resolved) = make_plan(vec![with_verify, with_criteria, with_must_haves], None);
+        let diags = lint_plan(&plan, &resolved);
+        assert!(!diags.iter().any(|d| d.rule == "no-verification"));
+    }
+
+    #[test]
+    fn weak_criteria_flags_prose_only() {
+        let mut t = task("a", "do a", &[]);
+        t.evaluation_criteria = vec!["The code is clean and well designed".to_string()];
+        let (plan, resolved) = make_plan(vec![t], None);
+        let diags = lint_plan(&plan, &resolved);
+        assert!(
+            diags
+                .iter()
+                .any(|d| d.rule == "weak-criteria" && d.severity == Severity::Info)
+        );
+    }
+
+    #[test]
+    fn weak_criteria_accepts_commands_paths_and_numbers() {
+        let mut t = task("a", "do a", &[]);
+        t.evaluation_criteria = vec![
+            "`cargo test` passes".to_string(),
+            "src/main.rs exists".to_string(),
+            "Writes config.toml".to_string(),
+            "p95 latency under 200ms".to_string(),
+        ];
+        let (plan, resolved) = make_plan(vec![t], None);
+        let diags = lint_plan(&plan, &resolved);
+        assert!(!diags.iter().any(|d| d.rule == "weak-criteria"));
     }
 
     #[test]
@@ -623,6 +881,112 @@ mod tests {
         let orphan_diags: Vec<_> = diags.iter().filter(|d| d.rule == "orphan-task").collect();
         assert_eq!(orphan_diags.len(), 1);
         assert!(orphan_diags[0].message.contains("orphan"));
+    }
+
+    fn eval_plan(eval_model: Option<&str>, sub_model: Option<&str>, with_eval: bool) -> Plan {
+        let (mut plan, _) = make_plan(vec![task("t1", "build it", &[])], None);
+        if with_eval {
+            plan.evaluator = Some(crate::domain::plan::EvaluatorConfig {
+                model: eval_model.map(str::to_string),
+                ..Default::default()
+            });
+        }
+        plan.orchestrator.subagent_model = sub_model.map(str::to_string);
+        plan
+    }
+
+    fn independence_diags(plan: &Plan) -> Vec<Diagnostic> {
+        lint_plan(plan, &[])
+            .into_iter()
+            .filter(|d| d.rule == "evaluator-not-independent")
+            .collect()
+    }
+
+    #[test]
+    fn evaluator_model_unset_warns() {
+        let d = independence_diags(&eval_plan(None, Some("sonnet"), true));
+        assert_eq!(
+            d.len(),
+            1,
+            "expected exactly one evaluator-not-independent diagnostic, got {d:?}"
+        );
+        assert_eq!(d[0].severity, Severity::Warning);
+        assert!(d[0].message.contains("[evaluator] model"));
+        assert!(d[0].message.contains("inherits the dispatcher's model"));
+    }
+
+    #[test]
+    fn evaluator_model_empty_string_counts_as_unset() {
+        let d = independence_diags(&eval_plan(Some("  "), Some("sonnet"), true));
+        assert_eq!(
+            d.len(),
+            1,
+            "expected exactly one evaluator-not-independent diagnostic, got {d:?}"
+        );
+        assert!(d[0].message.contains("inherits the dispatcher's model"));
+    }
+
+    #[test]
+    fn evaluator_model_equal_to_subagent_model_warns() {
+        let d = independence_diags(&eval_plan(Some("sonnet"), Some("sonnet"), true));
+        assert_eq!(
+            d.len(),
+            1,
+            "expected exactly one evaluator-not-independent diagnostic, got {d:?}"
+        );
+        assert!(d[0].message.contains("`sonnet`"));
+        assert!(d[0].message.contains("[orchestrator] subagent_model"));
+    }
+
+    #[test]
+    fn evaluator_model_equal_ignoring_case_and_whitespace_warns() {
+        let d = independence_diags(&eval_plan(
+            Some(" Claude-Sonnet "),
+            Some("claude-sonnet"),
+            true,
+        ));
+        assert_eq!(
+            d.len(),
+            1,
+            "expected exactly one evaluator-not-independent diagnostic, got {d:?}"
+        );
+        let d = independence_diags(&eval_plan(
+            Some("claude-sonnet"),
+            Some("  CLAUDE-SONNET\t"),
+            true,
+        ));
+        assert_eq!(
+            d.len(),
+            1,
+            "expected exactly one evaluator-not-independent diagnostic, got {d:?}"
+        );
+    }
+
+    #[test]
+    fn evaluator_model_distinct_does_not_warn() {
+        assert!(independence_diags(&eval_plan(Some("opus"), Some("sonnet"), true)).is_empty());
+    }
+
+    #[test]
+    fn evaluator_pinned_with_unset_subagent_model_does_not_warn() {
+        assert!(independence_diags(&eval_plan(Some("opus"), None, true)).is_empty());
+    }
+
+    #[test]
+    fn no_evaluator_does_not_raise_independence_warning() {
+        assert!(independence_diags(&eval_plan(None, None, false)).is_empty());
+        assert!(independence_diags(&eval_plan(None, Some("sonnet"), false)).is_empty());
+    }
+
+    #[test]
+    fn both_models_unset_warns() {
+        let d = independence_diags(&eval_plan(None, None, true));
+        assert_eq!(
+            d.len(),
+            1,
+            "expected exactly one evaluator-not-independent diagnostic, got {d:?}"
+        );
+        assert!(d[0].message.contains("set `[evaluator] model`"));
     }
 
     #[test]

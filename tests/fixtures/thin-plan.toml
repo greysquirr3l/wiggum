@@ -19,9 +19,11 @@ persona     = "Test orchestrator."
 strategy    = "standard"
 max_retries = 2
 on_failure  = "pause"
+subagent_model = "claude-sonnet-4.5"
 
 [evaluator]
 persona        = "QA"
+model          = "claude-opus-4.7"
 pass_threshold = 7
 hard_fail      = false
 mode           = "blocking"

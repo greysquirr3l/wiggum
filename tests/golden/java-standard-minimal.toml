@@ -1,0 +1,30 @@
+# golden-floor: 7
+[project]
+name = "golden-java-minimal"
+description = "Golden plan: java, default strategy, deliberate no-evaluator opt-out, no verify, no stop_when (preflight-only exit criteria)."
+language = "java"
+path = "/tmp/golden-java-minimal"
+
+[orchestrator]
+require_evaluator = false
+
+[[phases]]
+name = "Core"
+order = 1
+
+[[phases.tasks]]
+slug = "model-classes"
+title = "Model classes"
+goal = "Create the model classes."
+
+[[phases.tasks]]
+slug = "service-layer"
+title = "Service layer"
+goal = "Implement the service layer."
+depends_on = ["model-classes"]
+
+[[phases.tasks]]
+slug = "main-class"
+title = "Main class"
+goal = "Add the entry point."
+depends_on = ["service-layer"]

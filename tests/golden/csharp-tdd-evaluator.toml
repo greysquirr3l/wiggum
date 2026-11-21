@@ -1,0 +1,45 @@
+# golden-floor: 8
+[project]
+name = "golden-csharp-tdd"
+description = "Golden plan: csharp, tdd strategy, evaluator, verify and stop_when."
+language = "csharp"
+path = "/tmp/golden-csharp-tdd"
+
+[orchestrator]
+strategy = "tdd"
+subagent_model = "claude-haiku-4.5"
+stop_when = ["before changing the database schema"]
+
+[evaluator]
+model = "claude-sonnet-4.5"
+
+[[phases]]
+name = "Domain"
+order = 1
+
+[[phases.tasks]]
+slug = "order-entity"
+title = "Order entity"
+goal = "Define the order entity."
+verify = ["dotnet test --filter Order"]
+
+[[phases.tasks]]
+slug = "order-repository"
+title = "Order repository"
+goal = "Add the repository abstraction."
+depends_on = ["order-entity"]
+verify = ["dotnet test --filter Repository"]
+
+[[phases.tasks]]
+slug = "order-service"
+title = "Order service"
+goal = "Implement the order service."
+depends_on = ["order-repository"]
+verify = ["dotnet test --filter Service"]
+
+[[phases.tasks]]
+slug = "order-api"
+title = "Order API"
+goal = "Expose the order service."
+depends_on = ["order-service"]
+verify = ["dotnet build"]

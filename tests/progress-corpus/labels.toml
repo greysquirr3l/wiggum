@@ -1,0 +1,277 @@
+# Hand-labelled truth for the synthetic PROGRESS.md corpus. See README.md.
+
+["small-all-done.md"]
+shape = "Clean run: no retries, no verdict headings, no blocked tasks. The word 'fix' appears in a learning but no task was retried."
+project_name = "zephyr-kv"
+tasks = 8
+completed = 8
+in_progress = 0
+blocked = 0
+not_started = 0
+phases = 2
+phase_names = ["Storage engine", "Client surface"]
+real_retries = 0
+explicit_retries = 0
+gate_tasks = []
+lessons = ["Lock files before audit: the lockfile note is housekeeping, not a retry", "Property tests find off-by-one errors in binary formats"]
+
+["small-all-done.md".verdicts]
+
+["small-all-done.md".retro_today]
+tasks = 8
+retries = 2
+gates = 0
+
+["small-all-done.md".known_defects]
+retro_retries = "retro counts keyword hits in notes and learnings (fix, failed, attempt, retry); the truth counts recorded retries only (FAIL verdict headings or explicit retry notes). T06 replaces retro with typed patches"
+
+["small-all-done.md".today]
+retro_retries = 2
+
+["large-with-evaluator-verdicts.md"]
+shape = "Large: 64 tasks across 12 phases plus an out-of-band section with 4 task rows. Verdict headings in many wordings; T33 goes FAIL, FAIL, PASS."
+project_name = "quill-mq"
+tasks = 64
+completed = 56
+in_progress = 2
+blocked = 1
+not_started = 5
+phases = 12
+phase_names = ["Wire format", "Broker core", "Persistence", "Consumers", "Delivery guarantees", "Admin plane", "Observability", "Security", "Tenancy", "Tooling", "Hardening", "Release"]
+real_retries = 4
+explicit_retries = 0
+gate_tasks = ["T12"]
+lessons = ["Snapshots must carry the offsets table (T33): record what the evaluator has to see in the task description", "Fan-out routing needs a disconnect-mid-batch test before evaluation (T47)", "Evaluator PASS on first attempt (T21) is the template for the hand-off"]
+
+["large-with-evaluator-verdicts.md".verdicts]
+T21 = ["PASS:8.8"]
+T33 = ["FAIL:6.8", "FAIL:8.3", "PASS:9.2"]
+T39 = ["PASS:9.1", "PASS:9.2"]
+T44 = ["FAIL:8.3", "PASS:9.2"]
+T47 = ["FAIL:7", "PASS:9"]
+
+["large-with-evaluator-verdicts.md".retro_today]
+tasks = 64
+retries = 3
+gates = 0
+
+["large-with-evaluator-verdicts.md".known_defects]
+retro_retries = "retro counts keyword hits in notes and learnings (fix, failed, attempt, retry); the truth counts recorded retries only (FAIL verdict headings or explicit retry notes). T06 replaces retro with typed patches"
+retro_gates = "retro counts tasks with 'gate' in the title; truth is the human-confirmation gates. T06 replaces retro"
+
+["large-with-evaluator-verdicts.md".today]
+retro_retries = 3
+retro_gates = 0
+
+["retries-and-blocked.md"]
+shape = "Retries are explicit notes only (T02 once, T03 twice = 3 real retries). T09 has 'gate' in its title but is a CI script; T10 is the one human gate."
+project_name = "tern-sync"
+tasks = 12
+completed = 5
+in_progress = 1
+blocked = 2
+not_started = 4
+phases = 3
+phase_names = ["Core sync", "Edge cases", "Release"]
+real_retries = 3
+explicit_retries = 3
+gate_tasks = ["T10"]
+lessons = ["Hash collisions on zero blocks cost two retries (T03): add a salted second hash from the start", "Blocked tasks must name what unblocks them (T05, T08)", "Path-keyed caches go stale (T02)"]
+
+["retries-and-blocked.md".verdicts]
+
+["retries-and-blocked.md".retro_today]
+tasks = 12
+retries = 2
+gates = 2
+
+["retries-and-blocked.md".known_defects]
+retro_retries = "retro counts keyword hits in notes and learnings (fix, failed, attempt, retry); the truth counts recorded retries only (FAIL verdict headings or explicit retry notes). T06 replaces retro with typed patches"
+retro_gates = "retro counts tasks with 'gate' in the title; truth is the human-confirmation gates. T06 replaces retro"
+
+["retries-and-blocked.md".today]
+retro_retries = 2
+retro_gates = 2
+
+["no-task-rows.md"]
+shape = "Free-form file: zero `| T..` rows, zero phases, no learnings section."
+project_name = "basalt-scan"
+tasks = 0
+completed = 0
+in_progress = 0
+blocked = 0
+not_started = 0
+phases = 0
+phase_names = []
+real_retries = 0
+explicit_retries = 0
+gate_tasks = []
+lessons = ["Free-form remediation lists have no task rows; a retro must report that rather than invent tasks"]
+
+["no-task-rows.md".verdicts]
+
+["no-task-rows.md".retro_today]
+tasks = 0
+retries = 0
+gates = 0
+
+["scratch-copy-weird-title.md"]
+shape = "First line is just '# Progress', so the title carries no project name. Truth name comes from the body text."
+project_name = "lumen-cli"
+tasks = 5
+completed = 2
+in_progress = 1
+blocked = 0
+not_started = 2
+phases = 2
+phase_names = ["Argument parsing", "Output"]
+real_retries = 0
+explicit_retries = 0
+gate_tasks = []
+lessons = ["A scratch copy loses its project title; tooling should fall back to the plan or directory name rather than 'Progress'"]
+
+["scratch-copy-weird-title.md".verdicts]
+
+["scratch-copy-weird-title.md".retro_today]
+tasks = 5
+retries = 0
+gates = 0
+
+["scratch-copy-weird-title.md".known_defects]
+project_name = "A scratch copy whose first line is just '# Progress' parses with the project name 'Progress'; the real name only appears in the body. T05 may add a fallback"
+
+["scratch-copy-weird-title.md".today]
+project_name = "Progress"
+
+["legacy-no-approvals.md"]
+shape = "Pre-Approvals generated shape (no baseline or Approvals sections). Phase 3 uses a hyphen heading (hand edits drift like this); one out-of-band section holds a task row (T08) that must still count."
+project_name = "ember-ledger"
+tasks = 8
+completed = 7
+in_progress = 1
+blocked = 0
+not_started = 0
+phases = 3
+phase_names = ["Ledger model", "Reporting", "Hardening"]
+real_retries = 0
+explicit_retries = 0
+gate_tasks = []
+lessons = ["Integer minor units avoid float drift", "Hand-edited phase headings drift from the generated em-dash form"]
+
+["legacy-no-approvals.md".verdicts]
+
+["legacy-no-approvals.md".retro_today]
+tasks = 8
+retries = 1
+gates = 0
+
+["legacy-no-approvals.md".known_defects]
+phases = "A phase heading written '## Phase 3 - Hardening' (hyphen, not em dash) is not recognised by parse_progress; T05 may widen the heading match"
+retro_retries = "retro counts keyword hits in notes and learnings (fix, failed, attempt, retry); the truth counts recorded retries only (FAIL verdict headings or explicit retry notes). T06 replaces retro with typed patches"
+
+["legacy-no-approvals.md".today]
+phases = 2
+retro_retries = 1
+
+["with-approvals-and-baseline.md"]
+shape = "Current generated shape. Approvals has two rows of the problem shape '| T02 -- ... |' and the baseline table has one task-shaped row; none are tasks. Truth: 5 tasks."
+project_name = "heron-deploy"
+tasks = 5
+completed = 2
+in_progress = 1
+blocked = 0
+not_started = 2
+phases = 2
+phase_names = ["Plan engine", "Apply"]
+real_retries = 0
+explicit_retries = 0
+gate_tasks = ["T05"]
+lessons = ["Approval rows that start with a task id must not be counted as tasks", "Pre-existing baseline failures belong in the baseline table, not in task notes"]
+
+["with-approvals-and-baseline.md".verdicts]
+
+["with-approvals-and-baseline.md".retro_today]
+tasks = 5
+retries = 0
+gates = 1
+
+["session-handoff-section.md"]
+shape = "Session handoff section with a task-shaped table; its two rows are not tasks. Truth: 7 tasks."
+project_name = "cinder-pack"
+tasks = 7
+completed = 5
+in_progress = 1
+blocked = 0
+not_started = 1
+phases = 2
+phase_names = ["Archive format", "Tooling"]
+real_retries = 0
+explicit_retries = 0
+gate_tasks = []
+lessons = ["Handoff tables repeat task rows and must not double count them", "Normalise paths before checking for traversal"]
+
+["session-handoff-section.md".verdicts]
+
+["session-handoff-section.md".retro_today]
+tasks = 7
+retries = 0
+gates = 0
+
+["learnings-heavy.md"]
+shape = "15 learning bullets under three '###' subsections. Exactly one real retry (T02, explicit note). Words like fix/failed/attempt/clippy/split/blocked/waiting appear in non-retry bullets."
+project_name = "marl-parse"
+tasks = 8
+completed = 7
+in_progress = 1
+blocked = 0
+not_started = 0
+phases = 2
+phase_names = ["Grammar", "Diagnostics"]
+real_retries = 1
+explicit_retries = 1
+gate_tasks = []
+lessons = ["Spans as byte offsets (T01)", "Put lint configuration in the first task of a phase (T05)", "Only T02 was a real retry; the other 'fix', 'failed', 'attempt' mentions are ordinary words"]
+
+["learnings-heavy.md".verdicts]
+
+["learnings-heavy.md".retro_today]
+tasks = 8
+retries = 4
+gates = 0
+
+["learnings-heavy.md".known_defects]
+retro_retries = "retro counts keyword hits in notes and learnings (fix, failed, attempt, retry); the truth counts recorded retries only (FAIL verdict headings or explicit retry notes). T06 replaces retro with typed patches"
+
+["learnings-heavy.md".today]
+retro_retries = 4
+
+["evaluator-fail-then-pass.md"]
+shape = "T02 FAIL then PASS; T03 FAIL, FAIL, PASS; T04 PASS. 3 real retries (3 FAIL verdicts). T05 is blocked."
+project_name = "onyx-auth"
+tasks = 6
+completed = 4
+in_progress = 0
+blocked = 1
+not_started = 1
+phases = 2
+phase_names = ["Credentials", "Policy"]
+real_retries = 3
+explicit_retries = 0
+gate_tasks = []
+lessons = ["Constant-time comparison must be in the task's acceptance criteria (T02)", "Token rotation needs a grace window and an audit event (T03)", "Give security tasks a concurrency test from the start"]
+
+["evaluator-fail-then-pass.md".verdicts]
+T02 = ["FAIL:6.4", "PASS:9"]
+T03 = ["FAIL:7.2", "FAIL:8.4", "PASS:9.1"]
+T04 = ["PASS:8.9"]
+
+["evaluator-fail-then-pass.md".retro_today]
+tasks = 6
+retries = 1
+gates = 0
+
+["evaluator-fail-then-pass.md".known_defects]
+retro_retries = "retro counts keyword hits in notes and learnings (fix, failed, attempt, retry); the truth counts recorded retries only (FAIL verdict headings or explicit retry notes). T06 replaces retro with typed patches"
+
+["evaluator-fail-then-pass.md".today]
+retro_retries = 1

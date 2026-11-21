@@ -6,6 +6,65 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [0.24.0] - 2026-11-21
+
+### Added
+
+- **Scoped approvals** — `PROGRESS.md` gains an **Approvals** table (scope, action,
+  approved by, expires), and every orchestrator variant, subagent prompt and
+  `CLAUDE.md` gets an **Approvals** section: an approval covers only its recorded
+  scope, a staging approval never authorizes production, unclear scope means stop
+  and ask. Tasks accept an optional `gate_scope`, shown as a `Scope:` line in the
+  gate banner; new lint rules `gate-without-scope` and `gate-scope-without-gate`
+  (info). The section appears in `.vscode/orchestrator.prompt.md`,
+  `.opencode/agents/orchestrator.md`, `ORCHESTRATOR.md` and `CLAUDE.md` (and in the
+  subagent prompts embedded in the VS Code and OpenCode orchestrators); evaluator,
+  planner and auditor prompts, `AGENTS.md` and agent-rules files do not carry it.
+  `wiggum report`, `resume`, `retro` and the MCP progress reader ignore rows under
+  the `## Approvals` and `## Known baseline failures` sections of `PROGRESS.md`,
+  and `wiggum diff` reports gate scope changes. Existing plans keep
+  working; custom template overrides need `{{ approvals_section }}` to include
+  the section.
+- **Evaluator independence lint** — new warning (rule id `evaluator-not-independent`,
+  shown by the MCP lint tool; the CLI prints only the message) in
+  `wiggum validate --lint` when `[evaluator]` has no `model` ("evaluator has no
+  `[evaluator] model`, so it inherits the dispatcher's model...") or the same model
+  as `[orchestrator] subagent_model` ("`[evaluator] model` (...) is the same as
+  `[orchestrator] subagent_model`..."), case and whitespace ignored. All shipped
+  plans (fixtures, golden, reference and the example workspace) now pin distinct
+  evaluator and subagent models, enforced by a directory-scanning test. See
+  Evaluator configuration in the preflight docs.
+- **Golden plan corpus** — `tests/golden/` plans and `tests/golden_test.rs` check score
+  floors, the Stop and ask section, Exit Criteria commands and unrendered template
+  markers for every generated scaffold. Test-only; no change to generated output.
+- **Executable per-task verification** — tasks accept `verify = ["cargo test --test foo"]`.
+  The commands appear as `Verify:` items in the task file's Exit Criteria and the
+  orchestrator's independent verification step (VS Code, OpenCode and root
+  orchestrators) runs them after preflight. New lint rules `no-verification`
+  (warning) and `weak-criteria` (info), and a Verifiability dimension in
+  `wiggum check` (weights rebalanced; they still sum to 100%).
+- **Stop and ask section** — `[orchestrator] stop_when = [...]` adds plan-specific
+  stop conditions. Every orchestrator variant and `CLAUDE.md` now lists a default
+  set (destructive operations, force-push, external systems, human approvals)
+  followed by the plan's entries. Existing plans get the defaults only.
+- **Baseline-aware preflight** — the orchestrator runs the preflight once before the
+  first task and records failures under **Known baseline failures** in `PROGRESS.md`;
+  a task then passes when it adds no failure outside that baseline. A clean
+  baseline behaves as before. Template-only; preflight commands are unchanged.
+  Failure handling and `CLAUDE.md` step 6 now also mention `Verify:` commands and the baseline.
+
+### Fixed
+
+- **Approval rows are no longer rewritten by the progress writer** — `wiggum_update_progress` (MCP) matched any row beginning with a task id, so an **Approvals** row such as `| T02 — staging sandbox | ... |` was overwritten with a task status marker, destroying the recorded approval. The writer now rewrites only task rows in sections that allow tasks, so an approval row survives byte-identical. `## Known baseline failures` and `## Session handoff` join `## Approvals` in the sections that are skipped, and `wiggum report`, `resume`, `retro` and the MCP progress reader ignore rows under them too.
+
+### Changed
+
+- **Progress corpus (tests only)** — `tests/progress-corpus/` adds ten synthetic PROGRESS.md files with hand-labelled truth, `wiggum retro` snapshots and a leak guard; no behaviour change.
+
+### Dependencies
+
+- `anyhow` removed. It was never used in `src/` — `build.warnings = deny` made the unused dependency a hard build error.
+
 ## [0.23.0] - 2026-10-27
 
 ### Changed

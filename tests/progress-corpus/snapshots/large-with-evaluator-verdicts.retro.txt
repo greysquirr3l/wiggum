@@ -1,0 +1,13 @@
+Retrospective — quill-mq (64 tasks, 3 retries, 0 gates)
+
+⚠️ Pattern: 1 task(s) currently blocked
+  Suggestion: Review blocked tasks and consider adjusting dependencies or adding hints.
+
+⚠️ Pattern: T12 hit a blocking gate
+  Suggestion: Gates add latency. Consider if this gate is necessary or if automated preflight is sufficient.
+
+⚠️ Pattern: T59 hit a blocking gate
+  Suggestion: Gates add latency. Consider if this gate is necessary or if automated preflight is sufficient.
+
+💡 Pattern: General required 2 attempts
+  Suggestion: Add hints from learnings: Fix the lockfile drift before touching the benches; stale numbers cost an afternoon.; Soak tests need a fixed seed or failures cannot be replayed.

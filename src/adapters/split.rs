@@ -244,8 +244,7 @@ fn build_split_tasks(original: &TaskDef, split: &SplitPlan) -> Vec<TaskDef> {
                 split
                     .parts
                     .get(i - 1)
-                    .map(|prev| vec![prev.slug.clone()])
-                    .unwrap_or_default()
+                    .map_or_default(|prev| vec![prev.slug.clone()])
             } else {
                 vec![]
             };
@@ -282,8 +281,18 @@ fn build_split_tasks(original: &TaskDef, split: &SplitPlan) -> Vec<TaskDef> {
                 } else {
                     None
                 },
+                gate_scope: if i == last {
+                    original.gate_scope.clone()
+                } else {
+                    None
+                },
                 evaluation_criteria: if i == last {
                     original.evaluation_criteria.clone()
+                } else {
+                    vec![]
+                },
+                verify: if i == last {
+                    original.verify.clone()
                 } else {
                     vec![]
                 },
@@ -432,7 +441,9 @@ mod tests {
             test_hints: Vec::new(),
             must_haves: Vec::new(),
             gate: None,
+            gate_scope: None,
             evaluation_criteria: Vec::new(),
+            verify: Vec::new(),
             kind: TaskKind::default(),
             implements: Vec::new(),
             anchors: vec![],

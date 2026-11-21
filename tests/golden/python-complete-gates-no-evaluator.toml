@@ -1,0 +1,37 @@
+# golden-floor: 7
+[project]
+name = "golden-python-complete"
+description = "Golden plan: python, complete strategy, gates with a deliberate no-evaluator opt-out."
+language = "python"
+path = "/tmp/golden-python-complete"
+
+[orchestrator]
+strategy = "complete"
+require_evaluator = false
+gates = ["payment"]
+stop_when = ["before calling the live payment provider"]
+
+[[phases]]
+name = "Billing"
+order = 1
+
+[[phases.tasks]]
+slug = "invoice-model"
+title = "Invoice model"
+goal = "Define the invoice dataclass and totals."
+verify = ["pytest tests/test_invoice.py"]
+
+[[phases.tasks]]
+slug = "payment-capture"
+title = "Payment capture"
+goal = "Capture payments through the provider adapter."
+depends_on = ["invoice-model"]
+gate = "payment"
+verify = ["pytest tests/test_payment.py"]
+
+[[phases.tasks]]
+slug = "receipt-export"
+title = "Receipt export"
+goal = "Export receipts as PDF files."
+depends_on = ["payment-capture"]
+verify = ["pytest tests/test_receipt.py"]

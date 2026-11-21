@@ -41,7 +41,9 @@ depends_on = ["domain-model", "database-adapter"]
 | `test_hints` | No | Suggested tests the subagent should write |
 | `must_haves` | No | Hard exit criteria the task must satisfy |
 | `gate` | No | Precondition the orchestrator must verify before starting this task |
+| `gate_scope` | No | What the gate's approval covers, for example `T07, staging only`. Rendered as a `Scope:` line in the task's gate banner. A blank value counts as absent. Without it, `wiggum validate --lint` reports `gate-without-scope` (info); set on a task with no `gate` it reports `gate-scope-without-gate` (info) |
 | `evaluation_criteria` | No | Verifiable criteria scored by the [evaluator](./plan-preflight.md#evaluator-configuration) agent |
+| `verify` | No | Shell commands that must exit zero; listed in the task's Exit Criteria and run by the orchestrator after preflight |
 
 ## Task kinds
 

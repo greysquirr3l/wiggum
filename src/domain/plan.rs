@@ -340,6 +340,10 @@ pub struct Orchestrator {
     /// missing gate and the affected task.
     #[serde(default)]
     pub gates: Vec<String>,
+    /// Plan-specific situations in which the orchestrator must stop and ask
+    /// the human, rendered after the built-in default list.
+    #[serde(default)]
+    pub stop_when: Vec<String>,
 }
 
 /// Prompt strategy mode controlling task and orchestrator template styles.
@@ -426,10 +430,19 @@ pub struct TaskDef {
     /// message and pause for human confirmation before starting this task.
     #[serde(default)]
     pub gate: Option<String>,
+    /// What the gate's approval covers (task and environment). Rendered in
+    /// the gate banner; a sibling of `gate` so existing plans keep parsing.
+    #[serde(default)]
+    pub gate_scope: Option<String>,
     /// Evaluator exit criteria — each item is a verifiable condition that
     /// must pass before the task can be marked complete.
     #[serde(default)]
     pub evaluation_criteria: Vec<String>,
+    /// Shell commands that must exit zero for the task to count as done.
+    /// Rendered into the task's Exit Criteria and re-run by the
+    /// orchestrator's independent verification step.
+    #[serde(default)]
+    pub verify: Vec<String>,
     /// Task archetype — influences template variant and exit criteria.
     /// Defaults to `feature` when omitted.
     #[serde(default)]
@@ -568,8 +581,12 @@ pub struct ResolvedTask {
     pub must_haves: Vec<String>,
     /// Human-in-the-loop gate message, if any.
     pub gate: Option<String>,
+    /// Scope of the gate's approval, if declared.
+    pub gate_scope: Option<String>,
     /// Evaluator exit criteria carried over from `TaskDef`.
     pub evaluation_criteria: Vec<String>,
+    /// Verification commands carried over from `TaskDef::verify`.
+    pub verify: Vec<String>,
     pub phase_name: String,
     pub phase_order: u32,
     /// Task archetype, propagated from `TaskDef`.
@@ -583,6 +600,17 @@ pub struct ResolvedTask {
 }
 
 impl ResolvedTask {
+    /// The gate scope with surrounding whitespace removed; a blank scope
+    /// counts as absent. Every consumer (banner, lint, diff) goes through
+    /// this so they agree.
+    #[must_use]
+    pub fn effective_gate_scope(&self) -> Option<&str> {
+        self.gate_scope
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+    }
+
     /// Build a resolved task from its definition, stamped with its number
     /// and owning phase.
     fn from_def(task: &TaskDef, number: u32, phase: &Phase) -> Self {
@@ -596,7 +624,9 @@ impl ResolvedTask {
             test_hints: task.test_hints.clone(),
             must_haves: task.must_haves.clone(),
             gate: task.gate.clone(),
+            gate_scope: task.gate_scope.clone(),
             evaluation_criteria: task.evaluation_criteria.clone(),
+            verify: task.verify.clone(),
             phase_name: phase.name.clone(),
             phase_order: phase.order,
             kind: task.kind,
@@ -690,6 +720,7 @@ impl Default for Orchestrator {
             subagent_model: None,
             require_evaluator: None,
             gates: Vec::new(),
+            stop_when: Vec::new(),
         }
     }
 }
@@ -980,6 +1011,14 @@ impl Plan {
     /// and points at the two ways to resolve it: add an `[evaluator]` block
     /// or opt out with `require_evaluator = false`.
     pub fn validate_gates_and_evaluator(&self, resolved: &[ResolvedTask]) -> Result<()> {
+        for entry in &self.orchestrator.stop_when {
+            if entry.trim().is_empty() || entry.contains('\n') || entry.contains('\r') {
+                return Err(WiggumError::Validation(format!(
+                    "invalid [orchestrator] stop_when entry {entry:?}: each entry must be a \
+                     non-empty single line because it is rendered as one bullet"
+                )));
+            }
+        }
         let required = self.effective_require_evaluator(resolved);
         if required && self.evaluator.is_none() {
             let reason = if resolved.len() >= 4 {
@@ -1330,7 +1369,7 @@ fn security_hardening_task(
     phase_name: String,
     phase_order: u32,
 ) -> ResolvedTask {
-    let depends_on = last_slug.map(|s| vec![s]).unwrap_or_default();
+    let depends_on = last_slug.map_or_default(|s| vec![s]);
 
     ResolvedTask {
         number,
@@ -1382,6 +1421,7 @@ fn security_hardening_task(
             "URL-fetching code validates target against an allowlist".to_string(),
         ],
         gate: None,
+        gate_scope: None,
         evaluation_criteria: vec![
             "No secrets found by grep -r for hardcoded keys, passwords, or tokens".to_string(),
             "Security response headers verified by an integration test or curl assertion"
@@ -1390,6 +1430,7 @@ fn security_hardening_task(
             "File upload test rejects .exe/.sh/.php and oversized files".to_string(),
             "SSRF test confirms internal metadata URLs are blocked".to_string(),
         ],
+        verify: vec![],
         phase_name,
         phase_order,
         kind: TaskKind::Audit,
@@ -1409,7 +1450,7 @@ fn integration_wiring_task(
     phase_order: u32,
     wiring_hints: &[&str],
 ) -> ResolvedTask {
-    let depends_on = last_slug.map(|s| vec![s]).unwrap_or_default();
+    let depends_on = last_slug.map_or_default(|s| vec![s]);
 
     let hints: Vec<String> = wiring_hints.iter().map(|s| (*s).to_string()).collect();
 
@@ -1441,11 +1482,13 @@ fn integration_wiring_task(
             "Configuration values are read and passed to components that need them".to_string(),
         ],
         gate: None,
+        gate_scope: None,
         evaluation_criteria: vec![
             "No dead code: every public function/type is reachable from main or tests".to_string(),
             "Integration test passes exercising the primary user flow end-to-end".to_string(),
             "Manual trace confirms each feature's wiring from entry to implementation".to_string(),
         ],
+        verify: vec![],
         phase_name,
         phase_order,
         kind: TaskKind::Audit,
@@ -1463,7 +1506,7 @@ fn stub_cleanup_task(
     phase_order: u32,
     stub_patterns: &[&str],
 ) -> ResolvedTask {
-    let depends_on = last_slug.map(|s| vec![s]).unwrap_or_default();
+    let depends_on = last_slug.map_or_default(|s| vec![s]);
 
     let pattern_hints: Vec<String> = stub_patterns
         .iter()
@@ -1503,11 +1546,13 @@ fn stub_cleanup_task(
             "All code paths are reachable and functional".to_string(),
         ],
         gate: None,
+        gate_scope: None,
         evaluation_criteria: vec![
             "grep for stub patterns returns zero matches in src/ (excluding tests)".to_string(),
             "All previously-stubbed functions now have real implementations with tests".to_string(),
             "Test suite passes with full coverage of formerly-stubbed code paths".to_string(),
         ],
+        verify: vec![],
         phase_name,
         phase_order,
         kind: TaskKind::Audit,
@@ -1621,6 +1666,19 @@ depends_on = []
         match result {
             Ok(v) => v,
             Err(e) => panic!("{context}: expected Ok, got Err({e})"),
+        }
+    }
+
+    #[test]
+    fn stop_when_rejects_blank_and_multiline_entries() {
+        for bad in ["   ", "", "line one\nline two"] {
+            let toml = build_plan(&["alpha"], None, false).replacen(
+                "[orchestrator]\n",
+                &format!("[orchestrator]\nstop_when = [{bad:?}]\n"),
+                1,
+            );
+            let err = parse_and_validate_or_err(&toml, "bad stop_when");
+            assert!(err.to_string().contains("stop_when"), "{err}");
         }
     }
 

@@ -1,0 +1,19 @@
+Retrospective — tern-sync (12 tasks, 2 retries, 2 gates)
+
+⚠️ Pattern: 2 task(s) currently blocked
+  Suggestion: Review blocked tasks and consider adjusting dependencies or adding hints.
+
+⚠️ Pattern: General hit a blocking gate
+  Suggestion: Gates add latency. Consider if this gate is necessary or if automated preflight is sufficient.
+
+⚠️ Pattern: T05 hit a blocking gate
+  Suggestion: Gates add latency. Consider if this gate is necessary or if automated preflight is sufficient.
+
+⚠️ Pattern: T08 hit a blocking gate
+  Suggestion: Gates add latency. Consider if this gate is necessary or if automated preflight is sufficient.
+
+⚠️ Pattern: T09 hit a blocking gate
+  Suggestion: Gates add latency. Consider if this gate is necessary or if automated preflight is sufficient.
+
+⚠️ Pattern: T10 hit a blocking gate
+  Suggestion: Gates add latency. Consider if this gate is necessary or if automated preflight is sufficient.

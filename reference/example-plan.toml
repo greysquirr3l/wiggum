@@ -53,6 +53,9 @@ require_evaluator = true
 # errors with the missing-gate message. Set explicitly to override
 # auto-derive: `gates = ["auth", "payment"]`.
 gates = []
+# Extra situations where the orchestrator must stop and ask the human. Rendered after the
+# built-in defaults (deleting data, force-pushing, external systems, destructive operations).
+# stop_when = ["before changing the public API"]
 # Optional model pinning. Wiggum can't enforce the model from a prompt file, but it
 # will render `model` as a recommendation header in orchestrator.prompt.md and inject
 # `subagent_model` as the `model:` argument on every `runSubagent` dispatch.
@@ -60,7 +63,7 @@ gates = []
 # BYOK backends (Ollama, LM Studio, llama.cpp). Use the exact picker label in the
 # form "Model Name (Vendor)".
 # model          = "claude-opus-4.7"            # recommended for the orchestrator agent itself
-# subagent_model = "claude-sonnet-4.5"          # pinned model for implementation subagents
+subagent_model = "claude-sonnet-4.5"            # pinned model for implementation subagents
 # subagent_model = "Qwen 2.5 Coder 32B (Ollama)"  # or a local model — server must be running
 rules = [
     "Rust edition 2024, stable toolchain only — no nightly features.",
@@ -84,7 +87,10 @@ hard_fail      = true     # abort the loop on any failed criterion
 test_tool      = "cargo test --workspace"   # defaults to preflight.test if omitted
 mode           = "blocking"  # blocking (default) | advisor — blocking gates task progression
 contract_review = true       # run a contract-review phase before dispatching the subagent
-# model        = "claude-sonnet-4.5"  # optional model pin for the evaluator agent
+# Pin a model different from `[orchestrator] subagent_model` (or leave it unpinned and
+# `wiggum validate --lint` warns `evaluator-not-independent`): the model that writes the
+# code should not be the one that grades it.
+model          = "claude-opus-4.7"    # evaluator agent; must differ from subagent_model
 
 # Weighted criteria — when provided, weights must sum to 100.
 # The evaluator scores each criterion independently; hard_fail fires if any score < pass_threshold.
@@ -170,6 +176,7 @@ hints = [
 test_hints = [
     "CI must pass: green build + clippy with -D warnings + cargo test.",
 ]
+verify    = ["cargo build"]
 must_haves = [
     "Cargo.toml with edition = \"2024\"",
     ".github/workflows/ci.yml runs cargo build, clippy, and test",
@@ -202,6 +209,7 @@ test_hints = [
     "Unit-test RetryPolicy::next_delay(attempt) for exponential backoff correctness.",
     "Test that WebhookEvent rejects an empty source string.",
 ]
+verify    = ["cargo test domain"]
 must_haves = [
     "All domain types derive Serialize/Deserialize",
     "Port traits are object-safe",
@@ -229,6 +237,7 @@ test_hints = [
     "Test: wrong secret fails.",
     "Test: missing header (empty string) returns false when a secret is configured.",
 ]
+verify    = ["cargo test signature"]
 must_haves = [
     "Constant-time comparison — no timing side-channel",
     "Function is pure (no I/O, no side effects)",
@@ -261,6 +270,7 @@ test_hints = [
     "Integration test: POST with an invalid signature → 400 Bad Request.",
     "Integration test: GET /healthz → 200 OK.",
 ]
+verify    = ["cargo test router"]
 must_haves = [
     "Raw body read before JSON deserialization",
     "Secrets never logged",
@@ -292,6 +302,7 @@ test_hints = [
     "Use wiremock to simulate a failing downstream — assert retry count matches the target's RetryPolicy.",
     "Assert sign-then-verify round-trip: sign outbound payload, validate with the same secret.",
 ]
+verify    = ["cargo test dispatcher"]
 must_haves = [
     "TLS via rustls, not native-tls",
     "Retry count and final outcome persisted to DeliveryLog",
@@ -314,6 +325,7 @@ test_hints = [
     "Test save-then-load round-trip for WebhookEvent.",
     "Test that failed delivery status is recorded correctly.",
 ]
+verify    = ["cargo test sqlite"]
 must_haves = [
     "All SQL uses compile-time checked query macros",
     "Migrations applied automatically at startup",
@@ -342,6 +354,7 @@ test_hints = [
     "Test that a non-HTTPS target URL fails validation outside dev mode.",
     "Test that missing required fields produce clear error messages.",
 ]
+verify    = ["cargo test config"]
 must_haves = [
     "Config validated at startup — process exits with a clear error message if invalid",
     "No secrets in the committed default config file",
@@ -353,6 +366,7 @@ title     = "clap CLI — serve, validate-config, version"
 goal      = "Wire the application entry point with clap: subcommands for serve, validate-config, and version output."
 depends_on = ["config-parsing", "inbound-router", "sqlite-adapter"]
 gate      = "Run `cargo test --workspace` locally and confirm all phase 1–4 tests pass before the orchestrator starts this task."
+gate_scope = "the cli-entrypoint task only; local test run, no deployment"
 hints = [
     "Use the clap derive API.",
     "serve: load config, run migrations, bind the Axum server.",
@@ -364,6 +378,7 @@ test_hints = [
     "CLI integration test: kestrel validate-config --config tests/fixtures/valid.toml → exit 0.",
     "CLI integration test: kestrel validate-config --config tests/fixtures/invalid.toml → exit 1 with message.",
 ]
+verify    = ["cargo run -- --help"]
 must_haves = [
     "All three subcommands present and functional",
     "Startup log line includes version and bound address",

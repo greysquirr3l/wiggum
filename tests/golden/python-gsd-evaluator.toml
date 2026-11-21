@@ -1,0 +1,49 @@
+# golden-floor: 7
+[project]
+name = "golden-python-gsd"
+description = "Golden plan: python, gsd strategy, evaluator with a custom test tool."
+language = "python"
+path = "/tmp/golden-python-gsd"
+
+[orchestrator]
+strategy = "gsd"
+subagent_model = "claude-haiku-4.5"
+
+[evaluator]
+model = "claude-sonnet-4.5"
+test_tool = "pytest -q"
+
+[[phases]]
+name = "Pipeline"
+order = 1
+
+[[phases.tasks]]
+slug = "loader"
+title = "CSV loader"
+goal = "Load rows from CSV files."
+must_haves = ["Malformed rows are reported with line numbers"]
+verify = ["pytest tests/test_loader.py"]
+
+[[phases.tasks]]
+slug = "transform"
+title = "Row transforms"
+goal = "Apply the transforms to loaded rows."
+depends_on = ["loader"]
+must_haves = ["Transforms are pure functions"]
+verify = ["pytest tests/test_transform.py"]
+
+[[phases.tasks]]
+slug = "report"
+title = "Summary report"
+goal = "Print a summary report."
+depends_on = ["transform"]
+must_haves = ["Report output is deterministic"]
+verify = ["pytest tests/test_report.py"]
+
+[[phases.tasks]]
+slug = "entry-point"
+title = "Entry point"
+goal = "Add the command line entry point."
+depends_on = ["report"]
+must_haves = ["--help works"]
+verify = ["python -m golden_pipeline --help"]
