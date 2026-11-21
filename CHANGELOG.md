@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [0.24.0] - 2026-11-21
+
 ### Added
 
 - **Scoped approvals** — `PROGRESS.md` gains an **Approvals** table (scope, action,
@@ -53,11 +55,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Fixed
 
-- `wiggum_update_progress` (MCP) no longer rewrites rows under `## Approvals`, `## Known baseline failures` or `## Session handoff`; only task rows in task sections are touched.
+- **Approval rows are no longer rewritten by the progress writer** — `wiggum_update_progress` (MCP) matched any row beginning with a task id, so an **Approvals** row such as `| T02 — staging sandbox | ... |` was overwritten with a task status marker, destroying the recorded approval. The writer now rewrites only task rows in sections that allow tasks, so an approval row survives byte-identical. `## Known baseline failures` and `## Session handoff` join `## Approvals` in the sections that are skipped, and `wiggum report`, `resume`, `retro` and the MCP progress reader ignore rows under them too.
 
 ### Changed
 
 - **Progress corpus (tests only)** — `tests/progress-corpus/` adds ten synthetic PROGRESS.md files with hand-labelled truth, `wiggum retro` snapshots and a leak guard; no behaviour change.
+
+### Dependencies
+
+- `anyhow` removed. It was never used in `src/` — `build.warnings = deny` made the unused dependency a hard build error.
 
 ## [0.23.0] - 2026-10-27
 
