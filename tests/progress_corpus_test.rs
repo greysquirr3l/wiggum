@@ -12,12 +12,7 @@
 //! there (actual differs from truth and equals the recorded value), so a fix
 //! shows up as a failure telling you to delete the `known_defects` entry.
 
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::indexing_slicing,
-    clippy::panic
-)]
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing)]
 
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
@@ -122,9 +117,8 @@ fn explicit_retry_mentions(content: &str) -> usize {
 fn snapshot_header(snapshot: &str) -> (usize, usize, usize) {
     let first = snapshot.lines().next().expect("snapshot is not empty");
     let re = Regex::new(r"\((\d+) tasks, (\d+) retries, (\d+) gates\)").unwrap();
-    let c = re
-        .captures(first)
-        .unwrap_or_else(|| panic!("snapshot header not recognised: {first}"));
+    let unrecognised = format!("snapshot header not recognised: {first}");
+    let c = re.captures(first).expect(&unrecognised);
     (
         c[1].parse().unwrap(),
         c[2].parse().unwrap(),
@@ -140,10 +134,8 @@ struct Checker<'a> {
 
 impl Checker<'_> {
     fn truth(&self, field: &str) -> Value {
-        self.entry
-            .get(field)
-            .unwrap_or_else(|| panic!("{}: labels entry has no `{field}`", self.file))
-            .clone()
+        let missing = format!("{}: labels entry has no `{field}`", self.file);
+        self.entry.get(field).expect(&missing).clone()
     }
 
     /// Compare `actual` with the label `truth_field`. When the field is a
